@@ -162,12 +162,12 @@ const scrollHandlers = useFilteredScroll({
     // Calculate scroll speed based on the magnitude of movement
     const speed = Math.abs(deltaY);
     
-    // Acceleration curve: slow movements stay 1x, fast movements get up to 2.5x multiplier
+    // Acceleration curve: slow movements stay 1x, fast movements get up to 1.5x multiplier
     // This makes fast scrolling feel more responsive
     let multiplier = 1;
     if (speed > 5) {
-      // Apply exponential curve for speeds above 5px
-      multiplier = Math.min(1 + (speed - 5) / 10, 2.5);
+      // Apply curve for speeds above 5px
+      multiplier = Math.min(1 + (speed - 5) / 20, 1.5);
     }
     
     const acceleratedDelta = deltaY * multiplier;
@@ -199,7 +199,7 @@ const scrollHandlers = useFilteredScroll({
     if (timeSinceLastScroll < 150 && Math.abs(lastScrollDelta) > 1) {
       // Convert delta to velocity (scale based on speed for natural feel)
       // Faster movements get more momentum
-      const momentumMultiplier = Math.min(Math.abs(lastScrollDelta) / 5, 3);
+      const momentumMultiplier = Math.min(Math.abs(lastScrollDelta) / 5, 2);
       velocity.value = lastScrollDelta * momentumMultiplier;
       
       // Start animation loop for momentum
@@ -219,6 +219,9 @@ const gestureHandlers = useGestures({
   onSwipeRight: () => {
     emit('back');
   },
+}, {
+  swipeThreshold: 80, // Increased from default 50px to reduce false swipes
+  tapMaxDistance: 20, // Increased from default 10px to reduce false taps
 });
 
 // Combine both handler sets
