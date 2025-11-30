@@ -250,14 +250,10 @@ async function createWindow() {
     },
   });
 
-  // Hide cursor in production mode
-  if (!VITE_DEV_SERVER_URL) {
+  // Hide cursor when in fullscreen mode (screen width <= 1024)
+  if (shouldBeFullscreen) {
     win.webContents.on('dom-ready', () => {
       win?.webContents.insertCSS('* { cursor: none !important; }');
-      // Focus the window automatically to apply cursor hiding
-      win?.focus();
-      // Additionally, focus the web contents within the window
-      win?.webContents.focus();
     });
   }
 

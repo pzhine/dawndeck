@@ -27,17 +27,23 @@ const router = useRouter();
 const clockContainer = ref<HTMLDivElement | null>(null);
 const inactivityTimer = ref<number | null>(null);
 const isDimmed = ref(false);
+const isNavigating = ref(false);
 
 // Setup gesture handlers
 const gestureHandlers = useGestures({
   onDoubleTap: () => {
-    // Add a small delay before navigation to ensure the gesture is fully processed
+    if (isNavigating.value) return; // Prevent multiple triggers
+    
+    isNavigating.value = true;
+    // Add delay before navigation to ensure the gesture is fully processed
     // and won't leak to the next page
     setTimeout(() => {
       router.push('/menu');
-    }, 100);
+    }, 350); // Increased delay to ensure gesture state is fully reset
   },
   onTap: () => {
+    if (isNavigating.value) return; // Ignore taps during navigation
+    
     // Restore brightness if dimmed
     if (isDimmed.value) {
       restoreBrightness();
