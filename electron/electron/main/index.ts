@@ -517,7 +517,26 @@ function createApplicationMenu() {
         { role: 'zoomIn' },
         { role: 'zoomOut' },
         { type: 'separator' },
-        { role: 'togglefullscreen' },
+        { 
+          label: 'Toggle Fullscreen',
+          accelerator: 'F11',
+          click: () => {
+            const currentWindow = BrowserWindow.getFocusedWindow() || win;
+            if (currentWindow && !currentWindow.isDestroyed()) {
+              const isFullScreen = currentWindow.isFullScreen();
+              console.log(`Toggling fullscreen: currently ${isFullScreen}, setting to ${!isFullScreen}`);
+              
+              // On macOS, use simpleFullScreen for better compatibility
+              if (process.platform === 'darwin') {
+                currentWindow.setSimpleFullScreen(!currentWindow.isSimpleFullScreen());
+              } else {
+                currentWindow.setFullScreen(!isFullScreen);
+              }
+            } else {
+              console.error('No window available to toggle fullscreen');
+            }
+          }
+        },
         { type: 'separator' },
         { role: 'toggleDevTools' },
       ],

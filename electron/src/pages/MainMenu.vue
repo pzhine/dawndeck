@@ -9,24 +9,18 @@
       @back="router.push('/')"
     />
   </div>
-  <TimeoutRedirect
-    :ms="INACTIVITY_TIMEOUT"
-    :redirectRoute="'/'"
-    :resetOnActivity="'wheel'"
-  />
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import InteractiveList, { ListItem } from '../components/InteractiveList.vue';
+import { ListItem } from '../components/InteractiveList.vue';
 import RoundScrollContainer from '../components/RoundScrollContainer.vue';
 import { useAppStore } from '../stores/appState';
 import {
   isGlobalSoundPlaying,
   getCurrentSoundInfo,
 } from '../services/audioService';
-import TimeoutRedirect from '../components/TimeoutRedirect.vue';
 
 const router = useRouter();
 const appStore = useAppStore();

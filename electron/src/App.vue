@@ -3,10 +3,11 @@
     <div class="round-display">
       <router-view />
       <TimeoutRedirect
-        :ms="45000"
+        :ms="15_000"
         redirectRoute="/"
         resetOnActivity="wheel"
         :excludeRoutes="[
+          'MainMenu', 'main-menu',
           'SunrisePlayer', 'sunrise-player',   
           'Wifi', 'wifi', 
           'WifiPassword', 'wifi-password', 

@@ -9,7 +9,6 @@
     @mousedown="handleMouseDown"
     @mousemove="handleMouseMove"
     @mouseup="handleMouseUp"
-    @mouseleave="handleMouseUp"
   >
     <div class="w-full will-change-transform" ref="contentRef">
       <div class="scroll-spacer" :style="{ height: spacerHeight + 'px' }"></div>
@@ -56,15 +55,19 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
+import { useGestures } from '../utils/gestures';
 import type { ListItem } from './InteractiveList.vue';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   items?: ListItem[];
   title?: string;
   showTitle?: boolean;
   showBackButton?: boolean;
   backButtonLabel?: string;
-}>();
+  swipeScrollCount?: number; // Number of items to scroll per swipe
+}>(), {
+  swipeScrollCount: 2,
+});
 
 const emit = defineEmits<{
   (e: 'select', item: ListItem): void;
@@ -80,11 +83,11 @@ const spacerHeight = ref(300);
 const scrollTop = ref(0);
 const maxScroll = ref(0);
 const velocity = ref(0);
-const isDragging = ref(false);
-const lastTouchY = ref(0);
-const startTouchY = ref(0); // To detect clicks vs drags
-const startTouchX = ref(0); // To detect horizontal swipes
+const targetScrollTop = ref(0); // Target for animated scrolling
 let animationFrameId: number | null = null;
+
+// Item height tracking for discrete scrolling
+const itemHeight = ref(0);
 
 // Helper to check if item is object
 const isObject = (item: any): item is Extract<ListItem, object> => {
@@ -92,11 +95,6 @@ const isObject = (item: any): item is Extract<ListItem, object> => {
 };
 
 const handleItemClick = (item: ListItem) => {
-  // Prevent click if we were dragging
-  if (Math.abs(lastTouchY.value - startTouchY.value) > 10) {
-    return;
-  }
-  
   if (isObject(item) && item.onSelect) {
     item.onSelect();
   }
@@ -111,6 +109,13 @@ const updateLayout = () => {
   // Set spacer to 35% of container height (top of the stable zone)
   // The stable zone is the middle 50%, so it starts at 35% and ends at 75%
   spacerHeight.value = containerHeight * 0.35; 
+  
+  // Calculate average item height for discrete scrolling
+  const wrappers = contentRef.value.querySelectorAll('.round-item-wrapper');
+  if (wrappers.length > 0) {
+    const firstItem = wrappers[0] as HTMLElement;
+    itemHeight.value = firstItem.offsetHeight;
+  }
   
   // Recalculate max scroll
   // We need to wait for spacer update to affect scrollHeight
@@ -129,6 +134,51 @@ const updateLayout = () => {
   });
 };
 
+// --- Gesture Handlers ---
+
+const scrollByItems = (count: number) => {
+  if (!itemHeight.value) return;
+  
+  // Calculate target scroll position
+  const scrollDelta = count * itemHeight.value;
+  targetScrollTop.value = scrollTop.value + scrollDelta;
+  
+  // Clamp to valid range
+  targetScrollTop.value = Math.max(0, Math.min(targetScrollTop.value, maxScroll.value));
+  
+  // Start animation if not already running
+  if (!animationFrameId) {
+    animationLoop();
+  }
+};
+
+const gestureHandlers = useGestures({
+  onSwipeUp: () => {
+    // Swipe up = scroll down (show items below)
+    scrollByItems(props.swipeScrollCount);
+  },
+  onSwipeDown: () => {
+    // Swipe down = scroll up (show items above)
+    scrollByItems(-props.swipeScrollCount);
+  },
+  onSwipeRight: () => {
+    emit('back');
+  },
+  onTap: () => {
+    // Tap is handled by individual item click handlers
+  },
+});
+
+// Touch event handlers from gesture utility
+const handleTouchStart = gestureHandlers.onTouchstart;
+const handleTouchMove = gestureHandlers.onTouchmove;
+const handleTouchEnd = gestureHandlers.onTouchend;
+
+// Mouse event handlers from gesture utility (for development)
+const handleMouseDown = gestureHandlers.onMousedown;
+const handleMouseMove = gestureHandlers.onMousemove;
+const handleMouseUp = gestureHandlers.onMouseup;
+
 // --- Physics & Scroll Logic ---
 
 const handleWheel = (e: WheelEvent) => {
@@ -140,143 +190,26 @@ const handleWheel = (e: WheelEvent) => {
   }
 };
 
-const handleTouchStart = (e: TouchEvent) => {
-  isDragging.value = true;
-  velocity.value = 0;
-  lastTouchY.value = e.touches[0].clientY;
-  startTouchY.value = e.touches[0].clientY;
-  startTouchX.value = e.touches[0].clientX;
-  if (!animationFrameId) {
-    animationLoop();
-  }
-};
-
-const handleTouchMove = (e: TouchEvent) => {
-  if (!isDragging.value) return;
-  // e.preventDefault(); // Don't prevent default immediately to allow horizontal swipe detection?
-  // Actually we need to prevent default to stop browser scrolling/navigation
-  e.preventDefault();
-  
-  const currentY = e.touches[0].clientY;
-  const delta = lastTouchY.value - currentY;
-  lastTouchY.value = currentY;
-  
-  scrollTop.value += delta;
-  
-  // Rubber banding during drag
-  if (scrollTop.value < 0) {
-    // Apply resistance when pulling past top
-    // We need to be careful not to compound the resistance too much on each move
-    // A simple way is to just dampen the delta if we are already out of bounds
-    // But since we are adding delta to scrollTop directly, let's just dampen the result
-    // Actually, the standard way is: newPos = limit + (rawPos - limit) * resistance
-    // But here we are incremental.
-    // Let's just dampen the delta if we are out of bounds.
-    // Revert the addition
-    scrollTop.value -= delta;
-    // Add dampened delta
-    scrollTop.value += delta * 0.4;
-  } else if (scrollTop.value > maxScroll.value) {
-    scrollTop.value -= delta;
-    scrollTop.value += delta * 0.4;
-  }
-};
-
-const handleTouchEnd = (e: TouchEvent) => {
-  isDragging.value = false;
-  
-  // Check for horizontal swipe (Back gesture)
-  // Swipe right: endX > startX
-  const endX = e.changedTouches[0].clientX;
-  const diffX = endX - startTouchX.value;
-  const diffY = Math.abs(e.changedTouches[0].clientY - startTouchY.value);
-  
-  // Thresholds: moved right by > 50px, and horizontal movement was dominant
-  if (diffX > 50 && diffX > diffY * 1.5) {
-    emit('back');
-  }
-};
-
-const handleMouseDown = (e: MouseEvent) => {
-  isDragging.value = true;
-  velocity.value = 0;
-  lastTouchY.value = e.clientY;
-  startTouchY.value = e.clientY;
-  startTouchX.value = e.clientX;
-  if (!animationFrameId) {
-    animationLoop();
-  }
-};
-
-const handleMouseMove = (e: MouseEvent) => {
-  if (!isDragging.value) return;
-  e.preventDefault();
-  const currentY = e.clientY;
-  const delta = lastTouchY.value - currentY;
-  lastTouchY.value = currentY;
-  
-  scrollTop.value += delta;
-  
-  // Rubber banding during drag
-  if (scrollTop.value < 0) {
-    scrollTop.value -= delta;
-    scrollTop.value += delta * 0.4;
-  } else if (scrollTop.value > maxScroll.value) {
-    scrollTop.value -= delta;
-    scrollTop.value += delta * 0.4;
-  }
-};
-
-const handleMouseUp = (e: MouseEvent) => {
-  if (!isDragging.value) return;
-  isDragging.value = false;
-
-  // Check for horizontal swipe (Back gesture)
-  const endX = e.clientX;
-  const diffX = endX - startTouchX.value;
-  const diffY = Math.abs(e.clientY - startTouchY.value);
-  
-  if (diffX > 50 && diffX > diffY * 1.5) {
-    emit('back');
-  }
-};
-
 const animationLoop = () => {
-  // Apply friction
-  if (!isDragging.value) {
-    velocity.value *= 0.92; // Friction
-    if (Math.abs(velocity.value) < 0.1) {
-      velocity.value = 0;
-    }
-    scrollTop.value += velocity.value;
-    
-    // Bounce/Clamp
-    if (scrollTop.value < 0) {
-      // Spring back to 0
-      // Use a simple proportional control (P-controller) for spring physics
-      // Move 20% of the distance to target per frame
-      scrollTop.value = scrollTop.value * 0.8; 
-      
-      // Snap when close enough
-      if (Math.abs(scrollTop.value) < 0.5) {
-        scrollTop.value = 0;
-        // Stop velocity if we snapped
-        velocity.value = 0;
-      }
-    } else if (scrollTop.value > maxScroll.value) {
-      // Spring back to maxScroll
-      const overscroll = scrollTop.value - maxScroll.value;
-      scrollTop.value = maxScroll.value + overscroll * 0.8;
-      
-      // Snap when close enough
-      if (Math.abs(overscroll) < 0.5) {
-        scrollTop.value = maxScroll.value;
-        // Stop velocity if we snapped
-        velocity.value = 0;
-      }
-    }
-    
-    // No hard clamp here, let the spring physics handle it
+  // Smooth scroll to target position
+  const diff = targetScrollTop.value - scrollTop.value;
+  
+  if (Math.abs(diff) > 0.5) {
+    // Ease towards target (exponential smoothing)
+    scrollTop.value += diff * 0.15;
+  } else {
+    // Snap to target when close enough
+    scrollTop.value = targetScrollTop.value;
+  }
+  
+  // Apply friction to velocity (for wheel scrolling)
+  velocity.value *= 0.92;
+  if (Math.abs(velocity.value) < 0.1) {
+    velocity.value = 0;
+  } else {
+    targetScrollTop.value += velocity.value;
+    // Clamp target
+    targetScrollTop.value = Math.max(0, Math.min(targetScrollTop.value, maxScroll.value));
   }
 
   // Apply transform to content wrapper
@@ -287,7 +220,8 @@ const animationLoop = () => {
   // Apply item transforms
   applyTransforms();
 
-  if (Math.abs(velocity.value) > 0.1 || isDragging.value || scrollTop.value < 0 || scrollTop.value > maxScroll.value) {
+  // Continue animation if there's movement
+  if (Math.abs(diff) > 0.5 || Math.abs(velocity.value) > 0.1) {
     animationFrameId = requestAnimationFrame(animationLoop);
   } else {
     animationFrameId = null;
@@ -354,6 +288,9 @@ let resizeObserver: ResizeObserver | null = null;
 
 onMounted(() => {
   updateLayout();
+  
+  // Initialize target scroll position
+  targetScrollTop.value = scrollTop.value;
   
   if (containerRef.value) {
     resizeObserver = new ResizeObserver(() => {
