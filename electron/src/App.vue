@@ -1,5 +1,5 @@
 <template>
-  <div class="app-container">
+  <div class="app-container" :class="{ 'fullscreen-mode': isFullscreenMode }">
     <div class="round-display">
       <router-view />
       <TimeoutRedirect
@@ -22,12 +22,22 @@
 
 <script setup lang="ts">
 import { useAppStore } from './stores/appState';
-import { computed, watch, onMounted } from 'vue';
+import { computed, watch, onMounted, ref } from 'vue';
 import UpdateIndicator from './components/UpdateIndicator.vue';
 import TimeoutRedirect from './components/TimeoutRedirect.vue';
 import BluetoothNotifications from './components/BluetoothNotifications.vue';
 
 const appStore = useAppStore();
+
+// Fullscreen mode threshold - centralized configuration
+const FULLSCREEN_WIDTH_THRESHOLD = 1024;
+
+// Track if we're in fullscreen mode based on window width
+const isFullscreenMode = ref(false);
+
+const updateFullscreenMode = () => {
+  isFullscreenMode.value = window.innerWidth <= FULLSCREEN_WIDTH_THRESHOLD;
+};
 
 // Computed property to get text brightness as a CSS filter value
 const brightnessFilter = computed(() => {
@@ -55,6 +65,12 @@ onMounted(() => {
     '--brightness-filter',
     brightnessFilter.value
   );
+  
+  // Check fullscreen mode on mount
+  updateFullscreenMode();
+  
+  // Update on window resize
+  window.addEventListener('resize', updateFullscreenMode);
 });
 </script>
 

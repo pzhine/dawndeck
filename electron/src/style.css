@@ -156,3 +156,16 @@ textarea:focus {
     box-shadow: 0 0 50px rgba(0,0,0,0.5);
   }
 }
+
+/* Fullscreen mode styles - hide cursor and disable text selection */
+.app-container.fullscreen-mode {
+  cursor: none;
+}
+
+.app-container.fullscreen-mode * {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  cursor: none !important;
+}

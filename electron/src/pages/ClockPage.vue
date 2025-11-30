@@ -1,5 +1,14 @@
 <template>
-  <div tabindex="0" ref="clockContainer">
+  <div 
+    tabindex="0" 
+    ref="clockContainer"
+    @touchstart="handleTouchStart"
+    @touchend="handleTouchEnd"
+    @touchmove="handleTouchMove"
+    @mousedown="handleMouseDown"
+    @mouseup="handleMouseUp"
+    @mousemove="handleMouseMove"
+  >
     <div :class="['clock-wrapper', { dimmed: isDimmed }]">
       <ClockComponent ref="clockComponent" />
     </div>
@@ -11,13 +20,37 @@ import { useRouter } from 'vue-router';
 import { isGlobalSoundPlaying } from '../services/audioService';
 import ClockComponent from '../components/ClockComponent.vue';
 import { onMounted, onUnmounted, ref } from 'vue';
+import { useGestures } from '../utils/gestures';
 
 const router = useRouter();
 const clockContainer = ref<HTMLDivElement | null>(null);
 const inactivityTimer = ref<number | null>(null);
 const isDimmed = ref(false);
 
-// Navigation function
+// Setup gesture handlers
+const gestureHandlers = useGestures({
+  onDoubleTap: () => {
+    router.push('/menu');
+  },
+  onTap: () => {
+    // Restore brightness if dimmed
+    if (isDimmed.value) {
+      restoreBrightness();
+    }
+    // Reset inactivity timer
+    resetInactivityTimer();
+  },
+});
+
+// Gesture event handlers
+const handleTouchStart = gestureHandlers.onTouchstart;
+const handleTouchEnd = gestureHandlers.onTouchend;
+const handleTouchMove = gestureHandlers.onTouchmove;
+const handleMouseDown = gestureHandlers.onMousedown;
+const handleMouseUp = gestureHandlers.onMouseup;
+const handleMouseMove = gestureHandlers.onMousemove;
+
+// Navigation function (keep for right-click compatibility)
 const goToMenu = (event: MouseEvent) => {
   if (event.button !== 2) return; // Only handle right-click
   event.preventDefault();
@@ -34,20 +67,6 @@ const handleWheelEvent = (event: WheelEvent) => {
 
   // Navigate to LevelControl page with appropriate mode
   router.push(`/level/${mode}`);
-};
-
-// Handle any tap/click on the screen to restore brightness
-const handleTap = (event: MouseEvent) => {
-  // If it's a right-click, let goToMenu handle it
-  if (event.button === 2) return;
-
-  // Otherwise, restore brightness if dimmed
-  if (isDimmed.value) {
-    restoreBrightness();
-  }
-
-  // Reset inactivity timer
-  resetInactivityTimer();
 };
 
 // Start the inactivity timer
@@ -79,8 +98,7 @@ const restoreBrightness = () => {
 };
 
 onMounted(() => {
-  window.addEventListener('mousedown', goToMenu);
-  window.addEventListener('mousedown', handleTap);
+  window.addEventListener('contextmenu', goToMenu);
   window.addEventListener('wheel', handleWheelEvent, { passive: false });
 
   // Start the inactivity timer
@@ -88,8 +106,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  window.removeEventListener('mousedown', goToMenu);
-  window.removeEventListener('mousedown', handleTap);
+  window.removeEventListener('contextmenu', goToMenu);
   window.removeEventListener('wheel', handleWheelEvent);
 
   // Clean up the timer if it exists
