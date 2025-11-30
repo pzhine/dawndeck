@@ -248,12 +248,20 @@ async function createWindow() {
       // nodeIntegration: true,
       // contextIsolation: false,
     },
+    show: false, // Don't show window until cursor is hidden
   });
 
   // Hide cursor when in fullscreen mode (screen width <= 1024)
   if (shouldBeFullscreen) {
     win.webContents.on('dom-ready', () => {
       win?.webContents.insertCSS('* { cursor: none !important; }');
+      // Show window after cursor is hidden
+      win?.show();
+    });
+  } else {
+    // Show window immediately in non-fullscreen mode
+    win.once('ready-to-show', () => {
+      win?.show();
     });
   }
 
