@@ -158,11 +158,13 @@ textarea:focus {
 }
 
 /* Fullscreen mode styles - hide cursor and disable text selection */
-.app-container.fullscreen-mode {
+.app-container.fullscreen-mode,
+body.fullscreen-mode {
   cursor: none;
 }
 
-.app-container.fullscreen-mode * {
+.app-container.fullscreen-mode *,
+body.fullscreen-mode * {
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;

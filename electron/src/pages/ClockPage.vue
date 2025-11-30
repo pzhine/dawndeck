@@ -2,6 +2,7 @@
   <div 
     tabindex="0" 
     ref="clockContainer"
+    class="clock-page-container"
     @touchstart="handleTouchStart"
     @touchend="handleTouchEnd"
     @touchmove="handleTouchMove"
@@ -30,7 +31,11 @@ const isDimmed = ref(false);
 // Setup gesture handlers
 const gestureHandlers = useGestures({
   onDoubleTap: () => {
-    router.push('/menu');
+    // Add a small delay before navigation to ensure the gesture is fully processed
+    // and won't leak to the next page
+    setTimeout(() => {
+      router.push('/menu');
+    }, 100);
   },
   onTap: () => {
     // Restore brightness if dimmed
@@ -118,6 +123,14 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.clock-page-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .clock-wrapper {
   /* Default state - full brightness and color */
   filter: brightness(1) saturate(1);

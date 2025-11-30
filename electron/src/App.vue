@@ -71,7 +71,21 @@ onMounted(() => {
   
   // Update on window resize
   window.addEventListener('resize', updateFullscreenMode);
+  
+  // Apply fullscreen mode class immediately to body to hide cursor on startup
+  if (isFullscreenMode.value) {
+    document.body.classList.add('fullscreen-mode');
+  }
 });
+
+// Watch for fullscreen mode changes and update body class
+watch(isFullscreenMode, (newValue) => {
+  if (newValue) {
+    document.body.classList.add('fullscreen-mode');
+  } else {
+    document.body.classList.remove('fullscreen-mode');
+  }
+}, { immediate: true });
 </script>
 
 <style>
