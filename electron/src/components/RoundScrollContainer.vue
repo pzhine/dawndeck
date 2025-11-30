@@ -56,6 +56,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useGestures } from '../utils/gestures';
+import { useFilteredScroll } from '../utils/filteredScroll';
 import type { ListItem } from './InteractiveList.vue';
 
 const props = withDefaults(defineProps<{
@@ -89,12 +90,18 @@ let animationFrameId: number | null = null;
 // Item height tracking for discrete scrolling
 const itemHeight = ref(0);
 
+// Track if we're in continuous scroll mode
+const isScrolling = ref(false);
+
 // Helper to check if item is object
 const isObject = (item: any): item is Extract<ListItem, object> => {
   return typeof item === 'object' && item !== null;
 };
 
 const handleItemClick = (item: ListItem) => {
+  // Don't trigger clicks while scrolling
+  if (isScrolling.value) return;
+  
   if (isObject(item) && item.onSelect) {
     item.onSelect();
   }
@@ -134,50 +141,116 @@ const updateLayout = () => {
   });
 };
 
-// --- Gesture Handlers ---
+// --- Scroll Handlers ---
 
-const scrollByItems = (count: number) => {
-  if (!itemHeight.value) return;
-  
-  // Calculate target scroll position
-  const scrollDelta = count * itemHeight.value;
-  targetScrollTop.value = scrollTop.value + scrollDelta;
-  
-  // Clamp to valid range
-  targetScrollTop.value = Math.max(0, Math.min(targetScrollTop.value, maxScroll.value));
-  
-  // Start animation if not already running
-  if (!animationFrameId) {
-    animationLoop();
-  }
-};
+// Track momentum for inertia scrolling
+let lastScrollDelta = 0;
+let lastScrollTime = 0;
 
+// Continuous scroll with Kalman filtering
+const scrollHandlers = useFilteredScroll({
+  onScrollStart: () => {
+    isScrolling.value = true;
+    velocity.value = 0; // Stop any momentum
+    lastScrollDelta = 0;
+    lastScrollTime = Date.now();
+  },
+  onScroll: (deltaY: number) => {
+    const currentTime = Date.now();
+    
+    // Apply velocity-based acceleration
+    // Calculate scroll speed based on the magnitude of movement
+    const speed = Math.abs(deltaY);
+    
+    // Acceleration curve: slow movements stay 1x, fast movements get up to 2.5x multiplier
+    // This makes fast scrolling feel more responsive
+    let multiplier = 1;
+    if (speed > 5) {
+      // Apply exponential curve for speeds above 5px
+      multiplier = Math.min(1 + (speed - 5) / 10, 2.5);
+    }
+    
+    const acceleratedDelta = deltaY * multiplier;
+    
+    // Track for momentum calculation
+    lastScrollDelta = acceleratedDelta;
+    lastScrollTime = currentTime;
+    
+    // Directly update scroll position (not target, for immediate response)
+    scrollTop.value = scrollTop.value + acceleratedDelta;
+    targetScrollTop.value = scrollTop.value;
+    
+    // Clamp to valid range
+    scrollTop.value = Math.max(0, Math.min(scrollTop.value, maxScroll.value));
+    targetScrollTop.value = scrollTop.value;
+    
+    // Start animation if not already running (for visual updates)
+    if (!animationFrameId) {
+      animationLoop();
+    }
+  },
+  onScrollEnd: () => {
+    isScrolling.value = false;
+    
+    // Apply momentum based on last scroll velocity
+    const timeSinceLastScroll = Date.now() - lastScrollTime;
+    
+    // Only apply momentum if the last scroll was recent (within 150ms)
+    if (timeSinceLastScroll < 150 && Math.abs(lastScrollDelta) > 1) {
+      // Convert delta to velocity (scale based on speed for natural feel)
+      // Faster movements get more momentum
+      const momentumMultiplier = Math.min(Math.abs(lastScrollDelta) / 5, 3);
+      velocity.value = lastScrollDelta * momentumMultiplier;
+      
+      // Start animation loop for momentum
+      if (!animationFrameId) {
+        animationLoop();
+      }
+    }
+  },
+}, {
+  filterProcessNoise: 0.01,
+  filterMeasurementNoise: 20, // Lower value = more smoothing, higher = more responsive
+  scrollEndDelay: 100, // Shorter delay to capture momentum better
+});
+
+// Swipe right gesture for back navigation
 const gestureHandlers = useGestures({
-  onSwipeUp: () => {
-    // Swipe up = scroll down (show items below)
-    scrollByItems(props.swipeScrollCount);
-  },
-  onSwipeDown: () => {
-    // Swipe down = scroll up (show items above)
-    scrollByItems(-props.swipeScrollCount);
-  },
   onSwipeRight: () => {
     emit('back');
   },
-  onTap: () => {
-    // Tap is handled by individual item click handlers
-  },
 });
 
-// Touch event handlers from gesture utility
-const handleTouchStart = gestureHandlers.onTouchstart;
-const handleTouchMove = gestureHandlers.onTouchmove;
-const handleTouchEnd = gestureHandlers.onTouchend;
+// Combine both handler sets
+const handleTouchStart = (e: TouchEvent) => {
+  scrollHandlers.onTouchstart(e);
+  gestureHandlers.onTouchstart(e);
+};
 
-// Mouse event handlers from gesture utility (for development)
-const handleMouseDown = gestureHandlers.onMousedown;
-const handleMouseMove = gestureHandlers.onMousemove;
-const handleMouseUp = gestureHandlers.onMouseup;
+const handleTouchMove = (e: TouchEvent) => {
+  scrollHandlers.onTouchmove(e);
+  gestureHandlers.onTouchmove(e);
+};
+
+const handleTouchEnd = (e: TouchEvent) => {
+  scrollHandlers.onTouchend(e);
+  gestureHandlers.onTouchend(e);
+};
+
+const handleMouseDown = (e: MouseEvent) => {
+  scrollHandlers.onMousedown(e);
+  gestureHandlers.onMousedown(e);
+};
+
+const handleMouseMove = (e: MouseEvent) => {
+  scrollHandlers.onMousemove(e);
+  gestureHandlers.onMousemove(e);
+};
+
+const handleMouseUp = (e: MouseEvent) => {
+  scrollHandlers.onMouseup(e);
+  gestureHandlers.onMouseup(e);
+};
 
 // --- Physics & Scroll Logic ---
 
@@ -191,25 +264,31 @@ const handleWheel = (e: WheelEvent) => {
 };
 
 const animationLoop = () => {
-  // Smooth scroll to target position
-  const diff = targetScrollTop.value - scrollTop.value;
-  
-  if (Math.abs(diff) > 0.5) {
-    // Ease towards target (exponential smoothing)
-    scrollTop.value += diff * 0.15;
-  } else {
-    // Snap to target when close enough
-    scrollTop.value = targetScrollTop.value;
+  // During touch scrolling, skip the smooth interpolation
+  if (!isScrolling.value) {
+    // Smooth scroll to target position only when not actively scrolling
+    const diff = targetScrollTop.value - scrollTop.value;
+    
+    if (Math.abs(diff) > 0.5) {
+      // Ease towards target (exponential smoothing)
+      scrollTop.value += diff * 0.15;
+    } else {
+      // Snap to target when close enough
+      scrollTop.value = targetScrollTop.value;
+    }
   }
   
-  // Apply friction to velocity (for wheel scrolling)
-  velocity.value *= 0.92;
-  if (Math.abs(velocity.value) < 0.1) {
+  // Apply friction to velocity (for momentum and wheel scrolling)
+  if (!isScrolling.value && Math.abs(velocity.value) > 0.1) {
+    velocity.value *= 0.92; // Friction
+    scrollTop.value += velocity.value;
+    targetScrollTop.value = scrollTop.value;
+    
+    // Clamp to valid range
+    scrollTop.value = Math.max(0, Math.min(scrollTop.value, maxScroll.value));
+    targetScrollTop.value = scrollTop.value;
+  } else if (Math.abs(velocity.value) <= 0.1) {
     velocity.value = 0;
-  } else {
-    targetScrollTop.value += velocity.value;
-    // Clamp target
-    targetScrollTop.value = Math.max(0, Math.min(targetScrollTop.value, maxScroll.value));
   }
 
   // Apply transform to content wrapper
@@ -220,8 +299,9 @@ const animationLoop = () => {
   // Apply item transforms
   applyTransforms();
 
-  // Continue animation if there's movement
-  if (Math.abs(diff) > 0.5 || Math.abs(velocity.value) > 0.1) {
+  // Continue animation if there's movement or active scrolling
+  const diff = targetScrollTop.value - scrollTop.value;
+  if (isScrolling.value || Math.abs(diff) > 0.5 || Math.abs(velocity.value) > 0.1) {
     animationFrameId = requestAnimationFrame(animationLoop);
   } else {
     animationFrameId = null;
