@@ -72,6 +72,10 @@ interface TouchState {
   lastTapTime: number;
   tapCount: number;
   isMouseDown: boolean; // Track mouse state for mouse event simulation
+  lastX: number; // Track last position for continuity check
+  lastY: number;
+  isContinuous: boolean; // Track if touch has been continuous
+  maxJumpDistance: number; // Maximum allowed jump between touch points
 }
 
 const defaultConfig: Required<GestureConfig> = {
@@ -81,6 +85,10 @@ const defaultConfig: Required<GestureConfig> = {
   tapMaxDuration: 300, // 300ms maximum tap duration
   doubleTapDelay: 300, // 300ms between taps for double tap
 };
+
+// Maximum allowed jump between consecutive touch points (for continuity check)
+// If touch position jumps more than this, it's likely a noise spike
+const MAX_TOUCH_JUMP = 40; // pixels
 
 /**
  * Create gesture event handlers for an element
@@ -99,12 +107,37 @@ export function createGestureHandlers(
     lastTapTime: 0,
     tapCount: 0,
     isMouseDown: false,
+    lastX: 0,
+    lastY: 0,
+    isContinuous: true,
+    maxJumpDistance: MAX_TOUCH_JUMP,
   };
 
   const processGestureStart = (x: number, y: number) => {
     state.startX = x;
     state.startY = y;
+    state.lastX = x;
+    state.lastY = y;
     state.startTime = Date.now();
+    state.isContinuous = true; // Reset continuity flag
+  };
+
+  const processGestureMove = (x: number, y: number) => {
+    // Check if this move is continuous (no large jumps)
+    if (state.isContinuous) {
+      const jumpDistance = Math.sqrt(
+        Math.pow(x - state.lastX, 2) + Math.pow(y - state.lastY, 2)
+      );
+      
+      // If jump is too large, mark as discontinuous
+      if (jumpDistance > state.maxJumpDistance) {
+        state.isContinuous = false;
+      }
+    }
+    
+    // Update last position
+    state.lastX = x;
+    state.lastY = y;
   };
 
   const processGestureEnd = (x: number, y: number) => {
@@ -153,14 +186,16 @@ export function createGestureHandlers(
       
       // Determine primary direction
       if (absX > absY) {
-        // Horizontal swipe
-        if (deltaX > 0 && handlers.onSwipeRight) {
-          handlers.onSwipeRight();
-        } else if (deltaX < 0 && handlers.onSwipeLeft) {
-          handlers.onSwipeLeft();
+        // Horizontal swipe - MUST be continuous to prevent noise-induced false positives
+        if (state.isContinuous) {
+          if (deltaX > 0 && handlers.onSwipeRight) {
+            handlers.onSwipeRight();
+          } else if (deltaX < 0 && handlers.onSwipeLeft) {
+            handlers.onSwipeLeft();
+          }
         }
       } else {
-        // Vertical swipe
+        // Vertical swipe - allow even if not continuous (for scrolling)
         if (deltaY > 0 && handlers.onSwipeDown) {
           handlers.onSwipeDown();
         } else if (deltaY < 0 && handlers.onSwipeUp) {
@@ -176,14 +211,17 @@ export function createGestureHandlers(
     processGestureStart(touch.clientX, touch.clientY);
   };
 
+  const handleTouchMove = (e: TouchEvent) => {
+    const touch = e.touches[0];
+    processGestureMove(touch.clientX, touch.clientY);
+    
+    // Prevent default to avoid browser gestures
+    e.preventDefault();
+  };
+
   const handleTouchEnd = (e: TouchEvent) => {
     const touch = e.changedTouches[0];
     processGestureEnd(touch.clientX, touch.clientY);
-  };
-
-  const handleTouchMove = (e: TouchEvent) => {
-    // Prevent default to avoid browser gestures
-    e.preventDefault();
   };
 
   // Mouse event handlers (for development/testing)
@@ -192,17 +230,17 @@ export function createGestureHandlers(
     processGestureStart(e.clientX, e.clientY);
   };
 
+  const handleMouseMove = (e: MouseEvent) => {
+    if (state.isMouseDown) {
+      processGestureMove(e.clientX, e.clientY);
+      e.preventDefault();
+    }
+  };
+
   const handleMouseUp = (e: MouseEvent) => {
     if (!state.isMouseDown) return;
     state.isMouseDown = false;
     processGestureEnd(e.clientX, e.clientY);
-  };
-
-  const handleMouseMove = (e: MouseEvent) => {
-    // Prevent default during mouse drag
-    if (state.isMouseDown) {
-      e.preventDefault();
-    }
   };
 
   return {
