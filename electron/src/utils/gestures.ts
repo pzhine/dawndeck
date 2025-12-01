@@ -74,7 +74,7 @@ interface TouchState {
   isMouseDown: boolean; // Track mouse state for mouse event simulation
   lastX: number; // Track last position for continuity check
   lastY: number;
-  isContinuous: boolean; // Track if touch has been continuous
+  horizontallyContinuous: boolean; // Track if touch has been continuous in X direction
   maxJumpDistance: number; // Maximum allowed jump between touch points
 }
 
@@ -109,7 +109,7 @@ export function createGestureHandlers(
     isMouseDown: false,
     lastX: 0,
     lastY: 0,
-    isContinuous: true,
+    horizontallyContinuous: true,
     maxJumpDistance: MAX_TOUCH_JUMP,
   };
 
@@ -119,19 +119,18 @@ export function createGestureHandlers(
     state.lastX = x;
     state.lastY = y;
     state.startTime = Date.now();
-    state.isContinuous = true; // Reset continuity flag
+    state.horizontallyContinuous = true; // Reset continuity flag
   };
 
   const processGestureMove = (x: number, y: number) => {
-    // Check if this move is continuous (no large jumps)
-    if (state.isContinuous) {
-      const jumpDistance = Math.sqrt(
-        Math.pow(x - state.lastX, 2) + Math.pow(y - state.lastY, 2)
-      );
+    // Check if horizontal movement is continuous (no large jumps in X direction)
+    // Only check horizontal continuity since vertical scrolling can have large deltas
+    if (state.horizontallyContinuous) {
+      const horizontalJump = Math.abs(x - state.lastX);
       
-      // If jump is too large, mark as discontinuous
-      if (jumpDistance > state.maxJumpDistance) {
-        state.isContinuous = false;
+      // If horizontal jump is too large, mark as horizontally discontinuous
+      if (horizontalJump > state.maxJumpDistance) {
+        state.horizontallyContinuous = false;
       }
     }
     
@@ -187,7 +186,7 @@ export function createGestureHandlers(
       // Determine primary direction
       if (absX > absY) {
         // Horizontal swipe - MUST be continuous to prevent noise-induced false positives
-        if (state.isContinuous) {
+        if (state.horizontallyContinuous) {
           if (deltaX > 0 && handlers.onSwipeRight) {
             handlers.onSwipeRight();
           } else if (deltaX < 0 && handlers.onSwipeLeft) {
