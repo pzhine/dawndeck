@@ -10,7 +10,8 @@
           'SunrisePlayer', 'sunrise-player',   
           'Wifi', 'wifi', 
           'WifiPassword', 'wifi-password', 
-          'WifiConnect', 'wifi-connect'
+          'WifiConnect', 'wifi-connect',
+          'TouchInputTester', 'touch-input-tester'
         ]"
       />
       <UpdateIndicator />
@@ -21,12 +22,14 @@
 
 <script setup lang="ts">
 import { useAppStore } from './stores/appState';
-import { computed, watch, onMounted } from 'vue';
+import { computed, watch, onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
 import UpdateIndicator from './components/UpdateIndicator.vue';
 import TimeoutRedirect from './components/TimeoutRedirect.vue';
 import BluetoothNotifications from './components/BluetoothNotifications.vue';
 
 const appStore = useAppStore();
+const router = useRouter();
 
 // Computed property to get text brightness as a CSS filter value
 const brightnessFilter = computed(() => {
@@ -54,6 +57,21 @@ onMounted(() => {
     '--brightness-filter',
     brightnessFilter.value
   );
+  
+  // Listen for navigation events from main process
+  if (window.ipcRenderer) {
+    window.ipcRenderer.on('navigate-to-page', (_event: any, pageName: string) => {
+      console.log('Navigating to:', pageName);
+      router.push({ name: pageName });
+    });
+  }
+});
+
+// Clean up listener on unmount
+onUnmounted(() => {
+  if (window.ipcRenderer) {
+    window.ipcRenderer.off('navigate-to-page');
+  }
 });
 </script>
 

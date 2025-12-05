@@ -500,6 +500,13 @@ function initializeBluetoothServices(mainWindow: BrowserWindow) {
   // Note: Sound notifications are now handled in the Vue frontend via BluetoothNotifications.vue
 }
 
+// IPC handler for navigation
+ipcMain.handle('navigate-to-page', async (_, pageName: string) => {
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('navigate-to-page', pageName);
+  }
+});
+
 // Create the application menu with update options
 function createApplicationMenu() {
   const template = [
@@ -526,6 +533,16 @@ function createApplicationMenu() {
       label: 'Advanced',
       submenu: [
         {
+          label: 'Touch Input Tester',
+          accelerator: 'CmdOrCtrl+Shift+T',
+          click: async () => {
+            if (win && !win.isDestroyed()) {
+              win.webContents.send('navigate-to-page', 'TouchInputTester');
+            }
+          },
+        },
+        { type: 'separator' },
+        {
           label: 'WebGL Tests',
           click: async () => {
             win.loadURL('https://webglsamples.org');
@@ -537,6 +554,7 @@ function createApplicationMenu() {
             win.loadURL('chrome://gpu');
           },
         },
+        { type: 'separator' },
         {
           label: 'Force Update',
           accelerator: 'CmdOrCtrl+Shift+U',
