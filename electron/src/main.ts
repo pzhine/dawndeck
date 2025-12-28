@@ -119,6 +119,11 @@ const routes = [
     name: 'TouchInputTester',
     component: () => import('./pages/TouchInputTester.vue'),
   },
+  {
+    path: '/gesture-tester',
+    name: 'GestureTester',
+    component: () => import('./pages/GestureTester.vue'),
+  },
 ];
 
 const router = createRouter({
