@@ -197,6 +197,7 @@ interface GesturePath {
   pathString: string;
   color: string;
   opacity: number;
+  isActive?: boolean;
   arrow?: {
     x1: number;
     y1: number;
@@ -319,69 +320,112 @@ function handleGesture(gesture: RecognizedGesture) {
     direction: gesture.direction,
     distance: Math.round(gesture.distance),
     duration: Math.round(gesture.duration),
+    isActive: gesture.isActive,
     delta: {
       x: Math.round(gesture.deltaX || 0),
       y: Math.round(gesture.deltaY || 0),
     },
   });
 
-  // Update stats
-  switch (gesture.type) {
-    case 'tap':
-      stats.taps++;
-      break;
-    case 'double-tap':
-      stats.doubleTaps++;
-      break;
-    case 'drag-horizontal':
-      stats.horizontalDrags++;
-      break;
-    case 'drag-vertical':
-      stats.verticalDrags++;
-      break;
+  // Only update stats for completed gestures
+  if (!gesture.isActive) {
+    switch (gesture.type) {
+      case 'tap':
+        stats.taps++;
+        break;
+      case 'double-tap':
+        stats.doubleTaps++;
+        break;
+      case 'drag-horizontal':
+        stats.horizontalDrags++;
+        break;
+      case 'drag-vertical':
+        stats.verticalDrags++;
+        break;
+    }
   }
 
-  // Update last gesture
+  // Always update last gesture (including active ones)
   lastGesture.value = gesture;
 
-  // Add to recent gestures
-  recentGestures.value.unshift(gesture);
-  if (recentGestures.value.length > 8) {
-    recentGestures.value.pop();
+  // Only add to recent gestures when completed
+  if (!gesture.isActive) {
+    recentGestures.value.unshift(gesture);
+    if (recentGestures.value.length > 8) {
+      recentGestures.value.pop();
+    }
   }
 
   // Visualize gesture
   const color = getGestureColor(gesture.type);
 
   if (gesture.type === 'tap' || gesture.type === 'double-tap') {
-    // Show tap indicator
-    const indicator: TapIndicator = {
-      x: gesture.endPoint.x,
-      y: gesture.endPoint.y,
-      color,
-      opacity: 1.0,
-      isDoubleTap: gesture.type === 'double-tap',
-    };
-    tapIndicators.value.push(indicator);
-    
-    fadeOut(indicator, 1500, () => {
-      const index = tapIndicators.value.indexOf(indicator);
-      if (index > -1) tapIndicators.value.splice(index, 1);
-    });
+    // Show tap indicator (only for completed taps)
+    if (!gesture.isActive) {
+      const indicator: TapIndicator = {
+        x: gesture.endPoint.x,
+        y: gesture.endPoint.y,
+        color,
+        opacity: 1.0,
+        isDoubleTap: gesture.type === 'double-tap',
+      };
+      tapIndicators.value.push(indicator);
+      
+      fadeOut(indicator, 1500, () => {
+        const index = tapIndicators.value.indexOf(indicator);
+        if (index > -1) tapIndicators.value.splice(index, 1);
+      });
+    }
   } else {
     // Show drag path
-    const path: GesturePath = {
-      pathString: createPathString(gesture.path),
-      color,
-      opacity: 0.9,
-      arrow: createArrow(gesture.startPoint, gesture.endPoint, gesture.distance),
-    };
-    gesturePaths.value.push(path);
-    
-    fadeOut(path, 3000, () => {
-      const index = gesturePaths.value.indexOf(path);
-      if (index > -1) gesturePaths.value.splice(index, 1);
-    });
+    if (gesture.isActive) {
+      // For active gestures, update or create path
+      const existingPathIndex = gesturePaths.value.findIndex(p => p.isActive);
+      const path: GesturePath = {
+        pathString: createPathString(gesture.path),
+        color,
+        opacity: 1.0,
+        arrow: createArrow(gesture.startPoint, gesture.endPoint, gesture.distance),
+        isActive: true,
+      };
+
+      if (existingPathIndex >= 0) {
+        // Update existing active path
+        gesturePaths.value[existingPathIndex] = path;
+      } else {
+        // Add new active path
+        gesturePaths.value.push(path);
+      }
+    } else {
+      // Completed gesture - convert active path to completed
+      const activePathIndex = gesturePaths.value.findIndex(p => p.isActive);
+      if (activePathIndex >= 0) {
+        const path = gesturePaths.value[activePathIndex];
+        path.isActive = false;
+        path.pathString = createPathString(gesture.path);
+        path.arrow = createArrow(gesture.startPoint, gesture.endPoint, gesture.distance);
+        
+        fadeOut(path, 3000, () => {
+          const index = gesturePaths.value.indexOf(path);
+          if (index > -1) gesturePaths.value.splice(index, 1);
+        });
+      } else {
+        // No active path found, create a new one
+        const path: GesturePath = {
+          pathString: createPathString(gesture.path),
+          color,
+          opacity: 0.9,
+          arrow: createArrow(gesture.startPoint, gesture.endPoint, gesture.distance),
+          isActive: false,
+        };
+        gesturePaths.value.push(path);
+        
+        fadeOut(path, 3000, () => {
+          const index = gesturePaths.value.indexOf(path);
+          if (index > -1) gesturePaths.value.splice(index, 1);
+        });
+      }
+    }
   }
 }
 
