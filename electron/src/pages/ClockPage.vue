@@ -1,21 +1,49 @@
 <template>
-  <div tabindex="0" ref="clockContainer">
-    <div :class="['clock-wrapper', { dimmed: isDimmed }]">
-      <ClockComponent ref="clockComponent" />
+  <RadialMenu :items="menuItems">
+    <div tabindex="0" ref="clockContainer" class="page-container">
+      <div :class="['clock-wrapper', { dimmed: isDimmed }]">
+        <ClockComponent ref="clockComponent" />
+      </div>
     </div>
-  </div>
+  </RadialMenu>
 </template>
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
 import { isGlobalSoundPlaying } from '../services/audioService';
 import ClockComponent from '../components/ClockComponent.vue';
+import RadialMenu, { MenuItem } from '../components/RadialMenu.vue';
 import { onMounted, onUnmounted, ref } from 'vue';
+import { useAppStore } from '../stores/appState';
+import feather from 'feather-icons';
 
 const router = useRouter();
+const appStore = useAppStore();
 const clockContainer = ref<HTMLDivElement | null>(null);
 const inactivityTimer = ref<number | null>(null);
 const isDimmed = ref(false);
+
+const lampIcon = feather.icons['sun'].toSvg();
+const musicIcon = feather.icons['music'].toSvg();
+const projectorIcon = feather.icons['sunrise'].toSvg();
+const alarmIcon = feather.icons['bell'].toSvg();
+const muteIcon = feather.icons['volume-x'].toSvg();
+const settingsIcon = feather.icons['settings'].toSvg();
+
+const mute = () => {
+  appStore.setVolume(0);
+  appStore.setLampBrightness(0);
+  appStore.setProjectorBrightness(0);
+};
+
+const menuItems: MenuItem[] = [
+  { label: 'Lamp', icon: lampIcon, route: '/level/lampBrightness' },
+  { label: 'Music', icon: musicIcon, route: '/sounds' },
+  { label: 'Projector', icon: projectorIcon, route: '/projector' },
+  { label: 'Alarm', icon: alarmIcon, route: '/alarm' },
+  { label: 'Mute', icon: muteIcon, action: mute },
+  { label: 'Settings', icon: settingsIcon, route: '/sunriseSettings' },
+];
 
 // Navigation function
 const goToMenu = (event: MouseEvent) => {
