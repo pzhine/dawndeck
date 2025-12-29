@@ -377,6 +377,8 @@ export class BluetoothMediaService extends EventEmitter {
         return { success: await this.next(), action: 'next' };
       case 'previous':
         return { success: await this.previous(), action: 'previous' };
+      case 'toggleplaypause':
+        return { success: await this.togglePlayPause(), action: 'togglePlayPause' };
       case 'status':
         const metadata = await this.getMetadata();
         return { success: true, metadata, action: 'status' };

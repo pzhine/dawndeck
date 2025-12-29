@@ -42,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import RadialMenu, { MenuItem } from '../components/RadialMenu.vue';
 import feather from 'feather-icons';
@@ -61,6 +61,7 @@ const clockIcon = feather.icons['clock'].toSvg();
 const volumeUpIcon = feather.icons['volume-2'].toSvg();
 const nextIcon = feather.icons['skip-forward'].toSvg();
 const playPauseIcon = feather.icons['play'].toSvg();
+const pauseIcon = feather.icons['pause'].toSvg();
 const prevIcon = feather.icons['skip-back'].toSvg();
 
 // Actions
@@ -81,12 +82,6 @@ const adjustVolume = async (delta: number) => {
     volume.value = newVol;
     
     await (window as any).electronAPI?.volumeControl?.setSystemVolume(newVol);
-    
-    // Verify actual volume
-    const actualVol = await (window as any).electronAPI?.volumeControl?.getSystemVolume();
-    if (actualVol !== undefined) {
-      volume.value = actualVol;
-    }
   } catch (error) {
     console.error('Failed to adjust volume:', error);
   }
@@ -111,7 +106,7 @@ const getVolume = async () => {
 // 4: Next (Index 2)
 // 6: Play/Pause (Index 3)
 // 8: Prev (Index 4)
-const menuItems: MenuItem[] = [
+const menuItems = computed<MenuItem[]>(() => [
   { 
     label: 'Clock', 
     icon: clockIcon, 
@@ -120,34 +115,40 @@ const menuItems: MenuItem[] = [
   { 
     label: 'Vol +', 
     icon: volumeUpIcon, 
-    action: () => adjustVolume(5),
-    instant: true
+    action: () => adjustVolume(2),
+    continuous: true
   },
   { 
     label: 'Next', 
     icon: nextIcon, 
-    action: () => sendCommand('next') 
+    action: () => sendCommand('next'),
+    instant: true
   },
   { 
-    label: 'Play/Pause', 
-    icon: playPauseIcon, 
-    action: () => sendCommand('togglePlayPause') 
+    label: metadata.value?.status === 'playing' ? 'Pause' : 'Play', 
+    icon: metadata.value?.status === 'playing' ? pauseIcon : playPauseIcon, 
+    action: () => sendCommand('togglePlayPause'),
+    instant: true
   },
   { 
     label: 'Prev', 
     icon: prevIcon, 
-    action: () => sendCommand('previous') 
+    action: () => sendCommand('previous'),
+    instant: true
   },
   { 
     label: 'Vol -', 
     icon: volumeDownIcon, 
-    action: () => adjustVolume(-5),
-    instant: true
+    action: () => adjustVolume(-2),
+    continuous: true
   },
-];
+]);
 
 const refreshMetadata = async () => {
   try {
+    // Sync volume
+    getVolume();
+
     const result = await (window as any).electronAPI?.bluetoothMedia?.getMetadata();
     if (result && result.metadata) {
       metadata.value = result.metadata;

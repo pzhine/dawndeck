@@ -18,6 +18,7 @@ export interface MenuItem {
   route?: string;
   action?: () => void;
   instant?: boolean; // If true, action triggers immediately on touch start
+  continuous?: boolean; // If true, action triggers repeatedly while holding
 }
 
 const props = defineProps({
@@ -26,6 +27,39 @@ const props = defineProps({
     required: true,
   },
 });
+
+watch(() => props.items, (newItems, oldItems) => {
+  if (!scene) return;
+
+  // Check if full redraw is needed (if number of items changed)
+  const needsRedraw = !oldItems || newItems.length !== oldItems.length;
+
+  if (needsRedraw) {
+    createMenuGeometry();
+  } else {
+    // Just update the data and textures where needed
+    segments.forEach((mesh, i) => {
+      if (mesh.userData) {
+        const oldItem = mesh.userData.item;
+        const newItem = newItems[i];
+        
+        // Always update the item reference for actions
+        mesh.userData.item = newItem;
+
+        // Only redraw texture if label or icon changed
+        if (newItem.label !== oldItem.label || newItem.icon !== oldItem.icon) {
+           const iconMesh = mesh.userData.iconMesh;
+           if (iconMesh) {
+               const material = iconMesh.material as THREE.MeshBasicMaterial;
+               const texture = material.map as THREE.CanvasTexture;
+               const canvas = texture.image as HTMLCanvasElement;
+               drawIconAndLabel(canvas, texture, newItem);
+           }
+        }
+      }
+    });
+  }
+}, { deep: true });
 
 const isActive = ref(false);
 const router = useRouter();
@@ -168,39 +202,17 @@ const createMenuGeometry = () => {
     segments.push(mesh);
 
     // Icon
-    createIconAndLabel(item, segmentCenterAngle);
+    const iconMesh = createIconAndLabel(item, segmentCenterAngle);
+    mesh.userData.iconMesh = iconMesh;
   });
 };
 
-const createIconAndLabel = (item: MenuItem, angle: number) => {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 512;
+const drawIconAndLabel = (canvas: HTMLCanvasElement, texture: THREE.CanvasTexture, item: MenuItem) => {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  // Helper to update texture
-  const updateTexture = () => {
-    if (texture) texture.needsUpdate = true;
-  };
-
-  // Create texture and mesh immediately
-  const texture = new THREE.CanvasTexture(canvas);
-  // Increase plane size to fill the segment better
-  const planeGeometry = new THREE.PlaneGeometry(140, 140);
-  const planeMaterial = new THREE.MeshBasicMaterial({
-    map: texture,
-    transparent: true,
-    side: THREE.DoubleSide,
-    depthTest: false
-  });
-  
-  const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
-  const radius = (MENU_RADIUS_INNER + MENU_RADIUS_OUTER) / 2;
-  planeMesh.position.x = Math.cos(angle) * radius;
-  planeMesh.position.y = Math.sin(angle) * radius;
-  planeMesh.position.z = 2;
-  menuGroup.add(planeMesh);
+  // Clear canvas
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // Layout calculations
   const iconSize = 200;
@@ -218,7 +230,9 @@ const createIconAndLabel = (item: MenuItem, angle: number) => {
   ctx.textBaseline = 'top';
   // Draw text below icon
   ctx.fillText(item.label, canvas.width / 2, startY + iconSize + padding);
-  updateTexture();
+  
+  // Update texture for text immediately
+  texture.needsUpdate = true;
 
   // Load and Draw Icon
   const img = new Image();
@@ -232,16 +246,13 @@ const createIconAndLabel = (item: MenuItem, angle: number) => {
     svgString = svgString.replace('<svg', '<svg width="24" height="24"');
   }
   
-  // 3. Explicitly set stroke color if needed, but avoid replacing fill="none"
-  // The icons use stroke="currentColor", so step 1 covers it.
-  
   const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(svgBlob);
 
   img.onload = () => {
     const x = (canvas.width - iconSize) / 2;
     ctx.drawImage(img, x, startY, iconSize, iconSize);
-    updateTexture();
+    texture.needsUpdate = true;
     URL.revokeObjectURL(url);
   };
   
@@ -250,6 +261,34 @@ const createIconAndLabel = (item: MenuItem, angle: number) => {
   };
   
   img.src = url;
+};
+
+const createIconAndLabel = (item: MenuItem, angle: number) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  
+  const texture = new THREE.CanvasTexture(canvas);
+  
+  drawIconAndLabel(canvas, texture, item);
+
+  // Increase plane size to fill the segment better
+  const planeGeometry = new THREE.PlaneGeometry(140, 140);
+  const planeMaterial = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthTest: false
+  });
+  
+  const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
+  const radius = (MENU_RADIUS_INNER + MENU_RADIUS_OUTER) / 2;
+  planeMesh.position.x = Math.cos(angle) * radius;
+  planeMesh.position.y = Math.sin(angle) * radius;
+  planeMesh.position.z = 2;
+  menuGroup.add(planeMesh);
+  
+  return planeMesh;
 };
 
 const onWindowResize = () => {
@@ -267,7 +306,7 @@ const onWindowResize = () => {
   renderer.setSize(width, height);
 };
 
-let longPressTimer: NodeJS.Timeout | null = null;
+let inputTimer: any = null;
 
 const getIntersectedSegment = (clientX: number, clientY: number): THREE.Mesh | null => {
   if (!canvasContainer.value) return null;
@@ -301,19 +340,22 @@ const handleInputStart = (clientX: number, clientY: number) => {
     highlightSegment(segment);
     const item = segment.userData.item as MenuItem;
     
-    if (item.instant) {
+    if (item.continuous) {
+      // Trigger immediately
+      if (item.action) item.action();
+      // Start interval for continuous action
+      inputTimer = setInterval(() => {
+        if (item.action) item.action();
+      }, 100);
+    } else if (item.instant) {
       // Trigger immediately for instant items
       if (item.action) item.action();
       if (item.route) router.push(item.route);
       // Don't hide menu for instant actions (like volume) unless it's a route change
       if (item.route) hideMenu();
-      
-      // We still want to highlight, but maybe not start the long press timer?
-      // Or maybe we do want to allow "holding" for repeated action?
-      // For now, just trigger once.
     } else {
       // Standard long-press behavior
-      longPressTimer = setTimeout(() => {
+      inputTimer = setTimeout(() => {
         if (item.action) item.action();
         if (item.route) router.push(item.route);
         hideMenu();
@@ -327,9 +369,10 @@ const handleInputStart = (clientX: number, clientY: number) => {
 };
 
 const handleInputEnd = () => {
-  if (longPressTimer) {
-    clearTimeout(longPressTimer);
-    longPressTimer = null;
+  if (inputTimer) {
+    clearTimeout(inputTimer); // Works for both timeout and interval in browser env usually, but safer to check type if strict
+    clearInterval(inputTimer);
+    inputTimer = null;
   }
   highlightSegment(null);
 };
@@ -339,9 +382,10 @@ const handleInputMove = (clientX: number, clientY: number) => {
   
   // If we moved off the currently hovered segment
   if (segment !== hoveredSegment) {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer);
-      longPressTimer = null;
+    if (inputTimer) {
+      clearTimeout(inputTimer);
+      clearInterval(inputTimer);
+      inputTimer = null;
     }
     highlightSegment(null);
   }
@@ -398,7 +442,10 @@ const stopAnimation = () => {
 
 onUnmounted(() => {
   stopAnimation();
-  if (longPressTimer) clearTimeout(longPressTimer);
+  if (inputTimer) {
+    clearTimeout(inputTimer);
+    clearInterval(inputTimer);
+  }
   window.removeEventListener('resize', onWindowResize);
   if (renderer) {
     renderer.domElement.removeEventListener('touchstart', onTouchStart);
