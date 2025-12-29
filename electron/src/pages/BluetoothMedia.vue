@@ -75,16 +75,39 @@ const sendCommand = async (command: string) => {
   }
 };
 
-const adjustVolume = async (delta: number) => {
-  try {
-    // Optimistic update
-    const newVol = Math.max(0, Math.min(100, volume.value + delta));
-    volume.value = newVol;
-    
-    await (window as any).electronAPI?.volumeControl?.setSystemVolume(newVol);
-  } catch (error) {
-    console.error('Failed to adjust volume:', error);
+// Volume throttling
+let isVolumeSyncing = false;
+let pendingVolume: number | null = null;
+
+const syncVolumeToSystem = async (vol: number) => {
+  if (isVolumeSyncing) {
+    pendingVolume = vol;
+    return;
   }
+  
+  isVolumeSyncing = true;
+  try {
+    await (window as any).electronAPI?.volumeControl?.setSystemVolume(vol);
+  } catch (error) {
+    console.error('Failed to set volume:', error);
+  } finally {
+    isVolumeSyncing = false;
+    if (pendingVolume !== null) {
+      const nextVol = pendingVolume;
+      pendingVolume = null;
+      // Only sync if the value is different from what we just sent
+      if (nextVol !== vol) {
+        syncVolumeToSystem(nextVol);
+      }
+    }
+  }
+};
+
+const adjustVolume = (delta: number) => {
+  // Optimistic update
+  const newVol = Math.max(0, Math.min(100, volume.value + delta));
+  volume.value = newVol;
+  syncVolumeToSystem(newVol);
 };
 
 const getVolume = async () => {
@@ -127,7 +150,13 @@ const menuItems = computed<MenuItem[]>(() => [
   { 
     label: metadata.value?.status === 'playing' ? 'Pause' : 'Play', 
     icon: metadata.value?.status === 'playing' ? pauseIcon : playPauseIcon, 
-    action: () => sendCommand('togglePlayPause'),
+    action: () => {
+      if (metadata.value?.status === 'playing') {
+        sendCommand('pause');
+      } else {
+        sendCommand('play');
+      }
+    },
     instant: true
   },
   { 
@@ -146,9 +175,6 @@ const menuItems = computed<MenuItem[]>(() => [
 
 const refreshMetadata = async () => {
   try {
-    // Sync volume
-    getVolume();
-
     const result = await (window as any).electronAPI?.bluetoothMedia?.getMetadata();
     if (result && result.metadata) {
       metadata.value = result.metadata;
