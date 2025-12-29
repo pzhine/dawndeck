@@ -17,6 +17,7 @@ export interface MenuItem {
   icon: string; // SVG string
   route?: string;
   action?: () => void;
+  instant?: boolean; // If true, action triggers immediately on touch start
 }
 
 const props = defineProps({
@@ -298,13 +299,27 @@ const handleInputStart = (clientX: number, clientY: number) => {
   
   if (segment) {
     highlightSegment(segment);
-    longPressTimer = setTimeout(() => {
-      const item = segment.userData.item as MenuItem;
+    const item = segment.userData.item as MenuItem;
+    
+    if (item.instant) {
+      // Trigger immediately for instant items
       if (item.action) item.action();
       if (item.route) router.push(item.route);
-      hideMenu();
-      highlightSegment(null);
-    }, 500);
+      // Don't hide menu for instant actions (like volume) unless it's a route change
+      if (item.route) hideMenu();
+      
+      // We still want to highlight, but maybe not start the long press timer?
+      // Or maybe we do want to allow "holding" for repeated action?
+      // For now, just trigger once.
+    } else {
+      // Standard long-press behavior
+      longPressTimer = setTimeout(() => {
+        if (item.action) item.action();
+        if (item.route) router.push(item.route);
+        hideMenu();
+        highlightSegment(null);
+      }, 500);
+    }
   } else {
     highlightSegment(null);
     hideMenu();

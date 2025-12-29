@@ -99,6 +99,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onDevicePaired: (callback: (device: any) => void) => {
       ipcRenderer.on('bluetooth-device:paired', (_event, device) => callback(device));
     }
+  },
+  volumeControl: {
+    setSystemVolume: (level: number) => ipcRenderer.invoke('set-system-volume', level),
+    getSystemVolume: () => ipcRenderer.invoke('get-system-volume'),
   }
 });
 

@@ -38,7 +38,7 @@ const mute = () => {
 
 const menuItems: MenuItem[] = [
   { label: 'Lamp', icon: lampIcon, route: '/level/lampBrightness' },
-  { label: 'Music', icon: musicIcon, route: '/sounds' },
+  { label: 'Music', icon: musicIcon, route: '/bluetooth-media' },
   { label: 'Projector', icon: projectorIcon, route: '/projector' },
   { label: 'Alarm', icon: alarmIcon, route: '/alarm' },
   { label: 'Sleep', icon: sleepIcon, action: mute },
