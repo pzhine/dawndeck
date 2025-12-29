@@ -250,8 +250,8 @@ async function createWindow() {
     },
   });
 
-  // Hide cursor in production mode
-  if (!VITE_DEV_SERVER_URL) {
+  // Hide cursor in production mode or when fullscreen
+  if (!VITE_DEV_SERVER_URL || shouldBeFullscreen) {
     win.webContents.on('dom-ready', () => {
       win?.webContents.insertCSS('* { cursor: none !important; }');
       // Focus the window automatically to apply cursor hiding

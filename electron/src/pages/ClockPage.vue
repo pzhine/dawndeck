@@ -73,27 +73,6 @@ const handleTap = (event: MouseEvent) => {
   if (isDimmed.value) {
     restoreBrightness();
   }
-
-  // Reset inactivity timer
-  resetInactivityTimer();
-};
-
-// Start the inactivity timer
-const startInactivityTimer = () => {
-  // Clear any existing timer first
-  if (inactivityTimer.value !== null) {
-    window.clearTimeout(inactivityTimer.value);
-  }
-
-  // Set new timer - after 30 seconds, dim the clock
-  inactivityTimer.value = window.setTimeout(() => {
-    dimBrightness();
-  }, 30000);
-};
-
-// Reset the inactivity timer
-const resetInactivityTimer = () => {
-  startInactivityTimer();
 };
 
 // Dim the clock brightness to 15%
@@ -110,9 +89,6 @@ onMounted(() => {
   window.addEventListener('mousedown', goToMenu);
   window.addEventListener('mousedown', handleTap);
   window.addEventListener('wheel', handleWheelEvent, { passive: false });
-
-  // Start the inactivity timer
-  startInactivityTimer();
 });
 
 onUnmounted(() => {

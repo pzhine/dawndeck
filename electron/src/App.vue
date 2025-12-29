@@ -2,7 +2,7 @@
   <div class="app-container">
     <div class="round-display">
       <router-view />
-      <TimeoutRedirect
+      <!-- <TimeoutRedirect
         :ms="45000"
         redirectRoute="/"
         resetOnActivity="wheel"
@@ -13,7 +13,7 @@
           'WifiConnect', 'wifi-connect',
           'TouchInputTester', 'touch-input-tester'
         ]"
-      />
+      /> -->
       <UpdateIndicator />
       <BluetoothNotifications />
     </div>
@@ -25,7 +25,7 @@ import { useAppStore } from './stores/appState';
 import { computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import UpdateIndicator from './components/UpdateIndicator.vue';
-import TimeoutRedirect from './components/TimeoutRedirect.vue';
+// import TimeoutRedirect from './components/TimeoutRedirect.vue';
 import BluetoothNotifications from './components/BluetoothNotifications.vue';
 
 const appStore = useAppStore();
