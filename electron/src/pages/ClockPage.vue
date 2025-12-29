@@ -27,7 +27,7 @@ const lampIcon = feather.icons['sun'].toSvg();
 const musicIcon = feather.icons['music'].toSvg();
 const projectorIcon = feather.icons['sunrise'].toSvg();
 const alarmIcon = feather.icons['bell'].toSvg();
-const muteIcon = feather.icons['volume-x'].toSvg();
+const sleepIcon = feather.icons['moon'].toSvg();
 const settingsIcon = feather.icons['settings'].toSvg();
 
 const mute = () => {
@@ -41,7 +41,7 @@ const menuItems: MenuItem[] = [
   { label: 'Music', icon: musicIcon, route: '/sounds' },
   { label: 'Projector', icon: projectorIcon, route: '/projector' },
   { label: 'Alarm', icon: alarmIcon, route: '/alarm' },
-  { label: 'Mute', icon: muteIcon, action: mute },
+  { label: 'Sleep', icon: sleepIcon, action: mute },
   { label: 'Settings', icon: settingsIcon, route: '/sunriseSettings' },
 ];
 

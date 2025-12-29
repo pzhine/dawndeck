@@ -307,6 +307,7 @@ const handleInputStart = (clientX: number, clientY: number) => {
     }, 500);
   } else {
     highlightSegment(null);
+    hideMenu();
   }
 };
 
