@@ -334,6 +334,13 @@ const highlightSegment = (segment: THREE.Mesh | null) => {
 };
 
 const handleInputStart = (clientX: number, clientY: number) => {
+  // Safety clear existing timer
+  if (inputTimer) {
+    clearTimeout(inputTimer);
+    clearInterval(inputTimer);
+    inputTimer = null;
+  }
+
   const segment = getIntersectedSegment(clientX, clientY);
   
   if (segment) {
@@ -370,7 +377,7 @@ const handleInputStart = (clientX: number, clientY: number) => {
 
 const handleInputEnd = () => {
   if (inputTimer) {
-    clearTimeout(inputTimer); // Works for both timeout and interval in browser env usually, but safer to check type if strict
+    clearTimeout(inputTimer);
     clearInterval(inputTimer);
     inputTimer = null;
   }
@@ -391,14 +398,53 @@ const handleInputMove = (clientX: number, clientY: number) => {
   }
 };
 
+// Global event handlers for drag/release outside canvas
+const onGlobalMouseUp = () => {
+  handleInputEnd();
+  window.removeEventListener('mouseup', onGlobalMouseUp);
+  window.removeEventListener('mousemove', onGlobalMouseMove);
+};
+
+const onGlobalMouseMove = (event: MouseEvent) => {
+  if (event.buttons > 0) {
+    handleInputMove(event.clientX, event.clientY);
+  }
+};
+
+const onGlobalTouchEnd = (event: TouchEvent) => {
+  handleInputEnd();
+  window.removeEventListener('touchend', onGlobalTouchEnd);
+  window.removeEventListener('touchmove', onGlobalTouchMove);
+};
+
+const onGlobalTouchMove = (event: TouchEvent) => {
+  if (event.touches.length > 0) {
+    const touch = event.touches[0];
+    handleInputMove(touch.clientX, touch.clientY);
+  }
+};
+
 const onTouchStart = (event: TouchEvent) => {
   event.preventDefault();
   if (event.touches.length > 0) {
     const touch = event.touches[0];
     handleInputStart(touch.clientX, touch.clientY);
+    
+    // Attach global listeners
+    window.addEventListener('touchend', onGlobalTouchEnd, { passive: false });
+    window.addEventListener('touchmove', onGlobalTouchMove, { passive: false });
   }
 };
 
+const onMouseDown = (event: MouseEvent) => {
+  handleInputStart(event.clientX, event.clientY);
+  
+  // Attach global listeners
+  window.addEventListener('mouseup', onGlobalMouseUp);
+  window.addEventListener('mousemove', onGlobalMouseMove);
+};
+
+// Keep these for cleanup, but they are less critical now that we use global listeners
 const onTouchEnd = (event: TouchEvent) => {
   event.preventDefault();
   handleInputEnd();
@@ -412,16 +458,11 @@ const onTouchMove = (event: TouchEvent) => {
   }
 };
 
-const onMouseDown = (event: MouseEvent) => {
-  handleInputStart(event.clientX, event.clientY);
-};
-
 const onMouseUp = (event: MouseEvent) => {
   handleInputEnd();
 };
 
 const onMouseMove = (event: MouseEvent) => {
-  // Simulate touch move only when mouse button is pressed
   if (event.buttons > 0) {
     handleInputMove(event.clientX, event.clientY);
   }
@@ -447,6 +488,13 @@ onUnmounted(() => {
     clearInterval(inputTimer);
   }
   window.removeEventListener('resize', onWindowResize);
+  
+  // Remove global listeners just in case
+  window.removeEventListener('mouseup', onGlobalMouseUp);
+  window.removeEventListener('mousemove', onGlobalMouseMove);
+  window.removeEventListener('touchend', onGlobalTouchEnd);
+  window.removeEventListener('touchmove', onGlobalTouchMove);
+
   if (renderer) {
     renderer.domElement.removeEventListener('touchstart', onTouchStart);
     renderer.domElement.removeEventListener('touchend', onTouchEnd);
