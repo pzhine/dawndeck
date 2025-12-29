@@ -78,12 +78,14 @@ const sendCommand = async (command: string) => {
 // Volume throttling
 let isVolumeSyncing = false;
 let pendingVolume: number | null = null;
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
 
-const syncVolumeToSystem = async (vol: number) => {
-  if (isVolumeSyncing) {
-    pendingVolume = vol;
-    return;
-  }
+const performSync = async () => {
+  if (pendingVolume === null) return;
+  
+  const vol = pendingVolume;
+  // Clear pending so we can detect new updates during the async call
+  pendingVolume = null;
   
   isVolumeSyncing = true;
   try {
@@ -92,13 +94,12 @@ const syncVolumeToSystem = async (vol: number) => {
     console.error('Failed to set volume:', error);
   } finally {
     isVolumeSyncing = false;
+    // If new updates came in, schedule next sync with a delay
     if (pendingVolume !== null) {
-      const nextVol = pendingVolume;
-      pendingVolume = null;
-      // Only sync if the value is different from what we just sent
-      if (nextVol !== vol) {
-        syncVolumeToSystem(nextVol);
-      }
+      syncTimer = setTimeout(() => {
+        syncTimer = null;
+        performSync();
+      }, 150);
     }
   }
 };
@@ -107,7 +108,13 @@ const adjustVolume = (delta: number) => {
   // Optimistic update
   const newVol = Math.max(0, Math.min(100, volume.value + delta));
   volume.value = newVol;
-  syncVolumeToSystem(newVol);
+  
+  pendingVolume = newVol;
+  
+  // Only start if not already syncing or waiting
+  if (!isVolumeSyncing && !syncTimer) {
+    performSync();
+  }
 };
 
 const getVolume = async () => {
@@ -230,6 +237,9 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (updateInterval.value) {
     clearInterval(updateInterval.value);
+  }
+  if (syncTimer) {
+    clearTimeout(syncTimer);
   }
   
   // Clean up event listeners
