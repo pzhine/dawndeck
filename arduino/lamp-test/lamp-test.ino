@@ -20,6 +20,11 @@ Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_RGB + NEO_KHZ800);
 // Argument 2 = Arduino pin number (most are valid)
 // Argument 3 = Pixel type flags
 
+// Base color for lamp (orange/white/pink)
+int baseR = 200;
+int baseG = 255;
+int baseB = 150;
+
 void setup() {
   // These lines are specifically to support the Adafruit Trinket 5V 16 MHz.
   // Any other board, you can remove this part (but no harm leaving it):
@@ -30,26 +35,33 @@ void setup() {
 
   strip.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
   strip.show();            // Turn OFF all pixels ASAP
-  strip.setBrightness(0); // Set BRIGHTNESS to about 1/5 (max = 255)
+  strip.setBrightness(100); // Set BRIGHTNESS to max (max = 255)
 
-                    //    orng  wht  pnk
-  strip.setPixelColor(0,  200,  255, 150);
+  strip.setPixelColor(0, baseR, baseG, baseB);
   strip.show();
 }
 void loop() {
-  breathe(10);
-  //rainbow(10);             // Flowing rainbow cycle along the whole strip
+//  breathe(10);
 }
 
 // Breathe brightness from 0 to 255 and back
 void breathe(int wait) {
-  for (int b = 0; b < 256; b++) {
-    strip.setBrightness(b);
+  // Fade up from 0 to 255
+  for (int brightness = 0; brightness < 256; brightness++) {
+    int r = (baseR * brightness) / 255;
+    int g = (baseG * brightness) / 255;
+    int b = (baseB * brightness) / 255;
+    strip.setPixelColor(0, r, g, b);
     strip.show();
     delay(wait);
   }
-  for (int b = 255; b >= 0; b--) {
-    strip.setBrightness(b);
+  
+  // Fade down from 255 to 0
+  for (int brightness = 255; brightness >= 0; brightness--) {
+    int r = (baseR * brightness) / 255;
+    int g = (baseG * brightness) / 255;
+    int b = (baseB * brightness) / 255;
+    strip.setPixelColor(0, r, g, b);
     strip.show();
     delay(wait);
   }
