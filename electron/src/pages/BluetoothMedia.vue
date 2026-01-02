@@ -14,11 +14,25 @@
         </div>
 
         <!-- Volume Bar -->
-        <div class="w-64 h-2 bg-gray-700 rounded-full overflow-hidden z-10 pointer-events-none">
+        <div class="flex items-center gap-4 z-10">
+          <div class="w-6 h-6 pointer-events-none" v-html="volumeDownIcon"></div>
           <div 
-            class="h-full bg-white transition-all duration-200 ease-out"
-            :style="{ width: `${volume}%` }"
-          ></div>
+            ref="volumeBarRef"
+            class="w-50 h-12 flex items-center justify-center cursor-pointer"
+            @mousedown="handleVolumeInteraction"
+            @mousemove="handleVolumeInteraction"
+            @touchstart.prevent="handleVolumeInteraction"
+            @touchmove.prevent="handleVolumeInteraction"
+            @click.stop
+          >
+            <div class="w-full h-2 bg-gray-700 rounded-full overflow-hidden pointer-events-none">
+              <div 
+                class="h-full bg-white transition-all duration-100 ease-out"
+                :style="{ width: `${volume}%` }"
+              ></div>
+            </div>
+          </div>
+          <div class="w-6 h-6 pointer-events-none" v-html="volumeUpIcon"></div>
         </div>
       </div>
 
@@ -56,9 +70,9 @@ const updateInterval = ref<ReturnType<typeof setInterval> | null>(null);
 const volume = ref(50);
 
 // Icons
-const volumeDownIcon = feather.icons['volume-1'].toSvg();
+const volumeDownIcon = feather.icons['volume-1'].toSvg({ width: '100%', height: '100%' });
 const clockIcon = feather.icons['clock'].toSvg();
-const volumeUpIcon = feather.icons['volume-2'].toSvg();
+const volumeUpIcon = feather.icons['volume-2'].toSvg({ width: '100%', height: '100%' });
 const nextIcon = feather.icons['skip-forward'].toSvg();
 const playPauseIcon = feather.icons['play'].toSvg();
 const pauseIcon = feather.icons['pause'].toSvg();
@@ -104,9 +118,10 @@ const performSync = async () => {
   }
 };
 
-const adjustVolume = (delta: number) => {
-  // Optimistic update
-  const newVol = Math.max(0, Math.min(100, volume.value + delta));
+const volumeBarRef = ref<HTMLElement | null>(null);
+
+const setVolume = (newVol: number) => {
+  newVol = Math.max(0, Math.min(100, newVol));
   volume.value = newVol;
   
   pendingVolume = newVol;
@@ -115,6 +130,35 @@ const adjustVolume = (delta: number) => {
   if (!isVolumeSyncing && !syncTimer) {
     performSync();
   }
+};
+
+const adjustVolume = (delta: number) => {
+  setVolume(volume.value + delta);
+};
+
+const handleVolumeInteraction = (event: MouseEvent | TouchEvent) => {
+  event.stopPropagation();
+  if (!volumeBarRef.value) return;
+  
+  const rect = volumeBarRef.value.getBoundingClientRect();
+  let clientX;
+  
+  if (window.MouseEvent && event instanceof MouseEvent) {
+    clientX = event.clientX;
+    // Only handle if primary button is pressed for mousemove
+    if (event.type === 'mousemove' && event.buttons !== 1) return;
+  } else {
+    const touchEvent = event as TouchEvent;
+    if (touchEvent.touches && touchEvent.touches.length > 0) {
+      clientX = touchEvent.touches[0].clientX;
+    } else {
+      return;
+    }
+  }
+  
+  const x = clientX - rect.left;
+  const percentage = (x / rect.width) * 100;
+  setVolume(percentage);
 };
 
 const getVolume = async () => {
@@ -152,7 +196,6 @@ const menuItems = computed<MenuItem[]>(() => [
     label: 'Next', 
     icon: nextIcon, 
     action: () => sendCommand('next'),
-    instant: true
   },
   { 
     label: metadata.value?.status === 'playing' ? 'Pause' : 'Play', 
@@ -164,13 +207,11 @@ const menuItems = computed<MenuItem[]>(() => [
         sendCommand('play');
       }
     },
-    instant: true
   },
   { 
     label: 'Prev', 
     icon: prevIcon, 
     action: () => sendCommand('previous'),
-    instant: true
   },
   { 
     label: 'Vol -', 

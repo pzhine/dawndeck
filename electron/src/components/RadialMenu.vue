@@ -76,7 +76,7 @@ let segments: THREE.Mesh[] = [];
 let animationFrameId: number;
 let hoveredSegment: THREE.Mesh | null = null;
 
-const MENU_RADIUS_INNER = 180;
+const MENU_RADIUS_INNER = 200;
 const MENU_RADIUS_OUTER = 370;
 const GAP_ANGLE = 0.05; // Radians
 const SEGMENT_COLOR = 0x222222;
@@ -349,7 +349,7 @@ const handleInputStart = (clientX: number, clientY: number) => {
         if (item.action) item.action();
       }, 100);
     } else if (!item.hold) {
-      // Trigger immediately for instant items
+      // Trigger immediately
       if (item.action) item.action();
       if (item.route) router.push(item.route);
       // Don't hide menu for instant actions (like volume) unless it's a route change
