@@ -1,6 +1,6 @@
 <template>
   <div class="radial-menu-container">
-    <div class="content-wrapper" :class="{ 'shrunk': isActive }" @touchstart="activateMenu" @click="activateMenu">
+    <div class="content-wrapper" :class="{ 'shrunk': isActive }" @touchstart.prevent="activateMenu" @click="activateMenu">
       <slot></slot>
     </div>
     <div ref="canvasContainer" class="canvas-container" :class="{ 'active': isActive }"></div>
