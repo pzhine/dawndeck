@@ -1,6 +1,6 @@
 <template>
-  <div class="radial-menu-container" @touchstart="handleTouchStart" @dblclick="activateMenu">
-    <div class="content-wrapper" :class="{ 'shrunk': isActive }">
+  <div class="radial-menu-container">
+    <div class="content-wrapper" :class="{ 'shrunk': isActive }" @touchstart="activateMenu" @click="activateMenu">
       <slot></slot>
     </div>
     <div ref="canvasContainer" class="canvas-container" :class="{ 'active': isActive }"></div>
@@ -8,7 +8,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, PropType, watch, nextTick } from 'vue';
+import { ref, onUnmounted, PropType, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import * as THREE from 'three';
 
@@ -17,7 +17,7 @@ export interface MenuItem {
   icon: string; // SVG string
   route?: string;
   action?: () => void;
-  instant?: boolean; // If true, action triggers immediately on touch start
+  hold?: boolean; // If true, action triggers after a brief hold
   continuous?: boolean; // If true, action triggers repeatedly while holding
 }
 
@@ -64,7 +64,6 @@ watch(() => props.items, (newItems, oldItems) => {
 const isActive = ref(false);
 const router = useRouter();
 const canvasContainer = ref<HTMLDivElement | null>(null);
-let lastTap = 0;
 
 // Three.js variables
 let scene: THREE.Scene;
@@ -78,7 +77,7 @@ let animationFrameId: number;
 let hoveredSegment: THREE.Mesh | null = null;
 
 const MENU_RADIUS_INNER = 180;
-const MENU_RADIUS_OUTER = 350;
+const MENU_RADIUS_OUTER = 370;
 const GAP_ANGLE = 0.05; // Radians
 const SEGMENT_COLOR = 0x222222;
 const HOVER_COLOR = 0x444444;
@@ -95,18 +94,10 @@ const activateMenu = () => {
 };
 
 const hideMenu = () => {
-  isActive.value = false;
-  stopAnimation();
-};
-
-const handleTouchStart = (e: TouchEvent) => {
-  const currentTime = new Date().getTime();
-  const tapLength = currentTime - lastTap;
-  if (tapLength < 300 && tapLength > 0) {
-    activateMenu();
-    e.preventDefault();
-  }
-  lastTap = currentTime;
+  nextTick(() => {
+    isActive.value = false;
+    stopAnimation();
+  });
 };
 
 const initThree = () => {
@@ -147,11 +138,14 @@ const initThree = () => {
   renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
   renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: false });
   renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
+  window.addEventListener('touchend', onGlobalTouchEnd, { passive: false });
+  window.addEventListener('touchmove', onGlobalTouchMove, { passive: false });
   
   // Mouse events for desktop testing
   renderer.domElement.addEventListener('mousedown', onMouseDown);
   renderer.domElement.addEventListener('mouseup', onMouseUp);
   renderer.domElement.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onGlobalMouseUp);
 };
 
 const createMenuGeometry = () => {
@@ -354,14 +348,14 @@ const handleInputStart = (clientX: number, clientY: number) => {
       inputTimer = setInterval(() => {
         if (item.action) item.action();
       }, 100);
-    } else if (item.instant) {
+    } else if (!item.hold) {
       // Trigger immediately for instant items
       if (item.action) item.action();
       if (item.route) router.push(item.route);
       // Don't hide menu for instant actions (like volume) unless it's a route change
       if (item.route) hideMenu();
     } else {
-      // Standard long-press behavior
+      // long-press behavior
       inputTimer = setTimeout(() => {
         if (item.action) item.action();
         if (item.route) router.push(item.route);
@@ -401,20 +395,10 @@ const handleInputMove = (clientX: number, clientY: number) => {
 // Global event handlers for drag/release outside canvas
 const onGlobalMouseUp = () => {
   handleInputEnd();
-  window.removeEventListener('mouseup', onGlobalMouseUp);
-  window.removeEventListener('mousemove', onGlobalMouseMove);
-};
-
-const onGlobalMouseMove = (event: MouseEvent) => {
-  if (event.buttons > 0) {
-    handleInputMove(event.clientX, event.clientY);
-  }
 };
 
 const onGlobalTouchEnd = (event: TouchEvent) => {
   handleInputEnd();
-  window.removeEventListener('touchend', onGlobalTouchEnd);
-  window.removeEventListener('touchmove', onGlobalTouchMove);
 };
 
 const onGlobalTouchMove = (event: TouchEvent) => {
@@ -426,22 +410,17 @@ const onGlobalTouchMove = (event: TouchEvent) => {
 
 const onTouchStart = (event: TouchEvent) => {
   event.preventDefault();
+  event.stopPropagation();
   if (event.touches.length > 0) {
     const touch = event.touches[0];
     handleInputStart(touch.clientX, touch.clientY);
-    
-    // Attach global listeners
-    window.addEventListener('touchend', onGlobalTouchEnd, { passive: false });
-    window.addEventListener('touchmove', onGlobalTouchMove, { passive: false });
   }
 };
 
 const onMouseDown = (event: MouseEvent) => {
+  event.preventDefault();
+  event.stopPropagation();
   handleInputStart(event.clientX, event.clientY);
-  
-  // Attach global listeners
-  window.addEventListener('mouseup', onGlobalMouseUp);
-  window.addEventListener('mousemove', onGlobalMouseMove);
 };
 
 // Keep these for cleanup, but they are less critical now that we use global listeners
@@ -491,18 +470,14 @@ onUnmounted(() => {
   
   // Remove global listeners just in case
   window.removeEventListener('mouseup', onGlobalMouseUp);
-  window.removeEventListener('mousemove', onGlobalMouseMove);
   window.removeEventListener('touchend', onGlobalTouchEnd);
-  window.removeEventListener('touchmove', onGlobalTouchMove);
 
   if (renderer) {
     renderer.domElement.removeEventListener('touchstart', onTouchStart);
     renderer.domElement.removeEventListener('touchend', onTouchEnd);
-    renderer.domElement.removeEventListener('touchmove', onTouchMove);
     
     renderer.domElement.removeEventListener('mousedown', onMouseDown);
     renderer.domElement.removeEventListener('mouseup', onMouseUp);
-    renderer.domElement.removeEventListener('mousemove', onMouseMove);
     
     renderer.dispose();
   }
