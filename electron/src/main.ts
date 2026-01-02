@@ -114,16 +114,6 @@ const routes = [
     name: 'SunriseAnimation',
     component: () => import('./animations/SynthwaveSunrise.vue'),
   },
-  {
-    path: '/touch-input-tester',
-    name: 'TouchInputTester',
-    component: () => import('./pages/TouchInputTester.vue'),
-  },
-  {
-    path: '/gesture-tester',
-    name: 'GestureTester',
-    component: () => import('./pages/GestureTester.vue'),
-  },
 ];
 
 const router = createRouter({

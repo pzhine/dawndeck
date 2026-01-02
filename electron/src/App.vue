@@ -51,6 +51,12 @@ watch(
   { immediate: true }
 );
 
+// Listen for navigation events from main process
+const handleNavigate = (_event: any, pageName: string) => {
+  console.log('Navigating to:', pageName);
+  router.push({ name: pageName });
+};
+
 // Set initial value on mount
 onMounted(() => {
   document.documentElement.style.setProperty(
@@ -58,19 +64,16 @@ onMounted(() => {
     brightnessFilter.value
   );
   
-  // Listen for navigation events from main process
+  
   if (window.ipcRenderer) {
-    window.ipcRenderer.on('navigate-to-page', (_event: any, pageName: string) => {
-      console.log('Navigating to:', pageName);
-      router.push({ name: pageName });
-    });
+    window.ipcRenderer.on('navigate-to-page', handleNavigate);
   }
 });
 
 // Clean up listener on unmount
 onUnmounted(() => {
   if (window.ipcRenderer) {
-    window.ipcRenderer.off('navigate-to-page');
+    window.ipcRenderer.off('navigate-to-page', handleNavigate);
   }
 });
 </script>

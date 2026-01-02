@@ -541,15 +541,6 @@ function createApplicationMenu() {
             }
           },
         },
-        {
-          label: 'Gesture Tester',
-          accelerator: 'CmdOrCtrl+Shift+G',
-          click: async () => {
-            if (win && !win.isDestroyed()) {
-              win.webContents.send('navigate-to-page', 'GestureTester');
-            }
-          },
-        },
         { type: 'separator' },
         {
           label: 'WebGL Tests',
