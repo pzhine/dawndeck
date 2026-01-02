@@ -1,3 +1,4 @@
+@ -1,100 +1,83 @@
 #include <Adafruit_NeoPixel.h>
 
 #define LAMP_PIN   5
@@ -14,16 +15,27 @@ void setup() {
   lamp.show(); // Initialize all pixels to 'off'
   spot.begin();
   spot.show(); // Initialize all pixels to 'off'
+
+  night();
 }
 
 // Global variables for animation state
 float wavePhase = 0.0;
-const float waveSpeed = 0.15;
-const float waveWidth = 1.5;
-const float waveSpacing = 7.0; // Distance between peaks. 6 LEDs + 1 gap unit
+const float waveSpeed = 0.05;
+const float waveWidth = 1;
+const float waveSpacing = 6.0; // Distance between peaks. 6 LEDs + 1 gap unit
 const int numVirtualLeds = 6;
 
 void loop() {
+  //wave();
+}
+
+void night() {
+  spot.setPixelColor(0, 255, 0, 0);
+  spot.show();
+}
+
+void wave() {
   // Variables to hold the calculated brightness for each channel
   uint8_t lampR = 0, lampG = 0, lampB = 0;
   uint8_t spotR = 0, spotG = 0, spotB = 0;
