@@ -35,7 +35,7 @@
           <div 
             class="round-item-content flex items-center w-[90%] text-[1.2rem] leading-relaxed"
             :class="[
-              isObject(item) && 'value' in item && item.value !== undefined ? 'justify-between' : 'justify-center',
+              hasAnyValues ? 'justify-between' : 'justify-center',
               isObject(item) && item.customClass ? item.customClass : ''
             ]"
           >
@@ -58,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue';
 import type { ListItem } from './InteractiveList.vue';
 
 const props = defineProps<{
@@ -94,6 +94,12 @@ const isObject = (item: any): item is Extract<ListItem, object> => {
   return typeof item === 'object' && item !== null;
 };
 
+// Check if any items have values
+const hasAnyValues = computed(() => {
+  if (!props.items) return false;
+  return props.items.some(item => isObject(item) && 'value' in item && item.value !== undefined);
+});
+
 const handleItemClick = (item: ListItem) => {
   // Prevent click if we were dragging
   if (Math.abs(lastTouchY.value - startTouchY.value) > 10) {
@@ -111,9 +117,9 @@ const updateLayout = () => {
   
   const containerHeight = containerRef.value.clientHeight;
   
-  // Set spacer to 35% of container height (top of the stable zone)
-  // The stable zone is the middle 50%, so it starts at 35% and ends at 75%
-  spacerHeight.value = containerHeight * 0.35; 
+  // Set spacer to 25% of container height (top of the stable zone)
+  // The stable zone is the middle 50%, so it starts at 25% and ends at 75%
+  spacerHeight.value = containerHeight * 0.25; 
   
   // Recalculate max scroll
   // We need to wait for spacer update to affect scrollHeight
@@ -187,17 +193,6 @@ const handleTouchMove = (e: TouchEvent) => {
 
 const handleTouchEnd = (e: TouchEvent) => {
   isDragging.value = false;
-  
-  // Check for horizontal swipe (Back gesture)
-  // Swipe right: endX > startX
-  const endX = e.changedTouches[0].clientX;
-  const diffX = endX - startTouchX.value;
-  const diffY = Math.abs(e.changedTouches[0].clientY - startTouchY.value);
-  
-  // Thresholds: moved right by > 50px, and horizontal movement was dominant
-  if (diffX > 50 && diffX > diffY * 1.5) {
-    emit('back');
-  }
 };
 
 const handleMouseDown = (e: MouseEvent) => {
