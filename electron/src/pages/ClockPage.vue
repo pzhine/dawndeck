@@ -1,5 +1,5 @@
 <template>
-  <RadialMenu :items="menuItems">
+  <RadialMenu :items="menuItems" :skip-positions="[]">
     <div tabindex="0" ref="clockContainer" class="page-container">
       <div :class="['clock-wrapper', { dimmed: isDimmed }]">
         <ClockComponent ref="clockComponent" />

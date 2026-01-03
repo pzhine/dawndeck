@@ -8,8 +8,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onUnmounted, PropType, watch, nextTick } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, onUnmounted, PropType, watch, nextTick, computed } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import * as THREE from 'three';
 
 export interface MenuItem {
@@ -26,9 +26,41 @@ const props = defineProps({
     type: Array as PropType<MenuItem[]>,
     required: true,
   },
+  skipPositions: {
+    type: Array as PropType<number[]>,
+    default: () => [0],
+  },
+  minPositions: {
+    type: Number,
+    default: 6,
+  },
 });
 
-watch(() => props.items, (newItems, oldItems) => {
+const router = useRouter();
+
+// Create fixed number of positions with spacers at specified indices
+const processedItems = computed(() => {
+  const positions: (MenuItem & { isSpacer?: boolean })[] = [];
+  let itemIndex = 0;
+  
+  for (let positionIndex = 0; positionIndex < props.minPositions; positionIndex++) {
+    if (props.skipPositions.includes(positionIndex)) {
+      // Create an empty spacer at this position
+      positions.push({ label: '', icon: '', isSpacer: true });
+    } else if (itemIndex < props.items.length) {
+      // Fill with the next item from the data array
+      positions.push(props.items[itemIndex]);
+      itemIndex++;
+    } else {
+      // No more items, create a spacer to fill remaining positions
+      positions.push({ label: '', icon: '', isSpacer: true });
+    }
+  }
+  
+  return positions;
+});
+
+watch(() => processedItems.value, (newItems, oldItems) => {
   if (!scene) return;
 
   // Check if full redraw is needed (if number of items changed)
@@ -62,7 +94,6 @@ watch(() => props.items, (newItems, oldItems) => {
 }, { deep: true });
 
 const isActive = ref(false);
-const router = useRouter();
 const canvasContainer = ref<HTMLDivElement | null>(null);
 
 // Three.js variables
@@ -158,10 +189,10 @@ const createMenuGeometry = () => {
   menuGroup = new THREE.Group();
   scene.add(menuGroup);
 
-  const count = props.items.length;
+  const count = processedItems.value.length;
   const anglePerSegment = (Math.PI * 2) / count;
 
-  props.items.forEach((item, index) => {
+  processedItems.value.forEach((item, index) => {
     // Clockwise starting from Top (PI/2)
     const segmentCenterAngle = (Math.PI / 2) - (index * anglePerSegment);
     
@@ -182,12 +213,12 @@ const createMenuGeometry = () => {
       lengthAngle
     );
 
-    // Material
+    // Material - make spacer invisible
     const material = new THREE.MeshBasicMaterial({
       color: SEGMENT_COLOR,
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: 0.9,
+      opacity: (item as any).isSpacer ? 0 : 0.9,
     });
 
     const mesh = new THREE.Mesh(geometry, material);
@@ -195,9 +226,11 @@ const createMenuGeometry = () => {
     menuGroup.add(mesh);
     segments.push(mesh);
 
-    // Icon
-    const iconMesh = createIconAndLabel(item, segmentCenterAngle);
-    mesh.userData.iconMesh = iconMesh;
+    // Icon - skip for spacer
+    if (!(item as any).isSpacer) {
+      const iconMesh = createIconAndLabel(item, segmentCenterAngle);
+      mesh.userData.iconMesh = iconMesh;
+    }
   });
 };
 
@@ -338,8 +371,14 @@ const handleInputStart = (clientX: number, clientY: number) => {
   const segment = getIntersectedSegment(clientX, clientY);
   
   if (segment) {
-    highlightSegment(segment);
     const item = segment.userData.item as MenuItem;
+    
+    // Skip interaction if it's a spacer
+    if ((item as any).isSpacer) {
+      return;
+    }
+    
+    highlightSegment(segment);
     
     if (item.continuous) {
       // Trigger immediately

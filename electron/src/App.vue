@@ -1,6 +1,7 @@
 <template>
   <div class="app-container">
     <div class="round-display">
+      <BackButton v-if="route.path !== '/'" />
       <router-view />
       <!-- <TimeoutRedirect
         :ms="45000"
@@ -23,13 +24,15 @@
 <script setup lang="ts">
 import { useAppStore } from './stores/appState';
 import { computed, watch, onMounted, onUnmounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import UpdateIndicator from './components/UpdateIndicator.vue';
+import BackButton from './components/BackButton.vue';
 // import TimeoutRedirect from './components/TimeoutRedirect.vue';
 import BluetoothNotifications from './components/BluetoothNotifications.vue';
 
 const appStore = useAppStore();
 const router = useRouter();
+const route = useRoute();
 
 // Computed property to get text brightness as a CSS filter value
 const brightnessFilter = computed(() => {

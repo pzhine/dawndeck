@@ -182,11 +182,6 @@ const getVolume = async () => {
 // 8: Prev (Index 4)
 const menuItems = computed<MenuItem[]>(() => [
   { 
-    label: 'Clock', 
-    icon: clockIcon, 
-    route: '/' 
-  },
-  { 
     label: 'Vol +', 
     icon: volumeUpIcon, 
     action: () => adjustVolume(2),
