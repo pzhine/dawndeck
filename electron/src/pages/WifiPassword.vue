@@ -1,45 +1,27 @@
 <template>
-  <div class="w-full">
-    <div
-      class="fixed top-0 left-0 border-b z-10 flex flex-row w-full h-[var(--header-height)] bg-[var(--color-li-background)]"
-    >
-      <button
-        @click="router.back()"
-        :class="{
-          'border-r px-4': true,
-        }"
-      >
-        ← Back
-      </button>
-      <div
-        class="grow px-4 text-xl overflow-hidden overflow-ellipsis whitespace-nowrap flex items-center"
-      >
-        Password for {{ networkName }}
-      </div>
-      <button
-        @click="connectToNetwork"
-        :class="{
-          'border-l px-4': true,
-        }"
-      >
-        Connect
-      </button>
+  <div class="w-full h-full flex flex-col items-center justify-center p-6">
+    <!-- Title -->
+    <div class="text-center mb-4 text-[0.8rem] font-bold truncate max-w-full px-4">
+      {{ networkName }}
     </div>
 
-    <div class="flex flex-row items-stretch mt-[var(--header-height)]">
+    <!-- Password Input with Backspace -->
+    <div class="flex flex-row items-center justify-center mb-6 w-[75%]">
       <input
         type="text"
-        class="flex p-2 border rounded mb-6"
+        class="flex-1 p-2 border rounded text-center text-[0.8rem] min-w-0"
         v-model="password"
         ref="passwordInput"
+        placeholder="Enter password"
       />
       <button
-        class="ml-4 p-3 flex rounded border mb-6"
+        class="ml-2 p-1 flex rounded border shrink-0"
         @click="removeLastCharacter"
+        title="Backspace"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          class="w-5"
+          class="w-5 h-5"
           viewBox="0 0 20 20"
           fill="currentColor"
         >
@@ -51,21 +33,43 @@
         </svg>
       </button>
     </div>
-    <div
-      v-for="(row, rowIndex) in isShiftActive ? capKeys : keyboardKeys"
-      :key="rowIndex"
-    >
-      <button
-        v-for="key in row"
-        :key="key"
-        :class="{
-          'px-2 py-0.5 m-1 min-w-10 rounded border': true,
-          'bg-[var(--color-li-highlight)]': key === 'SHIFT' && isShiftActive,
-          'border-blue-400 text-blue-400': !key.match(/[a-zA-Z]/),
-        }"
-        @click="onKeyboard(key)"
+
+    <!-- Keyboard -->
+    <div class="flex flex-col items-center justify-center mb-4">
+      <div
+        v-for="(row, rowIndex) in isShiftActive ? capKeys : keyboardKeys"
+        :key="rowIndex"
+        class="flex flex-row justify-center"
       >
-        {{ key }}
+        <button
+          v-for="key in row"
+          :key="key"
+          :class="{
+            'px-1.5 py-2 m-0.5 min-w-[1.8rem] text-[0.55rem] rounded border': true,
+            'bg-[var(--color-li-highlight)]': key === 'SHIFT' && isShiftActive,
+            'border-blue-400 text-blue-400': !key.match(/[a-zA-Z]/),
+            'min-w-[3rem]': key === 'SHIFT',
+          }"
+          @click="onKeyboard(key)"
+        >
+          {{ key }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex flex-row gap-3 justify-center mt-2">
+      <button
+        @click="router.back()"
+        class="px-4 py-2 text-[0.6rem] border rounded"
+      >
+        ← Back
+      </button>
+      <button
+        @click="connectToNetwork"
+        class="px-4 py-2 text-[0.6rem] border rounded bg-blue-600 text-white"
+      >
+        Connect
       </button>
     </div>
   </div>

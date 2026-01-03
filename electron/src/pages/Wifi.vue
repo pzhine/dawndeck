@@ -1,6 +1,6 @@
 <template>
-  <div id="wifi" class="w-full">
-    <InteractiveList
+  <div id="wifi" class="w-full h-full">
+    <RoundScrollContainer
       :items="wifiNetworks"
       @select="selectNetwork"
       :title="'Available WiFi Networks'"
@@ -12,12 +12,31 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import InteractiveList, { ListItem } from '../components/InteractiveList.vue';
+import RoundScrollContainer from '../components/RoundScrollContainer.vue';
+import { ListItem } from '../components/InteractiveList.vue';
 
 const router = useRouter();
 const wifiNetworks = ref<string[]>([]);
 
+// Check if running on Linux
+const isLinux = navigator.userAgent.toLowerCase().includes('linux');
+
 const fetchWifiNetworks = async (): Promise<void> => {
+  // Mock WiFi networks when not running on Linux
+  if (!isLinux) {
+    wifiNetworks.value = [
+      'Home WiFi',
+      'Office Network',
+      'Guest Network',
+      'Coffee Shop WiFi',
+      'Neighbor WiFi 5G',
+      'Mobile Hotspot',
+      'Public Library',
+      'Airport WiFi',
+    ];
+    return;
+  }
+
   try {
     const networks = await window.ipcRenderer.invoke(
       'list-available-wifi-networks'
@@ -25,6 +44,12 @@ const fetchWifiNetworks = async (): Promise<void> => {
     wifiNetworks.value = networks;
   } catch (error) {
     console.error('Error fetching WiFi networks:', error);
+    // Fall back to mock data if IPC call fails
+    wifiNetworks.value = [
+      'Home WiFi',
+      'Office Network',
+      'Guest Network',
+    ];
   }
 };
 

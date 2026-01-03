@@ -42,7 +42,7 @@ const menuItems: MenuItem[] = [
   { label: 'Projector', icon: projectorIcon, route: '/projector' },
   { label: 'Alarm', icon: alarmIcon, route: '/alarm' },
   { label: 'Sleep', icon: sleepIcon, action: mute },
-  { label: 'Settings', icon: settingsIcon, route: '/sunriseSettings' },
+  { label: 'Settings', icon: settingsIcon, route: '/wifi' },
 ];
 
 // Navigation function
