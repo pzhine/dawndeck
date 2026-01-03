@@ -40,8 +40,9 @@ const fetchWifiNetworks = async (): Promise<void> => {
   try {
     const networks = await window.ipcRenderer.invoke(
       'list-available-wifi-networks'
-    );
-    wifiNetworks.value = networks;
+    ) as string[];
+    // Remove duplicates using Set
+    wifiNetworks.value = [...new Set(networks)];
   } catch (error) {
     console.error('Error fetching WiFi networks:', error);
     // Fall back to mock data if IPC call fails

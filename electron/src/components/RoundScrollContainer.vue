@@ -29,12 +29,15 @@
         <div
           v-for="(item, index) in items"
           :key="index"
-          class="round-item-wrapper flex justify-center items-center py-3 w-full origin-center border-b border-white/20"
+          class="round-item-wrapper flex justify-center items-center py-1 w-full origin-center border-b border-white/20"
           @click="handleItemClick(item)"
         >
           <div 
-            class="round-item-content flex justify-between items-center w-[90%] text-[1.2rem] text-center"
-            :class="isObject(item) && item.customClass ? item.customClass : ''"
+            class="round-item-content flex items-center w-[90%] text-[1.2rem] leading-relaxed"
+            :class="[
+              isObject(item) && 'value' in item && item.value !== undefined ? 'justify-between' : 'justify-center',
+              isObject(item) && item.customClass ? item.customClass : ''
+            ]"
           >
             <span class="truncate">{{ isObject(item) ? item.label : item }}</span>
             <span v-if="isObject(item) && 'value' in item" class="value-text ml-2.5 opacity-80">

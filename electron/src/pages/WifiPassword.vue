@@ -1,7 +1,7 @@
 <template>
   <div class="w-full h-full flex flex-col items-center justify-center p-6">
     <!-- Title -->
-    <div class="text-center mb-4 text-[0.8rem] font-bold truncate max-w-full px-4">
+    <div class="text-center mb-4 text-[1rem] font-bold truncate max-w-[50%] px-4">
       {{ networkName }}
     </div>
 
@@ -45,7 +45,7 @@
           v-for="key in row"
           :key="key"
           :class="{
-            'px-1.5 py-2 m-0.5 min-w-[1.8rem] text-[0.55rem] rounded border': true,
+            'px-1.5 py-2.5 m-0.5 min-w-[2rem] text-[0.9rem] rounded border': true,
             'bg-[var(--color-li-highlight)]': key === 'SHIFT' && isShiftActive,
             'border-blue-400 text-blue-400': !key.match(/[a-zA-Z]/),
             'min-w-[3rem]': key === 'SHIFT',
@@ -61,13 +61,13 @@
     <div class="flex flex-row gap-3 justify-center mt-2">
       <button
         @click="router.back()"
-        class="px-4 py-2 text-[0.6rem] border rounded"
+        class="px-4 py-2 text-[1rem] border rounded"
       >
         ← Back
       </button>
       <button
         @click="connectToNetwork"
-        class="px-4 py-2 text-[0.6rem] border rounded bg-blue-600 text-white"
+        class="px-4 py-2 text-[1rem] border rounded bg-blue-600 text-white"
       >
         Connect
       </button>
