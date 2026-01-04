@@ -14,7 +14,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, PropType, watch, nextTick, computed } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
+import { useRouter } from 'vue-router';
 import * as THREE from 'three';
 
 export interface MenuItem {
@@ -63,7 +63,7 @@ const ringWidth = computed(() => {
   return props.width === 'narrow' ? 70 : 140;
 });
 
-const MENU_RADIUS_OUTER = 370;
+const MENU_RADIUS_OUTER = 380;
 const menuRadiusInner = computed(() => MENU_RADIUS_OUTER - ringWidth.value);
 
 const isNarrow = computed(() => ringWidth.value <= 70);
@@ -144,9 +144,9 @@ let hoveredSegment: THREE.Mesh | null = null;
 let isInteracting = false;
 
 const GAP_ANGLE = 0.05; // Radians
-const SEGMENT_COLOR = 0x222222;
-const HOVER_COLOR = 0x444444;
-const ICON_COLOR = '#ffffff';
+let SEGMENT_COLOR = 0x111111;
+let HOVER_COLOR = 0x333333;
+let ICON_COLOR = '#cccccc';
 
 const activateMenu = () => {
   if (props.pinned) return; // Don't toggle if pinned
@@ -184,6 +184,39 @@ const initThree = () => {
 
   const width = canvasContainer.value.clientWidth;
   const height = canvasContainer.value.clientHeight;
+
+  // Resolve Tailwind colors from CSS variables
+  // We use Canvas getImageData to force the browser to convert any color format (like oklch) to RGB
+  const resolveColor = (varName: string) => {
+    if (!canvasContainer.value) return null;
+    
+    // 1. Get the computed color string
+    const originalColor = canvasContainer.value.style.color;
+    canvasContainer.value.style.color = `var(${varName})`;
+    const computedColor = getComputedStyle(canvasContainer.value).color;
+    canvasContainer.value.style.color = originalColor;
+
+    // 2. Draw to canvas and read back RGB values
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return computedColor;
+    
+    ctx.fillStyle = computedColor;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+    
+    return `rgb(${r}, ${g}, ${b})`;
+  };
+
+  const segmentColor = resolveColor('--color-gray-900');
+  const hoverColor = resolveColor('--color-gray-800');
+  const iconColor = resolveColor('--color-gray-200');
+
+  if (segmentColor) SEGMENT_COLOR = new THREE.Color(segmentColor).getHex();
+  if (hoverColor) HOVER_COLOR = new THREE.Color(hoverColor).getHex();
+  if (iconColor) ICON_COLOR = iconColor;
 
   // Scene
   scene = new THREE.Scene();

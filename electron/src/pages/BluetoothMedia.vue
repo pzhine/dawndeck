@@ -30,9 +30,9 @@
             @touchmove.prevent="handleVolumeInteraction"
             @click.stop
           >
-            <div class="w-full h-2 bg-gray-700 rounded-full overflow-hidden pointer-events-none">
+            <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden pointer-events-none">
               <div 
-                class="h-full bg-white transition-all duration-100 ease-out"
+                class="h-full bg-gray-500 transition-all duration-100 ease-out"
                 :style="{ width: `${volume}%` }"
               ></div>
             </div>
