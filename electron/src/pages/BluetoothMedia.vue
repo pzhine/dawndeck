@@ -20,7 +20,7 @@
 
         <!-- Volume Bar -->
         <div class="flex items-center gap-4 z-10">
-          <div class="w-6 h-6 pointer-events-none" v-html="volumeDownIcon"></div>
+          <div class="w-6 h-6 pointer-events-none opacity-70" v-html="volumeDownIcon"></div>
           <div 
             ref="volumeBarRef"
             class="w-40 h-12 flex items-center justify-center cursor-pointer"
@@ -37,7 +37,7 @@
               ></div>
             </div>
           </div>
-          <div class="w-6 h-6 pointer-events-none" v-html="volumeUpIcon"></div>
+          <div class="w-6 h-6 pointer-events-none opacity-70" v-html="volumeUpIcon"></div>
         </div>
       </div>
 
@@ -76,7 +76,6 @@ const volume = ref(50);
 
 // Icons
 const volumeDownIcon = feather.icons['volume-1'].toSvg({ width: '100%', height: '100%' });
-const clockIcon = feather.icons['clock'].toSvg();
 const volumeUpIcon = feather.icons['volume-2'].toSvg({ width: '100%', height: '100%' });
 const nextIcon = feather.icons['skip-forward'].toSvg();
 const playPauseIcon = feather.icons['play'].toSvg();
