@@ -1,14 +1,19 @@
 <template>
   <div class="radial-menu-container">
-    <div class="content-wrapper" :class="{ 'shrunk': isActive }" @touchstart.prevent="activateMenu" @click="activateMenu">
+    <div 
+      class="content-wrapper" 
+      :class="{ 'shrunk': isActive && !pinned, 'pinned': pinned }" 
+      @touchstart.prevent="!pinned && activateMenu()" 
+      @click="!pinned && activateMenu()"
+    >
       <slot></slot>
     </div>
-    <div ref="canvasContainer" class="canvas-container" :class="{ 'active': isActive }"></div>
+    <div ref="canvasContainer" class="canvas-container" :class="{ 'active': isActive || pinned }"></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onUnmounted, PropType, watch, nextTick, computed } from 'vue';
+import { ref, onMounted, onUnmounted, PropType, watch, nextTick, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import * as THREE from 'three';
 
@@ -28,22 +33,51 @@ const props = defineProps({
   },
   skipPositions: {
     type: Array as PropType<number[]>,
-    default: () => [1],
+    default: () => [],
   },
   minPositions: {
     type: Number,
     default: 6,
   },
+  width: {
+    type: [String, Number] as PropType<'wide' | 'narrow' | number>,
+    default: 'wide',
+  },
+  layout: {
+    type: String as PropType<'full' | 'lower' | 'upper'>,
+    default: 'full',
+  },
+  pinned: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const router = useRouter();
 
-// Create fixed number of positions with spacers at specified indices
+// Compute ring dimensions based on width prop (ring thickness)
+const ringWidth = computed(() => {
+  if (typeof props.width === 'number') {
+    return props.width;
+  }
+  return props.width === 'narrow' ? 70 : 140;
+});
+
+const MENU_RADIUS_OUTER = 340;
+const menuRadiusInner = computed(() => MENU_RADIUS_OUTER - ringWidth.value);
+
+const isNarrow = computed(() => ringWidth.value <= 70);
+
+// Create positions based on items and layout
 const processedItems = computed(() => {
   const positions: (MenuItem & { isSpacer?: boolean })[] = [];
   let itemIndex = 0;
+  let positionIndex = 0;
   
-  for (let positionIndex = 0; positionIndex < props.minPositions; positionIndex++) {
+  // Only enforce minPositions for full layout
+  const enforceMinPositions = props.layout === 'full';
+  
+  while (itemIndex < props.items.length || (enforceMinPositions && positionIndex < props.minPositions)) {
     if (props.skipPositions.includes(positionIndex)) {
       // Create an empty spacer at this position
       positions.push({ label: '', icon: '', isSpacer: true });
@@ -52,9 +86,10 @@ const processedItems = computed(() => {
       positions.push(props.items[itemIndex]);
       itemIndex++;
     } else {
-      // No more items, create a spacer to fill remaining positions
+      // No more items, create a spacer to fill remaining positions (only if enforcing minPositions)
       positions.push({ label: '', icon: '', isSpacer: true });
     }
+    positionIndex++;
   }
   
   return positions;
@@ -107,14 +142,13 @@ let segments: THREE.Mesh[] = [];
 let animationFrameId: number;
 let hoveredSegment: THREE.Mesh | null = null;
 
-const MENU_RADIUS_INNER = 200;
-const MENU_RADIUS_OUTER = 370;
 const GAP_ANGLE = 0.05; // Radians
 const SEGMENT_COLOR = 0x222222;
 const HOVER_COLOR = 0x444444;
 const ICON_COLOR = '#ffffff';
 
 const activateMenu = () => {
+  if (props.pinned) return; // Don't toggle if pinned
   isActive.value = true;
   nextTick(() => {
     if (!renderer) {
@@ -125,11 +159,24 @@ const activateMenu = () => {
 };
 
 const hideMenu = () => {
+  if (props.pinned) return; // Don't hide if pinned
   nextTick(() => {
     isActive.value = false;
     stopAnimation();
   });
 };
+
+// Initialize menu immediately if pinned
+onMounted(() => {
+  if (props.pinned) {
+    nextTick(() => {
+      if (!renderer) {
+        initThree();
+      }
+      startAnimation();
+    });
+  }
+});
 
 const initThree = () => {
   if (!canvasContainer.value) return;
@@ -190,11 +237,29 @@ const createMenuGeometry = () => {
   scene.add(menuGroup);
 
   const count = processedItems.value.length;
-  const anglePerSegment = (Math.PI * 2) / count;
+  
+  // Calculate angle range and center based on layout
+  const HORIZON_OFFSET = 20 * (Math.PI / 180);
+  let totalAngle: number;
+  let startSegmentCenter: number;
+  let anglePerSegment: number;
+
+  if (props.layout === 'full') {
+    totalAngle = Math.PI * 2;
+    anglePerSegment = totalAngle / count;
+    // Clockwise starting from Top-Left (PI/2 + one segment counterclockwise)
+    startSegmentCenter = (Math.PI / 2) + anglePerSegment;
+  } else {
+    totalAngle = Math.PI - (2 * HORIZON_OFFSET);
+    anglePerSegment = totalAngle / count;
+    const centerAngle = props.layout === 'lower' ? 3 * Math.PI / 2 : Math.PI / 2;
+    // Center the segments around centerAngle
+    startSegmentCenter = centerAngle + (totalAngle / 2) - (anglePerSegment / 2);
+  }
 
   processedItems.value.forEach((item, index) => {
-    // Clockwise starting from Top-Left (PI/2 + one segment counterclockwise)
-    const segmentCenterAngle = (Math.PI / 2) + anglePerSegment - (index * anglePerSegment);
+    // Position segments based on layout
+    const segmentCenterAngle = startSegmentCenter - (index * anglePerSegment);
     
     // RingGeometry draws counter-clockwise from thetaStart.
     // We want the segment to be centered at segmentCenterAngle.
@@ -205,7 +270,7 @@ const createMenuGeometry = () => {
 
     // Geometry
     const geometry = new THREE.RingGeometry(
-      MENU_RADIUS_INNER,
+      menuRadiusInner.value,
       MENU_RADIUS_OUTER,
       32,
       1,
@@ -241,22 +306,25 @@ const drawIconAndLabel = (canvas: HTMLCanvasElement, texture: THREE.CanvasTextur
   // Clear canvas
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Layout calculations
-  const iconSize = 200;
+  // Use relative sizing for narrow menus
+  const iconSize = isNarrow.value ? Math.min(ringWidth.value * 2, 200) : 200;
   const fontSize = 80;
   const padding = 20;
-  const totalHeight = iconSize + padding + fontSize;
+  const showText = !isNarrow.value;
+  const totalHeight = showText ? iconSize + padding + fontSize : iconSize;
   
   // Center vertically
   const startY = (canvas.height - totalHeight) / 2;
   
-  // Draw Label
-  ctx.font = `${fontSize}px FlexiIBM, sans-serif`;
-  ctx.fillStyle = ICON_COLOR;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  // Draw text below icon
-  ctx.fillText(item.label, canvas.width / 2, startY + iconSize + padding);
+  // Draw Label (only if not narrow)
+  if (showText) {
+    ctx.font = `${fontSize}px FlexiIBM, sans-serif`;
+    ctx.fillStyle = ICON_COLOR;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    // Draw text below icon
+    ctx.fillText(item.label, canvas.width / 2, startY + iconSize + padding);
+  }
   
   // Update texture for text immediately
   texture.needsUpdate = true;
@@ -309,7 +377,7 @@ const createIconAndLabel = (item: MenuItem, angle: number) => {
   });
   
   const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
-  const radius = (MENU_RADIUS_INNER + MENU_RADIUS_OUTER) / 2;
+  const radius = (menuRadiusInner.value + MENU_RADIUS_OUTER) / 2;
   planeMesh.position.x = Math.cos(angle) * radius;
   planeMesh.position.y = Math.sin(angle) * radius;
   planeMesh.position.z = 2;
@@ -488,7 +556,7 @@ const onMouseMove = (event: MouseEvent) => {
 
 const startAnimation = () => {
   const animate = () => {
-    if (!isActive.value) return;
+    if (!isActive.value && !props.pinned) return;
     animationFrameId = requestAnimationFrame(animate);
     renderer.render(scene, camera);
   };
@@ -544,6 +612,10 @@ onUnmounted(() => {
 .content-wrapper.shrunk {
   transform: scale(0.6);
   opacity: 0.5;
+}
+
+.content-wrapper.pinned {
+  padding: 50px;
 }
 
 .canvas-container {

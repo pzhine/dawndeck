@@ -1,15 +1,20 @@
 <template>
-  <RadialMenu :items="menuItems">
+  <RadialMenu 
+    :items="menuItems" 
+    :width="'narrow'" 
+    :layout="'lower'" 
+    :pinned="true"
+  >
     <div class="w-full h-screen flex justify-center items-center relative">
       <!-- Connected State -->
       <div v-if="metadata && connectionStatus === 'connected'" class="w-full h-full flex flex-col items-center justify-center">
         <!-- Title -->
-        <div class="text-center z-10 pointer-events-none mb-4 px-8">
+        <div class="text-center z-10 pointer-events-none mb-2 px-8">
           <div class="text-3xl font-bold tracking-widest leading-tight">{{ metadata.title || 'Unknown' }}</div>
         </div>
 
         <!-- Artist -->
-        <div class="text-center z-10 pointer-events-none px-8 mb-6">
+        <div class="text-center z-10 pointer-events-none px-8">
           <div class="text-xl opacity-80">{{ metadata.artist || 'Unknown Artist' }}</div>
         </div>
 
@@ -18,7 +23,7 @@
           <div class="w-6 h-6 pointer-events-none" v-html="volumeDownIcon"></div>
           <div 
             ref="volumeBarRef"
-            class="w-50 h-12 flex items-center justify-center cursor-pointer"
+            class="w-40 h-12 flex items-center justify-center cursor-pointer"
             @mousedown="handleVolumeInteraction"
             @mousemove="handleVolumeInteraction"
             @touchstart.prevent="handleVolumeInteraction"

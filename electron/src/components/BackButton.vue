@@ -17,9 +17,9 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 
 // Configuration
-const CIRCLE_DIAMETER = 300;
-const VISIBLE_WIDTH = 45; // 15% of 300px
-const TRIGGER_THRESHOLD = 100;
+const CIRCLE_DIAMETER = 400;
+const VISIBLE_WIDTH = 25; // 15% of 300px
+const TRIGGER_THRESHOLD = 150;
 
 // State
 const isDragging = ref(false);
@@ -39,7 +39,7 @@ const buttonStyle = computed(() => {
     height: `${CIRCLE_DIAMETER}px`,
     left: `${currentLeft}px`,
     transition: isDragging.value ? 'none' : 'left 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.2s',
-    backgroundColor: dragOffset.value > TRIGGER_THRESHOLD * 0.5 ? '#444444' : '#222222'
+    backgroundColor: dragOffset.value > TRIGGER_THRESHOLD * 0.5 ? '#444444' : '#111111'
   };
 });
 
