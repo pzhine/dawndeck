@@ -141,6 +141,7 @@ let menuGroup: THREE.Group;
 let segments: THREE.Mesh[] = [];
 let animationFrameId: number;
 let hoveredSegment: THREE.Mesh | null = null;
+let isInteracting = false;
 
 const GAP_ANGLE = 0.05; // Radians
 const SEGMENT_COLOR = 0x222222;
@@ -213,17 +214,16 @@ const initThree = () => {
 
   // Event Listeners
   window.addEventListener('resize', onWindowResize);
-  renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
-  renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: false });
-  renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
-  window.addEventListener('touchend', onGlobalTouchEnd, { passive: false });
-  window.addEventListener('touchmove', onGlobalTouchMove, { passive: false });
   
-  // Mouse events for desktop testing
-  renderer.domElement.addEventListener('mousedown', onMouseDown);
-  renderer.domElement.addEventListener('mouseup', onMouseUp);
-  renderer.domElement.addEventListener('mousemove', onMouseMove);
-  window.addEventListener('mouseup', onGlobalMouseUp);
+  // Use capture phase on window to intercept events before they reach underlying elements
+  // This allows us to "pass through" events if we don't hit a segment
+  window.addEventListener('touchstart', onTouchStart, { capture: true, passive: false });
+  window.addEventListener('touchend', onTouchEnd, { capture: true, passive: false });
+  window.addEventListener('touchmove', onTouchMove, { capture: true, passive: false });
+  
+  window.addEventListener('mousedown', onMouseDown, { capture: true });
+  window.addEventListener('mouseup', onMouseUp, { capture: true });
+  window.addEventListener('mousemove', onMouseMove, { capture: true });
 };
 
 const createMenuGeometry = () => {
@@ -577,57 +577,68 @@ const handleInputMove = (clientX: number, clientY: number) => {
   }
 };
 
-// Global event handlers for drag/release outside canvas
-const onGlobalMouseUp = () => {
-  handleInputEnd();
-};
-
-const onGlobalTouchEnd = (event: TouchEvent) => {
-  handleInputEnd();
-};
-
-const onGlobalTouchMove = (event: TouchEvent) => {
-  if (event.touches.length > 0) {
-    const touch = event.touches[0];
-    handleInputMove(touch.clientX, touch.clientY);
-  }
-};
-
 const onTouchStart = (event: TouchEvent) => {
-  event.preventDefault();
-  event.stopPropagation();
   if (event.touches.length > 0) {
     const touch = event.touches[0];
-    handleInputStart(touch.clientX, touch.clientY);
+    const segment = getIntersectedSegment(touch.clientX, touch.clientY);
+    
+    if (segment) {
+      isInteracting = true;
+      event.preventDefault();
+      event.stopPropagation();
+      handleInputStart(touch.clientX, touch.clientY);
+    } else {
+      isInteracting = false;
+    }
   }
 };
 
 const onMouseDown = (event: MouseEvent) => {
-  event.preventDefault();
-  event.stopPropagation();
-  handleInputStart(event.clientX, event.clientY);
+  const segment = getIntersectedSegment(event.clientX, event.clientY);
+  
+  if (segment) {
+    isInteracting = true;
+    event.preventDefault();
+    event.stopPropagation();
+    handleInputStart(event.clientX, event.clientY);
+  } else {
+    isInteracting = false;
+  }
 };
 
-// Keep these for cleanup, but they are less critical now that we use global listeners
 const onTouchEnd = (event: TouchEvent) => {
-  event.preventDefault();
-  handleInputEnd();
+  if (isInteracting) {
+    event.preventDefault();
+    event.stopPropagation();
+    handleInputEnd();
+    isInteracting = false;
+  }
 };
 
 const onTouchMove = (event: TouchEvent) => {
-  event.preventDefault();
-  if (event.touches.length > 0) {
-    const touch = event.touches[0];
-    handleInputMove(touch.clientX, touch.clientY);
+  if (isInteracting) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.touches.length > 0) {
+      const touch = event.touches[0];
+      handleInputMove(touch.clientX, touch.clientY);
+    }
   }
 };
 
 const onMouseUp = (event: MouseEvent) => {
-  handleInputEnd();
+  if (isInteracting) {
+    event.preventDefault();
+    event.stopPropagation();
+    handleInputEnd();
+    isInteracting = false;
+  }
 };
 
 const onMouseMove = (event: MouseEvent) => {
-  if (event.buttons > 0) {
+  if (isInteracting) {
+    event.preventDefault();
+    event.stopPropagation();
     handleInputMove(event.clientX, event.clientY);
   }
 };
@@ -653,17 +664,15 @@ onUnmounted(() => {
   }
   window.removeEventListener('resize', onWindowResize);
   
-  // Remove global listeners just in case
-  window.removeEventListener('mouseup', onGlobalMouseUp);
-  window.removeEventListener('touchend', onGlobalTouchEnd);
+  window.removeEventListener('touchstart', onTouchStart, { capture: true } as any);
+  window.removeEventListener('touchend', onTouchEnd, { capture: true } as any);
+  window.removeEventListener('touchmove', onTouchMove, { capture: true } as any);
+  
+  window.removeEventListener('mousedown', onMouseDown, { capture: true } as any);
+  window.removeEventListener('mouseup', onMouseUp, { capture: true } as any);
+  window.removeEventListener('mousemove', onMouseMove, { capture: true } as any);
 
   if (renderer) {
-    renderer.domElement.removeEventListener('touchstart', onTouchStart);
-    renderer.domElement.removeEventListener('touchend', onTouchEnd);
-    
-    renderer.domElement.removeEventListener('mousedown', onMouseDown);
-    renderer.domElement.removeEventListener('mouseup', onMouseUp);
-    
     renderer.dispose();
   }
 });
@@ -714,6 +723,6 @@ onUnmounted(() => {
 
 /* Enable pointer events only on the canvas element itself */
 .canvas-container.active canvas {
-  pointer-events: auto;
+  pointer-events: none !important;
 }
 </style>
