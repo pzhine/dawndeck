@@ -10,7 +10,7 @@
       <div v-if="metadata && connectionStatus === 'connected'" class="w-full h-full flex flex-col items-center justify-center">
         <!-- Title -->
         <div class="text-center z-10 pointer-events-none mb-2 px-8">
-          <div class="text-3xl font-bold tracking-widest leading-tight">{{ metadata.title || 'Unknown' }}</div>
+          <div class="text-3xl font-bold tracking-widest leading-tight line-clamp-2">{{ metadata.title || 'Unknown' }}</div>
         </div>
 
         <!-- Artist -->
