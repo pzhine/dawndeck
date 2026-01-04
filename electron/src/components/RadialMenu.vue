@@ -63,7 +63,7 @@ const ringWidth = computed(() => {
   return props.width === 'narrow' ? 70 : 140;
 });
 
-const MENU_RADIUS_OUTER = 340;
+const MENU_RADIUS_OUTER = 370;
 const menuRadiusInner = computed(() => MENU_RADIUS_OUTER - ringWidth.value);
 
 const isNarrow = computed(() => ringWidth.value <= 70);
@@ -267,16 +267,94 @@ const createMenuGeometry = () => {
     
     const lengthAngle = anglePerSegment - GAP_ANGLE;
     const startAngle = segmentCenterAngle - (lengthAngle / 2);
+    const endAngle = startAngle + lengthAngle;
 
-    // Geometry
-    const geometry = new THREE.RingGeometry(
-      menuRadiusInner.value,
-      MENU_RADIUS_OUTER,
-      32,
-      1,
-      startAngle,
-      lengthAngle
-    );
+    const isFirstItem = index === 0;
+    const isLastItem = index === count - 1;
+    const isNotFull = props.layout !== 'full';
+
+    // We want to round the CCW edge of the First Item (highest angle)
+    // and the CW edge of the Last Item (lowest angle).
+    const roundCCW = isNotFull && isFirstItem;
+    const roundCW = isNotFull && isLastItem;
+    
+    const cornerRadius = 20;
+    
+    let geometry: THREE.BufferGeometry;
+
+    if (roundCCW || roundCW) {
+      const shape = new THREE.Shape();
+      const R_in = menuRadiusInner.value;
+      const R_out = MENU_RADIUS_OUTER;
+      const r = cornerRadius;
+      
+      // Calculate angular offsets for corners
+      // sin(delta) = r / (R +/- r)
+      const delta_out = Math.asin(r / (R_out - r));
+      const delta_in = Math.asin(r / (R_in + r));
+      
+      // 1. Outer Arc (CCW)
+      let outerStart = startAngle;
+      let outerEnd = endAngle;
+      
+      if (roundCW) outerStart += delta_out;
+      if (roundCCW) outerEnd -= delta_out;
+      
+      shape.absarc(0, 0, R_out, outerStart, outerEnd, false);
+      
+      // 2. CCW Edge (at endAngle)
+      if (roundCCW) {
+        // Outer corner
+        const cOut = endAngle - delta_out;
+        const cxOut = (R_out - r) * Math.cos(cOut);
+        const cyOut = (R_out - r) * Math.sin(cOut);
+        shape.absarc(cxOut, cyOut, r, cOut, endAngle + Math.PI/2, false);
+        
+        // Inner corner
+        const cIn = endAngle - delta_in;
+        const cxIn = (R_in + r) * Math.cos(cIn);
+        const cyIn = (R_in + r) * Math.sin(cIn);
+        shape.absarc(cxIn, cyIn, r, endAngle + Math.PI/2, cIn + Math.PI, false);
+      } else {
+        shape.lineTo(R_in * Math.cos(endAngle), R_in * Math.sin(endAngle));
+      }
+      
+      // 3. Inner Arc (CW)
+      let innerStart = endAngle;
+      let innerEnd = startAngle;
+      
+      if (roundCCW) innerStart -= delta_in;
+      if (roundCW) innerEnd += delta_in;
+      
+      shape.absarc(0, 0, R_in, innerStart, innerEnd, true);
+      
+      // 4. CW Edge (at startAngle)
+      if (roundCW) {
+        // Inner corner
+        const cIn = startAngle + delta_in;
+        const cxIn = (R_in + r) * Math.cos(cIn);
+        const cyIn = (R_in + r) * Math.sin(cIn);
+        shape.absarc(cxIn, cyIn, r, cIn + Math.PI, startAngle - Math.PI/2, false);
+        
+        // Outer corner
+        const cOut = startAngle + delta_out;
+        const cxOut = (R_out - r) * Math.cos(cOut);
+        const cyOut = (R_out - r) * Math.sin(cOut);
+        shape.absarc(cxOut, cyOut, r, startAngle - Math.PI/2, cOut, false);
+      }
+      
+      geometry = new THREE.ShapeGeometry(shape);
+    } else {
+      // Standard RingGeometry
+      geometry = new THREE.RingGeometry(
+        menuRadiusInner.value,
+        MENU_RADIUS_OUTER,
+        32,
+        1,
+        startAngle,
+        lengthAngle
+      );
+    }
 
     // Material - make spacer invisible
     const material = new THREE.MeshBasicMaterial({
@@ -631,7 +709,11 @@ onUnmounted(() => {
 }
 
 .canvas-container.active {
-  pointer-events: auto;
   opacity: 1;
+}
+
+/* Enable pointer events only on the canvas element itself */
+.canvas-container.active canvas {
+  pointer-events: auto;
 }
 </style>
