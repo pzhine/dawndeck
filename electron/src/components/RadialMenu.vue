@@ -231,21 +231,13 @@ const preloadIcons = async () => {
   await Promise.all(promises);
 };
 
-const activateMenu = async () => {
+const activateMenu = () => {
   if (props.pinned) return; // Don't toggle if pinned
   isActive.value = true;
   justOpened.value = true;
   setTimeout(() => { justOpened.value = false; }, 500);
   
-  // Ensure font is loaded before rendering
-  await document.fonts.load('80px FlexiIBM');
-
-  nextTick(() => {
-    if (!renderer) {
-      initThree();
-    }
-    startAnimation();
-  });
+  startAnimation();
 };
 
 const hideMenu = () => {
@@ -258,22 +250,27 @@ const hideMenu = () => {
 
 // Initialize menu immediately if pinned
 onMounted(async () => {
+  // Wait for DOM to be fully ready for style computation
+  await nextTick();
+
   // Resolve colors immediately if possible
   if (canvasContainer.value) {
     updateColors();
-    await preloadIcons();
+  }
+  
+  // Preload icons and fonts immediately
+  const fontPromise = document.fonts.load('80px FlexiIBM');
+  const iconPromise = preloadIcons();
+  
+  await Promise.all([fontPromise, iconPromise]);
+
+  // Initialize Three.js immediately (invisible)
+  if (!renderer && canvasContainer.value) {
+    initThree();
   }
 
   if (props.pinned) {
-    // Ensure font is loaded before rendering
-    await document.fonts.load('80px FlexiIBM');
-
-    nextTick(() => {
-      if (!renderer) {
-        initThree();
-      }
-      startAnimation();
-    });
+    startAnimation();
   }
 });
 
