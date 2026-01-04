@@ -5,66 +5,77 @@
   src: url('./assets/fonts/Old-School-Adventures-847a.woff') format('woff');
   font-weight: normal;
   font-style: normal;
+  font-display: block;
 }
 @font-face {
   font-family: 'FrozenCrystalExpanded';
   src: url('./assets/fonts/FrozenCrystalExpanded-xzK0.otf') format('opentype');
   font-weight: normal;
   font-style: normal;
+  font-display: block;
 }
 @font-face {
   font-family: 'FrozenCrystalAcademy';
   src: url('./assets/fonts/FrozenCrystalAcademy-J787.otf') format('opentype');
   font-weight: normal;
   font-style: normal;
+  font-display: block;
 }
 @font-face {
   font-family: 'EditUndo';
   src: url('./assets/fonts/edit-undo.brk.ttf') format('opentype');
   font-weight: normal;
   font-style: normal;
+  font-display: block;
 }
 @font-face {
   font-family: 'EditUndoDot';
   src: url('./assets/fonts/edit-undo.dot-brk.ttf') format('opentype');
   font-weight: normal;
   font-style: normal;
+  font-display: block;
 }
 @font-face {
   font-family: 'Digital7';
   src: url('./assets/fonts/digital-7-mono.ttf') format('opentype');
   font-weight: normal;
   font-style: normal;
+  font-display: block;
 }
 @font-face {
   font-family: 'VCR-JP';
   src: url('./assets/fonts/vcr-jp.ttf') format('opentype');
   font-weight: normal;
   font-style: normal;
+  font-display: block;
 }
 @font-face {
   font-family: 'MobileFont';
   src: url('./assets/fonts/mobile-font.regular.ttf') format('opentype');
   font-weight: normal;
   font-style: normal;
+  font-display: block;
 }
 @font-face {
   font-family: 'November';
   src: url('./assets/fonts/november.regular.ttf') format('opentype');
   font-weight: normal;
   font-style: normal;
+  font-display: block;
 }
 @font-face {
   font-family: 'FlexiIBM';
   src: url('./assets/fonts/Flexi_IBM_VGA_True.ttf') format('opentype');
   font-weight: normal;
   font-style: normal;
+  font-display: block;
 }
 @font-face {
   font-family: 'DS-Digital';
   src: url('./assets/fonts/DS-DIGIB.TTF') format('opentype');
   font-weight: normal;
   font-style: normal;
+  font-display: block;
 }
 
 * {

@@ -126,7 +126,9 @@ app.use(router);
 app.use(pinia); // Add Pinia to the Vue application
 
 // Mount the app
-app.mount('#app');
+document.fonts.ready.then(() => {
+  app.mount('#app');
+});
 
 // Initialize the app state from saved data
 const initializeAppState = async () => {
