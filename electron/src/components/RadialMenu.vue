@@ -28,7 +28,7 @@ const props = defineProps({
   },
   skipPositions: {
     type: Array as PropType<number[]>,
-    default: () => [0],
+    default: () => [1],
   },
   minPositions: {
     type: Number,
@@ -193,8 +193,8 @@ const createMenuGeometry = () => {
   const anglePerSegment = (Math.PI * 2) / count;
 
   processedItems.value.forEach((item, index) => {
-    // Clockwise starting from Top (PI/2)
-    const segmentCenterAngle = (Math.PI / 2) - (index * anglePerSegment);
+    // Clockwise starting from Top-Left (PI/2 + one segment counterclockwise)
+    const segmentCenterAngle = (Math.PI / 2) + anglePerSegment - (index * anglePerSegment);
     
     // RingGeometry draws counter-clockwise from thetaStart.
     // We want the segment to be centered at segmentCenterAngle.
