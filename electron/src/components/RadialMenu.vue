@@ -151,11 +151,15 @@ let SEGMENT_OPACITY = 0.5;
 let HOVER_COLOR = 0x333333;
 let ICON_COLOR = '#cccccc';
 
-const activateMenu = () => {
+const activateMenu = async () => {
   if (props.pinned) return; // Don't toggle if pinned
   isActive.value = true;
   justOpened.value = true;
   setTimeout(() => { justOpened.value = false; }, 500);
+  
+  // Ensure font is loaded before rendering
+  await document.fonts.load('80px FlexiIBM');
+
   nextTick(() => {
     if (!renderer) {
       initThree();
@@ -173,8 +177,11 @@ const hideMenu = () => {
 };
 
 // Initialize menu immediately if pinned
-onMounted(() => {
+onMounted(async () => {
   if (props.pinned) {
+    // Ensure font is loaded before rendering
+    await document.fonts.load('80px FlexiIBM');
+
     nextTick(() => {
       if (!renderer) {
         initThree();
