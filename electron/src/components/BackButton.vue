@@ -1,6 +1,6 @@
 <template>
   <div 
-    class="fixed top-1/2 -translate-y-1/2 bg-[#222222] border-2 border-[#333333] rounded-full z-[1000] cursor-pointer shadow-lg"
+    class="fixed top-1/2 -translate-y-1/2 bg-gray-900 border-2 border-gray-800 rounded-full z-[1000] cursor-pointer shadow-lg"
     :style="buttonStyle"
     @touchstart.prevent="handleTouchStart"
     @touchmove.prevent="handleTouchMove"
@@ -39,7 +39,8 @@ const buttonStyle = computed(() => {
     height: `${CIRCLE_DIAMETER}px`,
     left: `${currentLeft}px`,
     transition: isDragging.value ? 'none' : 'left 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.2s',
-    backgroundColor: dragOffset.value > TRIGGER_THRESHOLD * 0.5 ? '#444444' : '#111111'
+    backgroundColor: dragOffset.value > TRIGGER_THRESHOLD * 0.5 ? 'gray-900' : 'gray-800',
+    opacity: 0.5
   };
 });
 

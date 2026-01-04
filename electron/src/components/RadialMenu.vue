@@ -3,8 +3,8 @@
     <div 
       class="content-wrapper" 
       :class="{ 'shrunk': isActive && !pinned, 'pinned': pinned }" 
-      @touchstart.prevent="!pinned && activateMenu()" 
-      @click="!pinned && activateMenu()"
+      @touchstart="!pinned && !justClosed && activateMenu()" 
+      @click="!pinned && !justClosed && activateMenu()"
     >
       <slot></slot>
     </div>
@@ -129,6 +129,7 @@ watch(() => processedItems.value, (newItems, oldItems) => {
 }, { deep: true });
 
 const isActive = ref(false);
+const justClosed = ref(false);
 const canvasContainer = ref<HTMLDivElement | null>(null);
 
 // Three.js variables
@@ -145,6 +146,7 @@ let isInteracting = false;
 
 const GAP_ANGLE = 0.05; // Radians
 let SEGMENT_COLOR = 0x111111;
+let SEGMENT_OPACITY = 0.5;
 let HOVER_COLOR = 0x333333;
 let ICON_COLOR = '#cccccc';
 
@@ -212,11 +214,12 @@ const initThree = () => {
 
   const segmentColor = resolveColor('--color-gray-900');
   const hoverColor = resolveColor('--color-gray-800');
-  const iconColor = resolveColor('--color-gray-200');
+  const iconColor = resolveColor('--color-gray-400');
 
   if (segmentColor) SEGMENT_COLOR = new THREE.Color(segmentColor).getHex();
   if (hoverColor) HOVER_COLOR = new THREE.Color(hoverColor).getHex();
   if (iconColor) ICON_COLOR = iconColor;
+  SEGMENT_OPACITY = 0.5;
 
   // Scene
   scene = new THREE.Scene();
@@ -394,7 +397,7 @@ const createMenuGeometry = () => {
       color: SEGMENT_COLOR,
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: (item as any).isSpacer ? 0 : 0.9,
+      opacity: (item as any).isSpacer ? 0 : SEGMENT_OPACITY,
     });
 
     const mesh = new THREE.Mesh(geometry, material);
@@ -440,6 +443,12 @@ const drawIconAndLabel = (canvas: HTMLCanvasElement, texture: THREE.CanvasTextur
   // Update texture for text immediately
   texture.needsUpdate = true;
 
+  // Cancel any pending icon load for this texture
+  if ((texture as any)._pendingIconUrl) {
+    URL.revokeObjectURL((texture as any)._pendingIconUrl);
+    (texture as any)._pendingIconUrl = null;
+  }
+
   // Load and Draw Icon
   const img = new Image();
   
@@ -454,16 +463,30 @@ const drawIconAndLabel = (canvas: HTMLCanvasElement, texture: THREE.CanvasTextur
   
   const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(svgBlob);
+  
+  // Track this URL so we can cancel it if a new icon is requested
+  (texture as any)._pendingIconUrl = url;
 
   img.onload = () => {
-    const x = (canvas.width - iconSize) / 2;
-    ctx.drawImage(img, x, startY, iconSize, iconSize);
-    texture.needsUpdate = true;
-    URL.revokeObjectURL(url);
+    // Only draw if this is still the current icon (wasn't superseded)
+    if ((texture as any)._pendingIconUrl === url) {
+      const x = (canvas.width - iconSize) / 2;
+      ctx.drawImage(img, x, startY, iconSize, iconSize);
+      texture.needsUpdate = true;
+      URL.revokeObjectURL(url);
+      (texture as any)._pendingIconUrl = null;
+    } else {
+      // This load was superseded, just clean up
+      URL.revokeObjectURL(url);
+    }
   };
   
   img.onerror = (e) => {
     console.error('Failed to load SVG icon', e);
+    URL.revokeObjectURL(url);
+    if ((texture as any)._pendingIconUrl === url) {
+      (texture as any)._pendingIconUrl = null;
+    }
   };
   
   img.src = url;
@@ -622,6 +645,14 @@ const onTouchStart = (event: TouchEvent) => {
       handleInputStart(touch.clientX, touch.clientY);
     } else {
       isInteracting = false;
+      // Hide menu if active and not pinned
+      if (isActive.value && !props.pinned) {
+        isActive.value = false;
+        justClosed.value = true;
+        setTimeout(() => { justClosed.value = false; }, 500);
+        stopAnimation();
+        // Allow event to propagate to underlying elements
+      }
     }
   }
 };
@@ -636,6 +667,14 @@ const onMouseDown = (event: MouseEvent) => {
     handleInputStart(event.clientX, event.clientY);
   } else {
     isInteracting = false;
+    // Hide menu if active and not pinned
+    if (isActive.value && !props.pinned) {
+      isActive.value = false;
+      justClosed.value = true;
+      setTimeout(() => { justClosed.value = false; }, 500);
+      stopAnimation();
+      // Allow event to propagate to underlying elements
+    }
   }
 };
 
