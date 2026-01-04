@@ -84,6 +84,8 @@ const selectCountry = (country: any) => {
     params: {
       categoryName: categoryName.value,
       searchPhrase: searchPhrase.value,
+    },
+    query: {
       country: encodeURIComponent(country.label),
     },
     // No longer passing the sounds data via router state

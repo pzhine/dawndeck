@@ -431,6 +431,12 @@ ipcMain.handle('get-sounds-by-country', async (_, query) => {
 ipcMain.handle('get-country-sounds', async (_, { query, country }) => {
   try {
     const countrySounds = await groupSoundsByCountryWithCache(query);
+    
+    // If country is 'all', return all sounds from all countries
+    if (country === 'all') {
+      return Object.values(countrySounds).flat();
+    }
+    
     return countrySounds[country] || [];
   } catch (error) {
     console.error('Error in get-country-sounds IPC handler:', error);

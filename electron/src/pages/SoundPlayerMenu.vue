@@ -140,9 +140,11 @@ const backToSoundsList = () => {
     appStore.lastSoundListRoute?.name === 'SoundsList' &&
     appStore.lastSoundListRoute?.params
   ) {
+    const { country, ...params } = appStore.lastSoundListRoute.params;
     router.push({
       name: 'SoundsList',
-      params: appStore.lastSoundListRoute.params,
+      params,
+      query: country ? { country } : {},
     });
   } else {
     // Fallback to default sound list if route isn't stored

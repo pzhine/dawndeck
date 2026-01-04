@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full">
+  <div class="w-full h-full">
     <div v-if="isLoading" class="flex justify-center items-center h-64">
       <div class="text-xl">Loading sounds...</div>
     </div>
@@ -18,7 +18,8 @@
         }}
       </div>
     </div>
-    <InteractiveList
+    <RoundScrollContainer
+      v-else
       :items="soundsList"
       :showBackButton="true"
       :title="listTitle"
@@ -32,7 +33,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import InteractiveList from '../components/InteractiveList.vue';
+import RoundScrollContainer from '../components/RoundScrollContainer.vue';
 import { playPreview, stopPreview } from '../services/audioService';
 import { useAppStore } from '../stores/appState';
 
@@ -75,9 +76,10 @@ const removeAudioExtensions = (name: string): string => {
   return name.replace(pattern, '');
 };
 
-// Get the country name from the route params
+// Get the country name from the query params (optional)
 const countryName = computed(() => {
-  return decodeURIComponent(route.params.country as string);
+  const country = route.query.country as string | undefined;
+  return country ? decodeURIComponent(country) : 'all';
 });
 
 // Get the search phrase from the route params
@@ -93,16 +95,15 @@ const listTitle = computed(() => {
   if (isFavorites.value) {
     return 'Favorite Sounds';
   }
+  if (countryName.value === 'all') {
+    return categoryName.value
+  }
   return `"${categoryName.value}" from ${countryName.value}`;
 });
 
 // Create a formatted list of sounds for the InteractiveList component
 const soundsList = computed(() => {
   return sounds.value
-    .sort((a, b) => {
-      // Sort by duration in descending order
-      return b.duration - a.duration;
-    })
     .map((sound) => {
       // Format duration in minutes:seconds
       const minutes = Math.floor(sound.duration / 60);
@@ -180,7 +181,7 @@ onMounted(() => {
   appStore.setLastSoundListRoute('SoundsList', {
     categoryName: route.params.categoryName as string,
     searchPhrase: route.params.searchPhrase as string,
-    country: route.params.country as string,
+    country: (route.query.country as string) || 'all',
   });
 });
 

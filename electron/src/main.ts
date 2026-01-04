@@ -47,7 +47,7 @@ const routes = [
     component: () => import('./pages/SoundCountries.vue'),
   },
   {
-    path: '/sounds/list/:searchPhrase/:country/:categoryName',
+    path: '/sounds/list/:searchPhrase/:categoryName',
     name: 'SoundsList',
     component: () => import('./pages/SoundsList.vue'),
   },
