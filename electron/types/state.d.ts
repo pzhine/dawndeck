@@ -87,6 +87,8 @@ export interface AppState {
   sunriseActive: boolean;
   sunriseBrightness: number; // Global brightness for sunrise (0-100)
   config: AppConfig; // Application configuration from main process
+  currentPlaylist: any[]; // Current playlist of sounds
+  currentPlaylistIndex: number; // Current index in the playlist
 }
 
 export type UpdateStatus =

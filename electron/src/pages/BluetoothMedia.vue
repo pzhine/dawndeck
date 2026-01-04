@@ -7,15 +7,15 @@
   >
     <div class="w-full h-screen flex justify-center items-center relative">
       <!-- Connected State -->
-      <div v-if="metadata && connectionStatus === 'connected'" class="w-full h-full flex flex-col items-center justify-center">
+      <div v-if="displayMetadata && isConnected" class="w-full h-full flex flex-col items-center justify-center">
         <!-- Title -->
         <div class="text-center z-10 pointer-events-none mb-2 px-8">
-          <div class="text-3xl font-bold tracking-widest leading-tight line-clamp-2">{{ metadata.title || 'Unknown' }}</div>
+          <div class="text-3xl font-bold tracking-widest leading-tight line-clamp-2 overflow-hidden" style="word-wrap: break-word; word-break: break-word; overflow-wrap: anywhere;">{{ displayMetadata.title || 'Unknown' }}</div>
         </div>
 
         <!-- Artist -->
         <div class="text-center z-10 pointer-events-none px-8">
-          <div class="text-xl opacity-80">{{ metadata.artist || 'Unknown Artist' }}</div>
+          <div class="text-xl opacity-80">{{ displayMetadata.artist || 'Unknown Artist' }}</div>
         </div>
 
         <!-- Volume Bar -->
@@ -65,14 +65,53 @@ import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import RadialMenu, { MenuItem } from '../components/RadialMenu.vue';
 import feather from 'feather-icons';
+import { getCurrentSoundInfo, isGlobalSoundPlaying, playGlobalSound } from '../services/audioService';
+import { useAppStore } from '../stores/appState';
 
 const router = useRouter();
+const appStore = useAppStore();
+
+// Helper function to remove audio file extensions
+const removeAudioExtensions = (name: string): string => {
+  const extensions = ['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a', '.wma', '.aiff', '.alac'];
+  const pattern = new RegExp(
+    `(${extensions.map((ext) => ext.replace('.', '\\.')).join('|')})$`,
+    'i'
+  );
+  return name.replace(pattern, '');
+};
 
 // Reactive state
 const metadata = ref<any>(null);
 const connectionStatus = ref<'connected' | 'connecting' | 'disconnected'>('disconnected');
 const updateInterval = ref<ReturnType<typeof setInterval> | null>(null);
 const volume = ref(50);
+const soundInfoRefreshTrigger = ref(0); // Trigger to force computed refresh
+
+// Computed property to show either global sound info or bluetooth metadata
+const displayMetadata = computed(() => {
+  // Access refresh trigger to make this computed reactive to manual updates
+  soundInfoRefreshTrigger.value;
+  
+  // Check if global sound is playing
+  if (isGlobalSoundPlaying()) {
+    const soundInfo = getCurrentSoundInfo();
+    if (soundInfo) {
+      return {
+        title: soundInfo.name,
+        artist: soundInfo.category || 'Freesound',
+        status: 'playing'
+      };
+    }
+  }
+  // Fall back to bluetooth metadata
+  return metadata.value;
+});
+
+// Computed property to check if we should show connected state
+const isConnected = computed(() => {
+  return isGlobalSoundPlaying() || connectionStatus.value === 'connected';
+});
 
 // Icons
 const volumeDownIcon = feather.icons['volume-1'].toSvg({ width: '100%', height: '100%' });
@@ -90,6 +129,72 @@ const sendCommand = async (command: string) => {
     setTimeout(refreshMetadata, 500);
   } catch (error) {
     console.error(`Failed to send command ${command}:`, error);
+  }
+};
+
+// Play next sound in playlist
+const playNextSound = () => {
+  const nextSound = appStore.moveToNextSound();
+  
+  if (nextSound) {
+    const context = nextSound._context || {};
+    
+    playGlobalSound({
+      id: nextSound.id.toString(),
+      name: removeAudioExtensions(nextSound.name),
+      previewUrl: nextSound.previews['preview-hq-mp3'],
+      duration: nextSound.duration,
+      currentTime: 0,
+      category: context.category || '',
+      country: context.country || '',
+      soundId: nextSound.id,
+      useCompressor: false,
+      highFreqReduction: -16,
+    });
+    
+    // Trigger display refresh
+    soundInfoRefreshTrigger.value++;
+  } else {
+    console.log('No next sound available');
+  }
+};
+
+// Play previous sound in playlist
+const playPreviousSound = () => {
+  console.log('playPreviousSound called');
+  console.log('Current playlist state:', {
+    playlistLength: appStore.currentPlaylist.length,
+    currentIndex: appStore.currentPlaylistIndex,
+  });
+  
+  const prevSound = appStore.moveToPreviousSound();
+  console.log('Previous sound:', prevSound ? prevSound.name : 'null');
+  
+  if (prevSound) {
+    const context = prevSound._context || {};
+    console.log('Playing previous sound:', {
+      name: prevSound.name,
+      id: prevSound.id,
+      context,
+    });
+    
+    playGlobalSound({
+      id: prevSound.id.toString(),
+      name: removeAudioExtensions(prevSound.name),
+      previewUrl: prevSound.previews['preview-hq-mp3'],
+      duration: prevSound.duration,
+      currentTime: 0,
+      category: context.category || '',
+      country: context.country || '',
+      soundId: prevSound.id,
+      useCompressor: false,
+      highFreqReduction: -16,
+    });
+    
+    // Trigger display refresh
+    soundInfoRefreshTrigger.value++;
+  } else {
+    console.log('No previous sound available');
   }
 };
 
@@ -194,13 +299,20 @@ const menuItems = computed<MenuItem[]>(() => [
   { 
     label: 'Next', 
     icon: nextIcon, 
-    action: () => sendCommand('next'),
+    action: () => {
+      console.log('Next button clicked, isGlobalSoundPlaying:', isGlobalSoundPlaying());
+      if (isGlobalSoundPlaying()) {
+        playNextSound();
+      } else {
+        sendCommand('next');
+      }
+    },
   },
   { 
-    label: metadata.value?.status === 'playing' ? 'Pause' : 'Play', 
-    icon: metadata.value?.status === 'playing' ? pauseIcon : playPauseIcon, 
+    label: displayMetadata.value?.status === 'playing' ? 'Pause' : 'Play', 
+    icon: displayMetadata.value?.status === 'playing' ? pauseIcon : playPauseIcon, 
     action: () => {
-      if (metadata.value?.status === 'playing') {
+      if (displayMetadata.value?.status === 'playing') {
         sendCommand('pause');
       } else {
         sendCommand('play');
@@ -210,7 +322,14 @@ const menuItems = computed<MenuItem[]>(() => [
   { 
     label: 'Prev', 
     icon: prevIcon, 
-    action: () => sendCommand('previous'),
+    action: () => {
+      console.log('Previous button clicked, isGlobalSoundPlaying:', isGlobalSoundPlaying());
+      if (isGlobalSoundPlaying()) {
+        playPreviousSound();
+      } else {
+        sendCommand('previous');
+      }
+    },
   },
   { 
     label: 'Vol -', 

@@ -34,7 +34,7 @@
 import { ref, onMounted, computed, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import RoundScrollContainer from '../components/RoundScrollContainer.vue';
-import { playPreview, stopPreview } from '../services/audioService';
+import { playPreview, stopPreview, playGlobalSound, getCurrentSoundInfo } from '../services/audioService';
 import { useAppStore } from '../stores/appState';
 
 const route = useRoute();
@@ -189,21 +189,39 @@ const selectSound = (sound: any) => {
   // Get the selected sound data
   const selectedSound = sound.data;
   if (selectedSound) {
-    // Navigate to the sound player page
-    const p = {
-      name: 'SoundPlayer',
-      params: isFavorites.value
-        ? selectedSound
-        : {
-            id: selectedSound.id.toString(),
-            name: removeAudioExtensions(selectedSound.name),
-            previewUrl: selectedSound.previews['preview-hq-mp3'],
-            duration: selectedSound.duration.toString(),
-            category: categoryName.value,
-            country: countryName.value,
-          },
-    };
-    router.push(p);
+    // Find the index of this sound in the sounds array
+    const soundIndex = sounds.value.findIndex(s => s.id === selectedSound.id);
+    
+    console.log('Setting playlist:', {
+      totalSounds: sounds.value.length,
+      currentIndex: soundIndex,
+      selectedSound: selectedSound.name,
+      category: categoryName.value,
+      country: countryName.value,
+    });
+    
+    // Store the playlist and current index in the app store with context
+    appStore.setCurrentPlaylist(sounds.value, soundIndex, {
+      category: categoryName.value,
+      country: countryName.value,
+    });
+    
+    // Play the sound globally using audioService
+    playGlobalSound({
+      id: selectedSound.id.toString(),
+      name: removeAudioExtensions(selectedSound.name),
+      previewUrl: selectedSound.previews['preview-hq-mp3'],
+      duration: selectedSound.duration,
+      currentTime: 0,
+      category: categoryName.value,
+      country: countryName.value,
+      soundId: selectedSound.id,
+      useCompressor: false,
+      highFreqReduction: -16,
+    });
+    
+    // Navigate to BluetoothMedia page to show the player
+    router.push({ name: 'BluetoothMedia' });
   }
 };
 

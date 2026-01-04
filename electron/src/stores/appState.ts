@@ -30,6 +30,8 @@ export const useAppStore = defineStore('appState', {
     sunriseActive: false,
     sunriseBrightness: 100, // Default: 100% brightness
     config: defaultConfig,
+    currentPlaylist: [], // Current playlist of sounds
+    currentPlaylistIndex: -1, // Current index in the playlist
   }),
 
   getters: {
@@ -284,6 +286,41 @@ export const useAppStore = defineStore('appState', {
       this.favoriteSounds = this.favoriteSounds.filter(
         (sound) => sound.id !== soundId
       );
+    },
+
+    // Set the current playlist with context info
+    setCurrentPlaylist(sounds: any[], currentIndex: number, context?: { category?: string; country?: string }): void {
+      this.currentPlaylist = sounds.map(sound => ({
+        ...sound,
+        _context: context || {}
+      }));
+      this.currentPlaylistIndex = currentIndex;
+    },
+
+    // Clear the current playlist
+    clearCurrentPlaylist(): void {
+      this.currentPlaylist = [];
+      this.currentPlaylistIndex = -1;
+    },
+
+    // Get current sound in playlist
+    getCurrentPlaylistSound(): any | null {
+      if (this.currentPlaylist.length === 0 || this.currentPlaylistIndex < 0) return null;
+      return this.currentPlaylist[this.currentPlaylistIndex];
+    },
+
+    // Move to next sound in playlist and return it
+    moveToNextSound(): any | null {
+      if (this.currentPlaylist.length === 0) return null;
+      this.currentPlaylistIndex = (this.currentPlaylistIndex + 1) % this.currentPlaylist.length;
+      return this.currentPlaylist[this.currentPlaylistIndex];
+    },
+
+    // Move to previous sound in playlist and return it
+    moveToPreviousSound(): any | null {
+      if (this.currentPlaylist.length === 0) return null;
+      this.currentPlaylistIndex = (this.currentPlaylistIndex - 1 + this.currentPlaylist.length) % this.currentPlaylist.length;
+      return this.currentPlaylist[this.currentPlaylistIndex];
     },
   },
 });

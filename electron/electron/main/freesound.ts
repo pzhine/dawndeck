@@ -237,7 +237,7 @@ export async function searchSoundsWithCache(
   query: string,
   page: number = 1,
   pageSize: number = 100,
-  fields: string = 'name,tags,geotag,duration,analysis'
+  fields: string = 'id,name,tags,username,license,previews,geotag,duration,analysis'
 ): Promise<FreesoundSearchResponse> {
   const API_KEY = getConfig().freesound.apiKey;
 
