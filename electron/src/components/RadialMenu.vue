@@ -130,6 +130,7 @@ watch(() => processedItems.value, (newItems, oldItems) => {
 
 const isActive = ref(false);
 const justClosed = ref(false);
+const justOpened = ref(false);
 const canvasContainer = ref<HTMLDivElement | null>(null);
 
 // Three.js variables
@@ -153,6 +154,8 @@ let ICON_COLOR = '#cccccc';
 const activateMenu = () => {
   if (props.pinned) return; // Don't toggle if pinned
   isActive.value = true;
+  justOpened.value = true;
+  setTimeout(() => { justOpened.value = false; }, 500);
   nextTick(() => {
     if (!renderer) {
       initThree();
@@ -646,7 +649,7 @@ const onTouchStart = (event: TouchEvent) => {
     } else {
       isInteracting = false;
       // Hide menu if active and not pinned
-      if (isActive.value && !props.pinned) {
+      if (isActive.value && !props.pinned && !justOpened.value) {
         isActive.value = false;
         justClosed.value = true;
         setTimeout(() => { justClosed.value = false; }, 500);
@@ -668,7 +671,7 @@ const onMouseDown = (event: MouseEvent) => {
   } else {
     isInteracting = false;
     // Hide menu if active and not pinned
-    if (isActive.value && !props.pinned) {
+    if (isActive.value && !props.pinned && !justOpened.value) {
       isActive.value = false;
       justClosed.value = true;
       setTimeout(() => { justClosed.value = false; }, 500);

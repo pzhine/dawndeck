@@ -39,7 +39,7 @@ const buttonStyle = computed(() => {
     height: `${CIRCLE_DIAMETER}px`,
     left: `${currentLeft}px`,
     transition: isDragging.value ? 'none' : 'left 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.2s',
-    backgroundColor: dragOffset.value > TRIGGER_THRESHOLD * 0.5 ? 'gray-900' : 'gray-800',
+    backgroundColor: dragOffset.value > TRIGGER_THRESHOLD * 0.7 ? 'gray-900' : 'gray-800',
     opacity: 0.5
   };
 });
