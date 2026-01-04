@@ -95,8 +95,11 @@ const processedItems = computed(() => {
   return positions;
 });
 
-watch(() => processedItems.value, (newItems, oldItems) => {
+watch(() => processedItems.value, async (newItems, oldItems) => {
   if (!scene) return;
+
+  // Preload new icons
+  await preloadIcons();
 
   // Check if full redraw is needed (if number of items changed)
   const needsRedraw = !oldItems || newItems.length !== oldItems.length;
@@ -144,6 +147,7 @@ let segments: THREE.Mesh[] = [];
 let animationFrameId: number;
 let hoveredSegment: THREE.Mesh | null = null;
 let isInteracting = false;
+const iconCache = new Map<string, HTMLImageElement>();
 
 const GAP_ANGLE = 0.05; // Radians
 let SEGMENT_COLOR = 0x111111;
@@ -151,51 +155,8 @@ let SEGMENT_OPACITY = 0.5;
 let HOVER_COLOR = 0x333333;
 let ICON_COLOR = '#cccccc';
 
-const activateMenu = async () => {
-  if (props.pinned) return; // Don't toggle if pinned
-  isActive.value = true;
-  justOpened.value = true;
-  setTimeout(() => { justOpened.value = false; }, 500);
-  
-  // Ensure font is loaded before rendering
-  await document.fonts.load('80px FlexiIBM');
-
-  nextTick(() => {
-    if (!renderer) {
-      initThree();
-    }
-    startAnimation();
-  });
-};
-
-const hideMenu = () => {
-  if (props.pinned) return; // Don't hide if pinned
-  nextTick(() => {
-    isActive.value = false;
-    stopAnimation();
-  });
-};
-
-// Initialize menu immediately if pinned
-onMounted(async () => {
-  if (props.pinned) {
-    // Ensure font is loaded before rendering
-    await document.fonts.load('80px FlexiIBM');
-
-    nextTick(() => {
-      if (!renderer) {
-        initThree();
-      }
-      startAnimation();
-    });
-  }
-});
-
-const initThree = () => {
+const updateColors = () => {
   if (!canvasContainer.value) return;
-
-  const width = canvasContainer.value.clientWidth;
-  const height = canvasContainer.value.clientHeight;
 
   // Resolve Tailwind colors from CSS variables
   // We use Canvas getImageData to force the browser to convert any color format (like oklch) to RGB
@@ -230,6 +191,100 @@ const initThree = () => {
   if (hoverColor) HOVER_COLOR = new THREE.Color(hoverColor).getHex();
   if (iconColor) ICON_COLOR = iconColor;
   SEGMENT_OPACITY = 0.5;
+};
+
+const preloadIcons = async () => {
+  const promises = props.items.map(item => {
+    if (iconCache.has(item.icon)) return Promise.resolve();
+    
+    return new Promise<void>((resolve) => {
+      const img = new Image();
+      
+      // Safer SVG processing:
+      // 1. Replace currentColor with white
+      let svgString = item.icon.replace(/currentColor/g, ICON_COLOR);
+      
+      // 2. Ensure width/height attributes exist (using viewBox size or default 24)
+      if (!svgString.includes('width=')) {
+        svgString = svgString.replace('<svg', '<svg width="24" height="24"');
+      }
+      
+      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+      
+      img.onload = () => {
+        iconCache.set(item.icon, img);
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      
+      img.onerror = (e) => {
+        console.error('Failed to preload SVG icon', e);
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      
+      img.src = url;
+    });
+  });
+  
+  await Promise.all(promises);
+};
+
+const activateMenu = async () => {
+  if (props.pinned) return; // Don't toggle if pinned
+  isActive.value = true;
+  justOpened.value = true;
+  setTimeout(() => { justOpened.value = false; }, 500);
+  
+  // Ensure font is loaded before rendering
+  await document.fonts.load('80px FlexiIBM');
+
+  nextTick(() => {
+    if (!renderer) {
+      initThree();
+    }
+    startAnimation();
+  });
+};
+
+const hideMenu = () => {
+  if (props.pinned) return; // Don't hide if pinned
+  nextTick(() => {
+    isActive.value = false;
+    stopAnimation();
+  });
+};
+
+// Initialize menu immediately if pinned
+onMounted(async () => {
+  // Resolve colors immediately if possible
+  if (canvasContainer.value) {
+    updateColors();
+    await preloadIcons();
+  }
+
+  if (props.pinned) {
+    // Ensure font is loaded before rendering
+    await document.fonts.load('80px FlexiIBM');
+
+    nextTick(() => {
+      if (!renderer) {
+        initThree();
+      }
+      startAnimation();
+    });
+  }
+});
+
+const initThree = () => {
+  if (!canvasContainer.value) return;
+
+  const width = canvasContainer.value.clientWidth;
+  const height = canvasContainer.value.clientHeight;
+
+  // Update colors if not already done
+  updateColors();
 
   // Scene
   scene = new THREE.Scene();
@@ -452,6 +507,15 @@ const drawIconAndLabel = (canvas: HTMLCanvasElement, texture: THREE.CanvasTextur
   
   // Update texture for text immediately
   texture.needsUpdate = true;
+
+  // Check cache first
+  if (iconCache.has(item.icon)) {
+    const img = iconCache.get(item.icon)!;
+    const x = (canvas.width - iconSize) / 2;
+    ctx.drawImage(img, x, startY, iconSize, iconSize);
+    texture.needsUpdate = true;
+    return;
+  }
 
   // Cancel any pending icon load for this texture
   if ((texture as any)._pendingIconUrl) {
