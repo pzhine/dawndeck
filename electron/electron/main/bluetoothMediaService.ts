@@ -97,16 +97,14 @@ export class BluetoothMediaService extends EventEmitter {
 
     this.socket.on('data', (data: Buffer) => {
       const messages = data.toString().trim().split('\n');
-      console.log('[BT Socket] Received data:', messages.length, 'messages');
       
       for (const message of messages) {
         if (message) {
           try {
             const response: MediaControlResponse = JSON.parse(message);
-            console.log('[BT Socket] Parsed response:', response);
             this.handleResponse(response);
           } catch (error) {
-            console.error('Failed to parse response:', error, 'Raw message:', message);
+            console.error('Failed to parse BT response:', error);
           }
         }
       }
@@ -190,21 +188,14 @@ export class BluetoothMediaService extends EventEmitter {
       const oldMetadata = this.currentMetadata;
       this.currentMetadata = response.metadata;
       
-      console.log('[BT handleResponse] Metadata received:', {
-        oldStatus: oldMetadata?.status,
-        newStatus: response.metadata.status,
-        title: response.metadata.title,
-        hasOldMetadata: !!oldMetadata
-      });
-      
       // Emit events for metadata changes
       if (!oldMetadata || oldMetadata.title !== response.metadata.title) {
-        console.log('[BT handleResponse] Track changed, emitting trackChanged');
+        console.log('[BT] Track changed:', response.metadata.title, '-', response.metadata.artist);
         this.emit('trackChanged', response.metadata);
       }
       
       if (!oldMetadata || oldMetadata.status !== response.metadata.status) {
-        console.log('[BT handleResponse] Status changed, emitting statusChanged event:', response.metadata.status);
+        console.log('[BT] Status changed:', oldMetadata?.status, '→', response.metadata.status);
         this.emit('statusChanged', response.metadata.status);
       }
       
