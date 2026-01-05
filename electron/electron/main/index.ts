@@ -476,8 +476,11 @@ function setupBluetoothMediaEventListeners() {
   // Also handle track changes - if we get a real track (not "No device connected" or "Not Provided"), treat as playback starting
   bluetoothMediaService.on('trackChanged', (metadata) => {
     console.log('[Main] BT track changed event received:', metadata);
-    if (win && !win.isDestroyed()) {
-      console.log('[Main] Track change detected, sending bluetooth-media:playback-started to renderer');
+    // Check if this is a real track (not placeholder text) and status is playing
+    if (metadata.title && 
+        metadata.title !== 'No device connected' && 
+        win && !win.isDestroyed()) {
+      console.log('[Main] Real track detected with playing status, sending bluetooth-media:playback-started to renderer');
       win.webContents.send('bluetooth-media:playback-started');
     }
   });

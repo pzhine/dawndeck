@@ -80,12 +80,14 @@ onMounted(() => {
   window.addEventListener('touchstart', handleTouchStart);
   window.addEventListener('touchmove', handleTouchMove);
   window.addEventListener('touchend', handleTouchEnd);
+  window.addEventListener('touchcancel', handleTouchEnd);
 });
 
 onUnmounted(() => {
   window.removeEventListener('touchstart', handleTouchStart);
   window.removeEventListener('touchmove', handleTouchMove);
   window.removeEventListener('touchend', handleTouchEnd);
+  window.removeEventListener('touchcancel', handleTouchEnd);
 });
 
 // Mouse Handlers (for testing/desktop)
