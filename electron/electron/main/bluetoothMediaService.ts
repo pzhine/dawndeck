@@ -39,12 +39,14 @@ export class BluetoothMediaService extends EventEmitter {
 
   constructor() {
     super();
-    // Don't auto-connect - allow manual control in dev mode
-    // this.connect();
+    // Start connecting immediately
+    this.connect();
   }
 
   public startConnection(): void {
-    this.connect();
+    if (this.connectionState === 'disconnected') {
+      this.connect();
+    }
   }
 
   public isSimulationActive(): boolean {
