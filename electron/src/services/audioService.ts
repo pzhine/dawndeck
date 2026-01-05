@@ -371,6 +371,7 @@ function playNonNormalized(soundInfo: SoundInfo): void {
   // Loop the sound to keep it playing continuously
   globalAudioElement.loop = true;
 
+  /*
   // Start audio streaming but delay audible playback to allow the analyzer to calibrate
   // Instead of using mute, set volume to 0 and gradually fade in for smoother transition
   const originalVolume = globalAudioElement.volume;
@@ -408,6 +409,8 @@ function playNonNormalized(soundInfo: SoundInfo): void {
   }).catch((err) => {
     console.error('Error starting audio stream:', err);
   });
+  */
+ globalAudioElement.play()
 }
 
 // Reset the anti-clip gain node when stopping playback or changing audio
