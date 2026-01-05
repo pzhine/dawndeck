@@ -477,9 +477,9 @@ function setupBluetoothMediaEventListeners() {
   
   // Handle BT playback starting - stop global sound and navigate
   bluetoothMediaService.on('statusChanged', (status) => {
-    console.log('BT status changed:', status);
+    console.log('[Main] BT status changed event received:', status);
     if (status === 'playing' && win && !win.isDestroyed()) {
-      console.log('Sending bluetooth-media:playback-started to renderer');
+      console.log('[Main] Status is playing, sending bluetooth-media:playback-started to renderer');
       win.webContents.send('bluetooth-media:playback-started');
     }
   });

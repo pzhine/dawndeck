@@ -190,19 +190,21 @@ export class BluetoothMediaService extends EventEmitter {
       const oldMetadata = this.currentMetadata;
       this.currentMetadata = response.metadata;
       
-      console.log('BT metadata received:', {
+      console.log('[BT handleResponse] Metadata received:', {
         oldStatus: oldMetadata?.status,
         newStatus: response.metadata.status,
-        title: response.metadata.title
+        title: response.metadata.title,
+        hasOldMetadata: !!oldMetadata
       });
       
       // Emit events for metadata changes
       if (!oldMetadata || oldMetadata.title !== response.metadata.title) {
+        console.log('[BT handleResponse] Track changed, emitting trackChanged');
         this.emit('trackChanged', response.metadata);
       }
       
       if (!oldMetadata || oldMetadata.status !== response.metadata.status) {
-        console.log('BT status changed, emitting statusChanged event:', response.metadata.status);
+        console.log('[BT handleResponse] Status changed, emitting statusChanged event:', response.metadata.status);
         this.emit('statusChanged', response.metadata.status);
       }
       
