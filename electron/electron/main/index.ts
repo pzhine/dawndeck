@@ -590,16 +590,6 @@ function createApplicationMenu() {
       label: 'Advanced',
       submenu: [
         {
-          label: 'Touch Input Tester',
-          accelerator: 'CmdOrCtrl+Shift+T',
-          click: async () => {
-            if (win && !win.isDestroyed()) {
-              win.webContents.send('navigate-to-page', 'TouchInputTester');
-            }
-          },
-        },
-        { type: 'separator' },
-        {
           label: bluetoothMediaService?.isSimulationActive() ? 'Stop Mock Bluetooth Playback' : 'Start Mock Bluetooth Playback',
           accelerator: 'CmdOrCtrl+Shift+B',
           click: async () => {

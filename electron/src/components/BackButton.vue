@@ -2,16 +2,13 @@
   <div 
     class="fixed top-1/2 -translate-y-1/2 bg-gray-900 border-2 border-gray-800 rounded-full z-[1000] cursor-pointer shadow-lg"
     :style="buttonStyle"
-    @touchstart.prevent="handleTouchStart"
-    @touchmove.prevent="handleTouchMove"
-    @touchend.prevent="handleTouchEnd"
     @mousedown.prevent="handleMouseDown" 
   >
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
@@ -20,6 +17,7 @@ const router = useRouter();
 const CIRCLE_DIAMETER = 400;
 const VISIBLE_WIDTH = 25; // 15% of 300px
 const TRIGGER_THRESHOLD = 150;
+const EDGE_THRESHOLD = 50;
 
 // State
 const isDragging = ref(false);
@@ -46,9 +44,12 @@ const buttonStyle = computed(() => {
 
 // Touch Handlers
 const handleTouchStart = (e: TouchEvent) => {
-  isDragging.value = true;
-  hasTriggered.value = false;
-  startX.value = e.touches[0].clientX;
+  // Only start if near the left edge
+  if (e.touches[0].clientX <= EDGE_THRESHOLD) {
+    isDragging.value = true;
+    hasTriggered.value = false;
+    startX.value = e.touches[0].clientX;
+  }
 };
 
 const handleTouchMove = (e: TouchEvent) => {
@@ -63,24 +64,7 @@ const handleTouchMove = (e: TouchEvent) => {
     // Trigger as soon as threshold is reached
     if (dragOffset.value >= TRIGGER_THRESHOLD && !hasTriggered.value) {
       hasTriggered.value = true;
-      
-      // Check if we should skip intermediate history entry
-      const skipIntermediate = (window as any).__skipIntermediateHistory;
-      if (skipIntermediate) {
-        // Clear the flag
-        (window as any).__skipIntermediateHistory = false;
-        // Go back 2 steps to skip the automatic redirect
-        if (window.history.length > 2) {
-          window.history.go(-2);
-        } else {
-          router.push('/');
-        }
-      } else if (window.history.length <= 1) {
-        // Go to home if there's no history to go back to
-        router.push('/');
-      } else {
-        router.back();
-      }
+      router.back();
     }
   }
 };
@@ -91,6 +75,18 @@ const handleTouchEnd = () => {
   dragOffset.value = 0;
   hasTriggered.value = false;
 };
+
+onMounted(() => {
+  window.addEventListener('touchstart', handleTouchStart);
+  window.addEventListener('touchmove', handleTouchMove);
+  window.addEventListener('touchend', handleTouchEnd);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('touchstart', handleTouchStart);
+  window.removeEventListener('touchmove', handleTouchMove);
+  window.removeEventListener('touchend', handleTouchEnd);
+});
 
 // Mouse Handlers (for testing/desktop)
 const handleMouseDown = (e: MouseEvent) => {
@@ -111,24 +107,7 @@ const handleMouseMove = (e: MouseEvent) => {
     // Trigger as soon as threshold is reached
     if (dragOffset.value >= TRIGGER_THRESHOLD && !hasTriggered.value) {
       hasTriggered.value = true;
-      
-      // Check if we should skip intermediate history entry
-      const skipIntermediate = (window as any).__skipIntermediateHistory;
-      if (skipIntermediate) {
-        // Clear the flag
-        (window as any).__skipIntermediateHistory = false;
-        // Go back 2 steps to skip the automatic redirect
-        if (window.history.length > 2) {
-          window.history.go(-2);
-        } else {
-          router.push('/');
-        }
-      } else if (window.history.length <= 1) {
-        // Go to home if there's no history to go back to
-        router.push('/');
-      } else {
-        router.back();
-      }
+      router.back();
     }
   }
 };
