@@ -41,18 +41,22 @@
         </div>
       </div>
 
-      <!-- Disconnected State -->
+      <!-- Disconnected/Loading State -->
       <div v-else class="flex flex-col items-center text-center p-8">
-        <div class="opacity-30 mb-8">
-          <svg width="80" height="80" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/>
+        <!-- Loading Spinner -->
+        <div class="mb-8">
+          <svg class="animate-spin h-20 w-20 opacity-30" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
         </div>
         
         <div class="mb-12">
-          <div class="text-xl font-bold tracking-widest mb-2">{{ connectionStatus.toUpperCase() }}</div>
+          <div class="text-xl font-bold tracking-widest mb-2">
+            {{ connectionStatus === 'connecting' ? 'CONNECTING' : 'WAITING' }}
+          </div>
           <div class="text-sm opacity-70">
-            {{ connectionStatus === 'connecting' ? 'Searching for device...' : 'No device connected' }}
+            {{ connectionStatus === 'connecting' ? 'Searching for device...' : 'Waiting for audio source...' }}
           </div>
         </div>
       </div>
@@ -70,16 +74,6 @@ import { useAppStore } from '../stores/appState';
 
 const router = useRouter();
 const appStore = useAppStore();
-
-// Helper function to remove audio file extensions
-const removeAudioExtensions = (name: string): string => {
-  const extensions = ['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a', '.wma', '.aiff', '.alac'];
-  const pattern = new RegExp(
-    `(${extensions.map((ext) => ext.replace('.', '\\.')).join('|')})$`,
-    'i'
-  );
-  return name.replace(pattern, '');
-};
 
 // Reactive state
 const metadata = ref<any>(null);
@@ -139,18 +133,19 @@ const playNextSound = () => {
   if (nextSound) {
     const context = nextSound._context || {};
     
-    playGlobalSound({
-      id: nextSound.id.toString(),
-      name: removeAudioExtensions(nextSound.name),
-      previewUrl: nextSound.previews['preview-hq-mp3'],
-      duration: nextSound.duration,
-      currentTime: 0,
-      category: context.category || '',
-      country: context.country || '',
-      soundId: nextSound.id,
-      useCompressor: false,
-      highFreqReduction: -16,
-    });
+    playGlobalSound(
+      {
+        id: nextSound.id.toString(),
+        name: nextSound.name,
+        previewUrl: nextSound.previews['preview-hq-mp3'],
+        duration: nextSound.duration,
+        currentTime: 0,
+        category: context.category || '',
+        country: context.country || '',
+        soundId: nextSound.id,
+      },
+      false // don't loop
+    );
     
     // Trigger display refresh
     soundInfoRefreshTrigger.value++;
@@ -178,18 +173,19 @@ const playPreviousSound = () => {
       context,
     });
     
-    playGlobalSound({
-      id: prevSound.id.toString(),
-      name: removeAudioExtensions(prevSound.name),
-      previewUrl: prevSound.previews['preview-hq-mp3'],
-      duration: prevSound.duration,
-      currentTime: 0,
-      category: context.category || '',
-      country: context.country || '',
-      soundId: prevSound.id,
-      useCompressor: false,
-      highFreqReduction: -16,
-    });
+    playGlobalSound(
+      {
+        id: prevSound.id.toString(),
+        name: prevSound.name,
+        previewUrl: prevSound.previews['preview-hq-mp3'],
+        duration: prevSound.duration,
+        currentTime: 0,
+        category: context.category || '',
+        country: context.country || '',
+        soundId: prevSound.id,
+      },
+      false // don't loop
+    );
     
     // Trigger display refresh
     soundInfoRefreshTrigger.value++;
@@ -372,9 +368,29 @@ const refreshMetadata = async () => {
 
 // Lifecycle
 onMounted(() => {
+  // Check if we should be on this page - redirect if no BT and no global sound
+  const checkAndRedirect = () => {
+    // Don't redirect if BT is connected or global sound is playing
+    if (!isGlobalSoundPlaying() && connectionStatus.value === 'disconnected' && !metadata.value) {
+      console.log('No audio playing, redirecting to sound categories');
+      // Set flag to tell BackButton to skip intermediate history entry
+      (window as any).__skipIntermediateHistory = true;
+      router.push({ name: 'SoundCategories' });
+    }
+  };
+  
+  // Listen for sound changes from global auto-advance
+  window.addEventListener('sound-changed', () => {
+    console.log('Sound changed event received, refreshing display');
+    soundInfoRefreshTrigger.value++;
+  });
+  
   // Initial load
   refreshMetadata();
   getVolume();
+  
+  // Check after giving time for metadata to load
+  setTimeout(checkAndRedirect, 500);
   
   // Set up periodic updates
   updateInterval.value = setInterval(refreshMetadata, 2000);
@@ -398,6 +414,31 @@ onMounted(() => {
       connectionStatus.value = status;
       if (status === 'disconnected') {
         metadata.value = null;
+        // Redirect to sound categories if BT disconnects while on this page
+        if (!isGlobalSoundPlaying()) {
+          console.log('BT disconnected and no global sound playing, redirecting to sound categories');
+          // Set flag to tell BackButton to skip intermediate history entry
+          (window as any).__skipIntermediateHistory = true;
+          router.push({ name: 'SoundCategories' });
+        }
+      }
+    });
+  }
+  
+  // Also listen via ipcRenderer for connection changes (from menu toggle)
+  if (window.ipcRenderer) {
+    window.ipcRenderer.on('bluetooth-media:connection-changed', (_event: any, status: string) => {
+      console.log('BT connection changed via IPC:', status);
+      connectionStatus.value = status as 'connected' | 'disconnected';
+      if (status === 'disconnected') {
+        metadata.value = null;
+        // Redirect to sound categories if BT disconnects while on this page
+        if (!isGlobalSoundPlaying()) {
+          console.log('BT disconnected and no global sound playing, redirecting to sound categories');
+          // Set flag to tell BackButton to skip intermediate history entry
+          (window as any).__skipIntermediateHistory = true;
+          router.push({ name: 'SoundCategories' });
+        }
       }
     });
   }
@@ -406,6 +447,11 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  // Remove sound-changed listener
+  window.removeEventListener('sound-changed', () => {
+    soundInfoRefreshTrigger.value++;
+  });
+  
   if (updateInterval.value) {
     clearInterval(updateInterval.value);
   }

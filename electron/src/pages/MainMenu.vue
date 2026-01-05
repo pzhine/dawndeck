@@ -55,9 +55,9 @@ const menuItems = computed(() => {
       onSelect: () => router.push('/sounds'),
     },
     {
-      label: 'Bluetooth Media',
+      label: 'Media Player',
       value: 'Remote Control',
-      onSelect: () => router.push('/bluetooth-media'),
+      onSelect: () => router.push('/media-player'),
     },
     {
       label: 'Bluetooth Pairing',

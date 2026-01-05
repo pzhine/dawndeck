@@ -448,18 +448,45 @@ ipcMain.handle('get-country-sounds', async (_, { query, country }) => {
 let bluetoothMediaService: BluetoothMediaService | null = null;
 let bluetoothPairingService: any = null;
 
+// Helper function to set up bluetooth media service event listeners
+function setupBluetoothMediaEventListeners() {
+  if (!bluetoothMediaService) return;
+  
+  // Forward metadata updates to renderer
+  bluetoothMediaService.on('metadataUpdated', (metadata) => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('bluetooth-media:metadata-update', metadata);
+    }
+  });
+  
+  // Handle BT playback starting - stop global sound and navigate
+  bluetoothMediaService.on('statusChanged', (status) => {
+    console.log('BT status changed:', status);
+    if (status === 'playing' && win && !win.isDestroyed()) {
+      console.log('Sending bluetooth-media:playback-started to renderer');
+      win.webContents.send('bluetooth-media:playback-started');
+    }
+  });
+  
+  bluetoothMediaService.on('connected', () => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('bluetooth-media:connection-changed', 'connected');
+    }
+  });
+  
+  bluetoothMediaService.on('disconnected', () => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('bluetooth-media:connection-changed', 'disconnected');
+    }
+  });
+}
+
 // Register IPC handlers for Bluetooth Media Control
 ipcMain.handle('bluetooth-media:send-command', async (_, command: string) => {
   try {
     if (!bluetoothMediaService) {
       bluetoothMediaService = new BluetoothMediaService();
-      
-      // Forward metadata updates to renderer
-      bluetoothMediaService.on('metadataUpdated', (metadata) => {
-        if (win && !win.isDestroyed()) {
-          win.webContents.send('bluetooth-media:metadata-update', metadata);
-        }
-      });
+      setupBluetoothMediaEventListeners();
     }
     
     return await bluetoothMediaService.sendMediaCommand(command);
@@ -473,13 +500,7 @@ ipcMain.handle('bluetooth-media:get-metadata', async () => {
   try {
     if (!bluetoothMediaService) {
       bluetoothMediaService = new BluetoothMediaService();
-      
-      // Forward metadata updates to renderer
-      bluetoothMediaService.on('metadataUpdated', (metadata) => {
-        if (win && !win.isDestroyed()) {
-          win.webContents.send('bluetooth-media:metadata-update', metadata);
-        }
-      });
+      setupBluetoothMediaEventListeners();
     }
     
     const metadata = await bluetoothMediaService.getMetadata();
@@ -545,6 +566,26 @@ function createApplicationMenu() {
             if (win && !win.isDestroyed()) {
               win.webContents.send('navigate-to-page', 'TouchInputTester');
             }
+          },
+        },
+        { type: 'separator' },
+        {
+          label: bluetoothMediaService?.isSimulationActive() ? 'Stop Mock Bluetooth Playback' : 'Start Mock Bluetooth Playback',
+          accelerator: 'CmdOrCtrl+Shift+B',
+          click: async () => {
+            if (!bluetoothMediaService) {
+              bluetoothMediaService = new BluetoothMediaService();
+              setupBluetoothMediaEventListeners();
+            }
+            
+            if (bluetoothMediaService.isSimulationActive()) {
+              bluetoothMediaService.stopSimulation();
+              console.log('🛑 Mock Bluetooth playback stopped');
+            } else {
+              bluetoothMediaService.startConnection();
+              console.log('🎵 Mock Bluetooth playback started');
+            }
+            createApplicationMenu(); // Rebuild menu to update label
           },
         },
         { type: 'separator' },

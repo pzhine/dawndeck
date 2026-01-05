@@ -32,9 +32,9 @@ const routes = [
   { path: '/menu', name: 'MainMenu', component: MainMenu },
   { path: '/sounds', name: 'SoundCategories', component: SoundCategories },
   {
-    path: '/bluetooth-media',
-    name: 'BluetoothMedia',
-    component: () => import('./pages/BluetoothMedia.vue'),
+    path: '/media-player',
+    name: 'MediaPlayer',
+    component: () => import('./pages/MediaPlayer.vue'),
   },
   {
     path: '/bluetooth-pairing',

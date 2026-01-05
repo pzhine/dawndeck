@@ -34,7 +34,7 @@
 import { ref, onMounted, computed, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import RoundScrollContainer from '../components/RoundScrollContainer.vue';
-import { playPreview, stopPreview, playGlobalSound, getCurrentSoundInfo } from '../services/audioService';
+import { stopPreview, playGlobalSound } from '../services/audioService';
 import { useAppStore } from '../stores/appState';
 
 const route = useRoute();
@@ -207,21 +207,22 @@ const selectSound = (sound: any) => {
     });
     
     // Play the sound globally using audioService
-    playGlobalSound({
-      id: selectedSound.id.toString(),
-      name: removeAudioExtensions(selectedSound.name),
-      previewUrl: selectedSound.previews['preview-hq-mp3'],
-      duration: selectedSound.duration,
-      currentTime: 0,
-      category: categoryName.value,
-      country: countryName.value,
-      soundId: selectedSound.id,
-      useCompressor: false,
-      highFreqReduction: -16,
-    });
+    playGlobalSound(
+      {
+        id: selectedSound.id.toString(),
+        name: selectedSound.name,
+        previewUrl: selectedSound.previews['preview-hq-mp3'],
+        duration: selectedSound.duration,
+        currentTime: 0,
+        category: categoryName.value,
+        country: countryName.value,
+        soundId: selectedSound.id,
+      },
+      false // don't loop
+    );
     
-    // Navigate to BluetoothMedia page to show the player
-    router.push({ name: 'BluetoothMedia' });
+    // Navigate to MediaPlayer page to show the player
+    router.push({ name: 'MediaPlayer' });
   }
 };
 

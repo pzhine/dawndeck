@@ -13,7 +13,7 @@ import { useRouter } from 'vue-router';
 import { isGlobalSoundPlaying } from '../services/audioService';
 import ClockComponent from '../components/ClockComponent.vue';
 import RadialMenu, { MenuItem } from '../components/RadialMenu.vue';
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, computed } from 'vue';
 import { useAppStore } from '../stores/appState';
 import feather from 'feather-icons';
 
@@ -22,6 +22,7 @@ const appStore = useAppStore();
 const clockContainer = ref<HTMLDivElement | null>(null);
 const inactivityTimer = ref<number | null>(null);
 const isDimmed = ref(false);
+const isBTConnected = ref(false);
 
 const lampIcon = feather.icons['sun'].toSvg();
 const musicIcon = feather.icons['music'].toSvg();
@@ -36,14 +37,14 @@ const mute = () => {
   appStore.setProjectorBrightness(0);
 };
 
-const menuItems: MenuItem[] = [
+const menuItems = computed<MenuItem[]>(() => [
   { label: 'Lamp', icon: lampIcon, route: '/level/lampBrightness' },
-  { label: 'Sounds & Music', icon: musicIcon, route: '/bluetooth-media' },
+  { label: 'Sounds & Music', icon: musicIcon, route: isBTConnected.value ? '/media-player' : '/sounds' },
   { label: 'Projector', icon: projectorIcon, route: '/projector' },
   { label: 'Alarm', icon: alarmIcon, route: '/alarm' },
   { label: 'Sleep', icon: sleepIcon, action: mute },
   { label: 'Settings', icon: settingsIcon, route: '/wifi' },
-];
+]);
 
 // Navigation function
 const goToMenu = (event: MouseEvent) => {
@@ -89,6 +90,25 @@ onMounted(() => {
   window.addEventListener('mousedown', goToMenu);
   window.addEventListener('mousedown', handleTap);
   window.addEventListener('wheel', handleWheelEvent, { passive: false });
+  
+  // Listen for BT connection changes
+  if (window.ipcRenderer) {
+    window.ipcRenderer.on('bluetooth-media:connection-changed', (_event: any, status: string) => {
+      console.log('BT connection status changed:', status);
+      isBTConnected.value = status === 'connected';
+    });
+  }
+  
+  // Check initial BT status
+  if ((window as any).electronAPI?.bluetoothMedia?.getMetadata) {
+    (window as any).electronAPI.bluetoothMedia.getMetadata().then((result: any) => {
+      if (result && result.connectionState === 'connected') {
+        isBTConnected.value = true;
+      }
+    }).catch(() => {
+      isBTConnected.value = false;
+    });
+  }
 });
 
 onUnmounted(() => {

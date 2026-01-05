@@ -39,7 +39,29 @@ export class BluetoothMediaService extends EventEmitter {
 
   constructor() {
     super();
+    // Don't auto-connect - allow manual control in dev mode
+    // this.connect();
+  }
+
+  public startConnection(): void {
     this.connect();
+  }
+
+  public isSimulationActive(): boolean {
+    return this.simulationMode && this.mockService !== null;
+  }
+
+  public stopSimulation(): void {
+    if (this.simulationMode && this.mockService) {
+      this.mockService.stopSimulation();
+      this.mockService = null;
+      this.simulationMode = false;
+      this.connectionState = 'disconnected';
+      this.currentMetadata = null;
+      this.emit('disconnected');
+      this.emit('simulationStateChanged', false);
+      console.log('🛑 Simulation mode stopped');
+    }
   }
 
   private connect(): void {
@@ -133,15 +155,27 @@ export class BluetoothMediaService extends EventEmitter {
     // Initialize mock service
     this.mockService = new MockBluetoothMedia();
     this.mockService.on('metadataUpdated', (metadata: MediaMetadata) => {
+      const oldMetadata = this.currentMetadata;
       this.currentMetadata = metadata;
       this.emit('metadataUpdated', metadata);
+      
+      // Also emit statusChanged if status changed
+      if (!oldMetadata || oldMetadata.status !== metadata.status) {
+        console.log('Mock BT status changed:', metadata.status);
+        this.emit('statusChanged', metadata.status);
+      }
     });
     
     // Start simulation and get initial metadata
     this.mockService.startSimulation();
+    
+    // Automatically start playing
+    this.mockService.play();
+    
     this.currentMetadata = this.mockService.getCurrentMetadata();
     
     this.emit('connected');
+    this.emit('simulationStateChanged', true);
     console.log('🎶 Simulation mode ready');
   }
 

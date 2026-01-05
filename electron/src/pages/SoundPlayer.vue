@@ -112,8 +112,6 @@ const startPlayback = () => {
     category: category.value,
     country: country.value,
     soundId: soundId.value, // Add soundId for normalization
-    useCompressor: false,
-    highFreqReduction: -16,
   });
 };
 

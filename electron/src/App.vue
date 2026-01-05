@@ -29,6 +29,7 @@ import UpdateIndicator from './components/UpdateIndicator.vue';
 import BackButton from './components/BackButton.vue';
 // import TimeoutRedirect from './components/TimeoutRedirect.vue';
 import BluetoothNotifications from './components/BluetoothNotifications.vue';
+import { setOnSoundEndedCallback, playGlobalSound, stopGlobalSound, isGlobalSoundPlaying } from './services/audioService';
 
 const appStore = useAppStore();
 const router = useRouter();
@@ -60,6 +61,25 @@ const handleNavigate = (_event: any, pageName: string) => {
   router.push({ name: pageName });
 };
 
+// Handle BT media playback starting
+const handleBTPlaybackStarted = () => {
+  console.log('BT media playback started, stopping global sound and navigating to MediaPlayer');
+  
+  // Stop global sound if playing
+  if (isGlobalSoundPlaying()) {
+    stopGlobalSound();
+    // Emit event to notify components that sound state changed
+    window.dispatchEvent(new CustomEvent('sound-changed'));
+  }
+  
+  // Navigate to MediaPlayer if not already there
+  if (route.name !== 'MediaPlayer') {
+    // Set flag to tell BackButton to skip intermediate history entry
+    (window as any).__skipIntermediateHistory = true;
+    router.push({ name: 'MediaPlayer' });
+  }
+};
+
 // Set initial value on mount
 onMounted(() => {
   document.documentElement.style.setProperty(
@@ -67,16 +87,44 @@ onMounted(() => {
     brightnessFilter.value
   );
   
+  // Set up global auto-advance callback for playlist
+  setOnSoundEndedCallback(() => {
+    console.log('Sound ended, auto-advancing to next track');
+    const nextSound = appStore.moveToNextSound();
+    if (nextSound) {
+      const context = nextSound._context || {};
+      playGlobalSound(
+        {
+          id: nextSound.id.toString(),
+          name: nextSound.name,
+          previewUrl: nextSound.previews['preview-hq-mp3'],
+          duration: nextSound.duration,
+          currentTime: 0,
+          category: context.category || '',
+          country: context.country || '',
+          soundId: nextSound.id,
+        },
+        false // don't loop
+      );
+      
+      // Emit custom event for components to listen to
+      window.dispatchEvent(new CustomEvent('sound-changed'));
+    }
+  });
   
   if (window.ipcRenderer) {
     window.ipcRenderer.on('navigate-to-page', handleNavigate);
+    window.ipcRenderer.on('bluetooth-media:playback-started', handleBTPlaybackStarted);
   }
 });
 
 // Clean up listener on unmount
 onUnmounted(() => {
+  setOnSoundEndedCallback(null);
+  
   if (window.ipcRenderer) {
     window.ipcRenderer.off('navigate-to-page', handleNavigate);
+    window.ipcRenderer.off('bluetooth-media:playback-started', handleBTPlaybackStarted);
   }
 });
 </script>
