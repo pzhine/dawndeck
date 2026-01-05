@@ -95,14 +95,16 @@ export class BluetoothMediaService extends EventEmitter {
 
     this.socket.on('data', (data: Buffer) => {
       const messages = data.toString().trim().split('\n');
+      console.log('[BT Socket] Received data:', messages.length, 'messages');
       
       for (const message of messages) {
         if (message) {
           try {
             const response: MediaControlResponse = JSON.parse(message);
+            console.log('[BT Socket] Parsed response:', response);
             this.handleResponse(response);
           } catch (error) {
-            console.error('Failed to parse response:', error);
+            console.error('Failed to parse response:', error, 'Raw message:', message);
           }
         }
       }
