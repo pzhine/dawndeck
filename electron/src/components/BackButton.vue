@@ -76,6 +76,13 @@ const handleTouchEnd = () => {
   hasTriggered.value = false;
 };
 
+// Reset on route change to prevent stuck state
+router.afterEach(() => {
+  isDragging.value = false;
+  dragOffset.value = 0;
+  hasTriggered.value = false;
+});
+
 onMounted(() => {
   window.addEventListener('touchstart', handleTouchStart);
   window.addEventListener('touchmove', handleTouchMove);
