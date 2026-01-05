@@ -351,16 +351,40 @@ const refreshMetadata = async () => {
   try {
     const result = await (window as any).electronAPI?.bluetoothMedia?.getMetadata();
     if (result && result.metadata) {
-      metadata.value = result.metadata;
-      connectionStatus.value = 'connected';
+      // Check if we got an error indicating no device connected
+      if (result.error && result.error.includes('No Bluetooth media device connected')) {
+        connectionStatus.value = 'disconnected';
+        metadata.value = null;
+        // Redirect if no global sound is playing
+        if (!isGlobalSoundPlaying()) {
+          console.log('No BT device connected and no global sound, redirecting to sound categories');
+          (window as any).__skipIntermediateHistory = true;
+          router.push({ name: 'SoundCategories' });
+        }
+      } else {
+        metadata.value = result.metadata;
+        connectionStatus.value = 'connected';
+      }
     } else {
       connectionStatus.value = 'disconnected';
       metadata.value = null;
+      // Redirect if no global sound is playing
+      if (!isGlobalSoundPlaying()) {
+        console.log('No metadata and no global sound, redirecting to sound categories');
+        (window as any).__skipIntermediateHistory = true;
+        router.push({ name: 'SoundCategories' });
+      }
     }
   } catch (error) {
     console.error('Failed to get metadata:', error);
     connectionStatus.value = 'disconnected';
     metadata.value = null;
+    // Redirect if no global sound is playing
+    if (!isGlobalSoundPlaying()) {
+      console.log('Metadata error and no global sound, redirecting to sound categories');
+      (window as any).__skipIntermediateHistory = true;
+      router.push({ name: 'SoundCategories' });
+    }
   }
 };
 
