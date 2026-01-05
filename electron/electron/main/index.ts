@@ -348,6 +348,11 @@ async function initializeApp() {
   initVolumeControl();
   initAutoUpdater();
   initSunriseController();
+  
+  // Initialize Bluetooth Media Service early to detect connections
+  bluetoothMediaService = new BluetoothMediaService();
+  setupBluetoothMediaEventListeners();
+  
   createApplicationMenu();
 }
 
