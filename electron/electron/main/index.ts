@@ -353,6 +353,17 @@ async function initializeApp() {
   bluetoothMediaService = new BluetoothMediaService();
   setupBluetoothMediaEventListeners();
   
+  // Poll for metadata every 2 seconds as a backup in case socket push notifications are missed
+  setInterval(async () => {
+    if (bluetoothMediaService) {
+      try {
+        await bluetoothMediaService.getMetadata();
+      } catch (error) {
+        // Silently ignore errors - this is just a backup check
+      }
+    }
+  }, 2000);
+  
   createApplicationMenu();
 }
 
