@@ -64,7 +64,23 @@ const handleTouchMove = (e: TouchEvent) => {
     // Trigger as soon as threshold is reached
     if (dragOffset.value >= TRIGGER_THRESHOLD && !hasTriggered.value) {
       hasTriggered.value = true;
-      router.back();
+      // Check if we should skip intermediate history entry
+      const skipIntermediate = (window as any).__skipIntermediateHistory;
+      if (skipIntermediate) {
+        // Clear the flag
+        (window as any).__skipIntermediateHistory = false;
+        // Go back 2 steps to skip the automatic redirect
+        if (window.history.length > 2) {
+          window.history.go(-2);
+        } else {
+          router.push('/');
+        }
+      } else if (window.history.length <= 1) {
+        // Go to home if there's no history to go back to
+        router.push('/');
+      } else {
+        router.back();
+      }
     }
   }
 };
