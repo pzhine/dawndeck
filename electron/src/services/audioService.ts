@@ -424,7 +424,7 @@ function resetAntiClipGain(): void {
 // Play a sound globally so it persists across component navigation
 export async function playGlobalSound(
   soundInfo: SoundInfo,
-  normalize: boolean = true
+  normalize: boolean = false
 ): Promise<void> {
   // Stop any currently playing sound
   if (globalAudioElement) {
@@ -438,6 +438,12 @@ export async function playGlobalSound(
   globalAudioElement = new Audio();
   globalAudioElement.crossOrigin = 'anonymous'; // Allow cross-origin requests
 
+  globalAudioElement.src = soundInfo.previewUrl;   
+  playNonNormalized(soundInfo);
+
+  return;
+
+  /*
   // Set up normalization
   if (normalize && soundInfo.soundId) {
     try {
@@ -580,7 +586,7 @@ export async function playGlobalSound(
       globalAudioElement.src = soundInfo.previewUrl;
       playNonNormalized(soundInfo);
     }
-  }
+  }*/
 }
 
 // Stop playing the global sound
@@ -598,6 +604,7 @@ export function stopGlobalSound(): void {
     }
   }
   
+  /*
   // Reset anti-clip gain before disconnecting
   resetAntiClipGain();
 
@@ -626,9 +633,31 @@ export function stopGlobalSound(): void {
     antiClipNode.disconnect();
     antiClipNode = null;
   }
+  */
   
   globalAudioElement = null;
   currentSoundInfo = null;
+}
+
+// Pause the global sound
+export function pauseGlobalSound(): void {
+  if (globalAudioElement && !globalAudioElement.paused) {
+    globalAudioElement.pause();
+  }
+}
+
+// Resume the global sound
+export function resumeGlobalSound(): void {
+  if (globalAudioElement && globalAudioElement.paused) {
+    globalAudioElement.play().catch(error => {
+      console.error('Failed to resume audio:', error);
+    });
+  }
+}
+
+// Check if global sound is paused
+export function isGlobalSoundPaused(): boolean {
+  return globalAudioElement !== null && globalAudioElement.paused;
 }
 
 // Check if a sound is currently playing
@@ -671,14 +700,6 @@ export function setGlobalVolume(volume: number): void {
     .catch((error) => {
       console.error('Failed to set system volume:', error);
     });
-}
-
-// Update the center frequency of the parametric EQ
-export function updateParametricEQFrequency(frequency: number): void {
-  if (parametricEQ && audioContext) {
-    parametricEQ.frequency.value = frequency;
-    console.log(`Updated parametric EQ center frequency to: ${frequency} Hz`);
-  }
 }
 
 // Stop playing a preview

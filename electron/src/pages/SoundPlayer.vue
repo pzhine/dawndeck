@@ -35,7 +35,6 @@ import { useAppStore } from '../stores/appState';
 import {
   playGlobalSound,
   getCurrentSoundInfo,
-  updateParametricEQFrequency,
 } from '../services/audioService';
 
 const route = useRoute();
@@ -226,9 +225,4 @@ onBeforeUnmount(() => {
   removeEventListeners();
 });
 
-// Update frequency
-const updateFrequency = () => {
-  // Call the function with the new frequency value
-  updateParametricEQFrequency(centerFrequency.value);
-};
 </script>

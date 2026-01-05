@@ -65,7 +65,7 @@ import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import RadialMenu, { MenuItem } from '../components/RadialMenu.vue';
 import feather from 'feather-icons';
-import { getCurrentSoundInfo, isGlobalSoundPlaying, playGlobalSound } from '../services/audioService';
+import { getCurrentSoundInfo, isGlobalSoundPlaying, playGlobalSound, pauseGlobalSound, resumeGlobalSound, isGlobalSoundPaused } from '../services/audioService';
 import { useAppStore } from '../stores/appState';
 
 const router = useRouter();
@@ -100,7 +100,7 @@ const displayMetadata = computed(() => {
       return {
         title: soundInfo.name,
         artist: soundInfo.category || 'Freesound',
-        status: 'playing'
+        status: isGlobalSoundPaused() ? 'paused' : 'playing'
       };
     }
   }
@@ -312,10 +312,22 @@ const menuItems = computed<MenuItem[]>(() => [
     label: displayMetadata.value?.status === 'playing' ? 'Pause' : 'Play', 
     icon: displayMetadata.value?.status === 'playing' ? pauseIcon : playPauseIcon, 
     action: () => {
-      if (displayMetadata.value?.status === 'playing') {
-        sendCommand('pause');
+      if (isGlobalSoundPlaying()) {
+        // Handle global sound play/pause
+        if (isGlobalSoundPaused()) {
+          resumeGlobalSound();
+        } else {
+          pauseGlobalSound();
+        }
+        // Trigger display refresh
+        soundInfoRefreshTrigger.value++;
       } else {
-        sendCommand('play');
+        // Handle bluetooth commands
+        if (displayMetadata.value?.status === 'playing') {
+          sendCommand('pause');
+        } else {
+          sendCommand('play');
+        }
       }
     },
   },
