@@ -14,7 +14,7 @@
         {{
           isFavorites
             ? 'No favorite sounds yet.'
-            : 'No sounds found for this country.'
+            : 'No sounds found for this category.'
         }}
       </div>
     </div>
@@ -206,12 +206,17 @@ const selectSound = (sound: any) => {
       country: countryName.value,
     });
     
+    // Determine preview URL based on sound object structure (Search Result vs Favorite)
+    const previewUrl = selectedSound.previews 
+      ? selectedSound.previews['preview-hq-mp3'] 
+      : selectedSound.previewUrl;
+
     // Play the sound globally using audioService
     playGlobalSound(
       {
         id: selectedSound.id.toString(),
         name: selectedSound.name,
-        previewUrl: selectedSound.previews['preview-hq-mp3'],
+        previewUrl: previewUrl,
         duration: selectedSound.duration,
         currentTime: 0,
         category: categoryName.value,

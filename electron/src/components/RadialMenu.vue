@@ -24,12 +24,21 @@ export interface MenuItem {
   action?: () => void;
   hold?: boolean; // If true, action triggers after a brief hold
   continuous?: boolean; // If true, action triggers repeatedly while holding
+  active?: boolean; // If true, icon is colored yellow
 }
 
 const props = defineProps({
   items: {
     type: Array as PropType<MenuItem[]>,
-    required: true,
+    default: () => [],
+  },
+  upperItems: {
+    type: Array as PropType<MenuItem[]>,
+    default: () => [],
+  },
+  lowerItems: {
+    type: Array as PropType<MenuItem[]>,
+    default: () => [],
   },
   skipPositions: {
     type: Array as PropType<number[]>,
@@ -43,10 +52,7 @@ const props = defineProps({
     type: [String, Number] as PropType<'wide' | 'narrow' | number>,
     default: 'wide',
   },
-  layout: {
-    type: String as PropType<'full' | 'lower' | 'upper'>,
-    default: 'full',
-  },
+  // layout prop removed
   pinned: {
     type: Boolean,
     default: false,
@@ -68,65 +74,102 @@ const menuRadiusInner = computed(() => MENU_RADIUS_OUTER - ringWidth.value);
 
 const isNarrow = computed(() => ringWidth.value <= 70);
 
-// Create positions based on items and layout
-const processedItems = computed(() => {
+// Helper to process items for a layout
+const processItemsForLayout = (
+  rawItems: MenuItem[], 
+  type: 'full' | 'upper' | 'lower'
+) => {
   const positions: (MenuItem & { isSpacer?: boolean })[] = [];
   let itemIndex = 0;
   let positionIndex = 0;
   
   // Only enforce minPositions for full layout
-  const enforceMinPositions = props.layout === 'full';
+  const enforceMinPositions = type === 'full';
   
-  while (itemIndex < props.items.length || (enforceMinPositions && positionIndex < props.minPositions)) {
+  while (itemIndex < rawItems.length || (enforceMinPositions && positionIndex < props.minPositions)) {
     if (props.skipPositions.includes(positionIndex)) {
       // Create an empty spacer at this position
+      // For now, only 'full' layout likely uses skipPositions efficiently, but we support it for all
       positions.push({ label: '', icon: '', isSpacer: true });
-    } else if (itemIndex < props.items.length) {
-      // Fill with the next item from the data array
-      positions.push(props.items[itemIndex]);
+    } else if (itemIndex < rawItems.length) {
+      positions.push(rawItems[itemIndex]);
       itemIndex++;
     } else {
-      // No more items, create a spacer to fill remaining positions (only if enforcing minPositions)
       positions.push({ label: '', icon: '', isSpacer: true });
     }
     positionIndex++;
   }
   
   return positions;
+};
+
+// Create groups based on active props
+const menuGroups = computed(() => {
+  const groups: { type: 'full' | 'upper' | 'lower', items: (MenuItem & { isSpacer?: boolean })[] }[] = [];
+  
+  if (props.items.length > 0) {
+    groups.push({ type: 'full', items: processItemsForLayout(props.items, 'full') });
+  } else {
+    // Check upper and lower
+    if (props.upperItems.length > 0) {
+      groups.push({ type: 'upper', items: processItemsForLayout(props.upperItems, 'upper') });
+    }
+    if (props.lowerItems.length > 0) {
+      groups.push({ type: 'lower', items: processItemsForLayout(props.lowerItems, 'lower') });
+    }
+  }
+  
+  return groups;
 });
 
-watch(() => processedItems.value, async (newItems, oldItems) => {
+watch(() => menuGroups.value, async (newGroups, oldGroups) => {
   if (!scene) return;
 
-  // Preload new icons
+  // Preload new icons from all groups
   await preloadIcons();
 
-  // Check if full redraw is needed (if number of items changed)
-  const needsRedraw = !oldItems || newItems.length !== oldItems.length;
+  // Simple check: if number of groups changed, or lengths of items within groups changed -> redraw
+  let needsRedraw = !oldGroups || newGroups.length !== oldGroups.length;
+  if (!needsRedraw && oldGroups) {
+    for (let i = 0; i < newGroups.length; i++) {
+        if (newGroups[i].items.length !== oldGroups[i].items.length) {
+            needsRedraw = true;
+            break;
+        }
+    }
+  }
 
   if (needsRedraw) {
     createMenuGeometry();
   } else {
-    // Just update the data and textures where needed
-    segments.forEach((mesh, i) => {
-      if (mesh.userData) {
-        const oldItem = mesh.userData.item;
-        const newItem = newItems[i];
-        
-        // Always update the item reference for actions
-        mesh.userData.item = newItem;
+    // Deep update for existing segments
+    // We assume segments are pushed in order of groups -> items
+    let flatIndex = 0;
+    
+    newGroups.forEach((group) => {
+        group.items.forEach((newItem) => {
+            if (flatIndex < segments.length) {
+                const mesh = segments[flatIndex];
+                if (mesh.userData) {
+                    const oldItem = mesh.userData.item;
+                    
+                    // Always update the item reference
+                    mesh.userData.item = newItem;
 
-        // Only redraw texture if label or icon changed
-        if (newItem.label !== oldItem.label || newItem.icon !== oldItem.icon) {
-           const iconMesh = mesh.userData.iconMesh;
-           if (iconMesh) {
-               const material = iconMesh.material as THREE.MeshBasicMaterial;
-               const texture = material.map as THREE.CanvasTexture;
-               const canvas = texture.image as HTMLCanvasElement;
-               drawIconAndLabel(canvas, texture, newItem);
-           }
-        }
-      }
+                    // Only redraw texture if label or icon changed
+                    if (newItem.label !== oldItem.label || newItem.icon !== oldItem.icon || newItem.active !== oldItem.active) {
+                       const iconMesh = mesh.userData.iconMesh;
+                       if (iconMesh) {
+                           const material = iconMesh.material as THREE.MeshBasicMaterial;
+                           const texture = material.map as THREE.CanvasTexture;
+                           const canvas = texture.image as HTMLCanvasElement;
+                           drawIconAndLabel(canvas, texture, newItem);
+                       }
+                    }
+                }
+                flatIndex++;
+            }
+        });
     });
   }
 }, { deep: true });
@@ -154,6 +197,7 @@ let SEGMENT_COLOR = 0x111111;
 let SEGMENT_OPACITY = 0.5;
 let HOVER_COLOR = 0x333333;
 let ICON_COLOR = '#cccccc';
+let ACTIVE_ICON_COLOR = '#facc15'; // Yellow-400
 
 const updateColors = () => {
   if (!canvasContainer.value) return;
@@ -186,23 +230,34 @@ const updateColors = () => {
   const segmentColor = resolveColor('--color-gray-900');
   const hoverColor = resolveColor('--color-gray-800');
   const iconColor = resolveColor('--color-gray-400');
+  const activeIconColor = resolveColor('--color-yellow-400');
 
   if (segmentColor) SEGMENT_COLOR = new THREE.Color(segmentColor).getHex();
   if (hoverColor) HOVER_COLOR = new THREE.Color(hoverColor).getHex();
   if (iconColor) ICON_COLOR = iconColor;
+  if (activeIconColor) ACTIVE_ICON_COLOR = activeIconColor;
   SEGMENT_OPACITY = 0.5;
 };
 
 const preloadIcons = async () => {
-  const promises = props.items.map(item => {
-    if (iconCache.has(item.icon)) return Promise.resolve();
+  const allItems = [
+    ...(props.items || []),
+    ...(props.upperItems || []),
+    ...(props.lowerItems || [])
+  ];
+
+  const promises = allItems.map(item => {
+    const cacheKey = item.icon + (item.active ? '_active' : '');
+    if (iconCache.has(cacheKey)) return Promise.resolve();
     
     return new Promise<void>((resolve) => {
       const img = new Image();
       
+      const targetColor = item.active ? ACTIVE_ICON_COLOR : ICON_COLOR;
+      
       // Safer SVG processing:
       // 1. Replace currentColor with white
-      let svgString = item.icon.replace(/currentColor/g, ICON_COLOR);
+      let svgString = item.icon.replace(/currentColor/g, targetColor);
       
       // 2. Ensure width/height attributes exist (using viewBox size or default 24)
       if (!svgString.includes('width=')) {
@@ -213,7 +268,7 @@ const preloadIcons = async () => {
       const url = URL.createObjectURL(svgBlob);
       
       img.onload = () => {
-        iconCache.set(item.icon, img);
+        iconCache.set(cacheKey, img);
         URL.revokeObjectURL(url);
         resolve();
       };
@@ -334,144 +389,149 @@ const createMenuGeometry = () => {
   menuGroup = new THREE.Group();
   scene.add(menuGroup);
 
-  const count = processedItems.value.length;
-  
-  // Calculate angle range and center based on layout
-  const HORIZON_OFFSET = 20 * (Math.PI / 180);
-  let totalAngle: number;
-  let startSegmentCenter: number;
-  let anglePerSegment: number;
-
-  if (props.layout === 'full') {
-    totalAngle = Math.PI * 2;
-    anglePerSegment = totalAngle / count;
-    // Clockwise starting from Top-Left (PI/2 + one segment counterclockwise)
-    startSegmentCenter = (Math.PI / 2) + anglePerSegment;
-  } else {
-    totalAngle = Math.PI - (2 * HORIZON_OFFSET);
-    anglePerSegment = totalAngle / count;
-    const centerAngle = props.layout === 'lower' ? 3 * Math.PI / 2 : Math.PI / 2;
-    // Center the segments around centerAngle
-    startSegmentCenter = centerAngle + (totalAngle / 2) - (anglePerSegment / 2);
-  }
-
-  processedItems.value.forEach((item, index) => {
-    // Position segments based on layout
-    const segmentCenterAngle = startSegmentCenter - (index * anglePerSegment);
-    
-    // RingGeometry draws counter-clockwise from thetaStart.
-    // We want the segment to be centered at segmentCenterAngle.
-    // So thetaStart should be segmentCenterAngle - (length/2).
-    
-    const lengthAngle = anglePerSegment - GAP_ANGLE;
-    const startAngle = segmentCenterAngle - (lengthAngle / 2);
-    const endAngle = startAngle + lengthAngle;
-
-    const isFirstItem = index === 0;
-    const isLastItem = index === count - 1;
-    const isNotFull = props.layout !== 'full';
-
-    // We want to round the CCW edge of the First Item (highest angle)
-    // and the CW edge of the Last Item (lowest angle).
-    const roundCCW = isNotFull && isFirstItem;
-    const roundCW = isNotFull && isLastItem;
-    
-    const cornerRadius = 20;
-    
-    let geometry: THREE.BufferGeometry;
-
-    if (roundCCW || roundCW) {
-      const shape = new THREE.Shape();
-      const R_in = menuRadiusInner.value;
-      const R_out = MENU_RADIUS_OUTER;
-      const r = cornerRadius;
+  // Iterate over each group of items (full, upper, or lower)
+  menuGroups.value.forEach(group => {
+      const items = group.items;
+      const count = items.length;
+      const layoutType = group.type;
       
-      // Calculate angular offsets for corners
-      // sin(delta) = r / (R +/- r)
-      const delta_out = Math.asin(r / (R_out - r));
-      const delta_in = Math.asin(r / (R_in + r));
-      
-      // 1. Outer Arc (CCW)
-      let outerStart = startAngle;
-      let outerEnd = endAngle;
-      
-      if (roundCW) outerStart += delta_out;
-      if (roundCCW) outerEnd -= delta_out;
-      
-      shape.absarc(0, 0, R_out, outerStart, outerEnd, false);
-      
-      // 2. CCW Edge (at endAngle)
-      if (roundCCW) {
-        // Outer corner
-        const cOut = endAngle - delta_out;
-        const cxOut = (R_out - r) * Math.cos(cOut);
-        const cyOut = (R_out - r) * Math.sin(cOut);
-        shape.absarc(cxOut, cyOut, r, cOut, endAngle + Math.PI/2, false);
-        
-        // Inner corner
-        const cIn = endAngle - delta_in;
-        const cxIn = (R_in + r) * Math.cos(cIn);
-        const cyIn = (R_in + r) * Math.sin(cIn);
-        shape.absarc(cxIn, cyIn, r, endAngle + Math.PI/2, cIn + Math.PI, false);
+      // Calculate angle range and center based on layout
+      const HORIZON_OFFSET = 20 * (Math.PI / 180);
+      let totalAngle: number;
+      let startSegmentCenter: number;
+      let anglePerSegment: number;
+
+      if (layoutType === 'full') {
+        totalAngle = Math.PI * 2;
+        anglePerSegment = totalAngle / count;
+        // Clockwise starting from Top-Left (PI/2 + one segment counterclockwise)
+        startSegmentCenter = (Math.PI / 2) + anglePerSegment;
       } else {
-        shape.lineTo(R_in * Math.cos(endAngle), R_in * Math.sin(endAngle));
+        totalAngle = Math.PI - (2 * HORIZON_OFFSET);
+        anglePerSegment = totalAngle / count;
+        const centerAngle = layoutType === 'lower' ? 3 * Math.PI / 2 : Math.PI / 2;
+        // Center the segments around centerAngle
+        startSegmentCenter = centerAngle + (totalAngle / 2) - (anglePerSegment / 2);
       }
-      
-      // 3. Inner Arc (CW)
-      let innerStart = endAngle;
-      let innerEnd = startAngle;
-      
-      if (roundCCW) innerStart -= delta_in;
-      if (roundCW) innerEnd += delta_in;
-      
-      shape.absarc(0, 0, R_in, innerStart, innerEnd, true);
-      
-      // 4. CW Edge (at startAngle)
-      if (roundCW) {
-        // Inner corner
-        const cIn = startAngle + delta_in;
-        const cxIn = (R_in + r) * Math.cos(cIn);
-        const cyIn = (R_in + r) * Math.sin(cIn);
-        shape.absarc(cxIn, cyIn, r, cIn + Math.PI, startAngle - Math.PI/2, false);
+
+      items.forEach((item, index) => {
+        // Position segments based on layout
+        const segmentCenterAngle = startSegmentCenter - (index * anglePerSegment);
         
-        // Outer corner
-        const cOut = startAngle + delta_out;
-        const cxOut = (R_out - r) * Math.cos(cOut);
-        const cyOut = (R_out - r) * Math.sin(cOut);
-        shape.absarc(cxOut, cyOut, r, startAngle - Math.PI/2, cOut, false);
-      }
-      
-      geometry = new THREE.ShapeGeometry(shape);
-    } else {
-      // Standard RingGeometry
-      geometry = new THREE.RingGeometry(
-        menuRadiusInner.value,
-        MENU_RADIUS_OUTER,
-        32,
-        1,
-        startAngle,
-        lengthAngle
-      );
-    }
+        // RingGeometry draws counter-clockwise from thetaStart.
+        // We want the segment to be centered at segmentCenterAngle.
+        // So thetaStart should be segmentCenterAngle - (length/2).
+        
+        const lengthAngle = anglePerSegment - GAP_ANGLE;
+        const startAngle = segmentCenterAngle - (lengthAngle / 2);
+        const endAngle = startAngle + lengthAngle;
 
-    // Material - make spacer invisible
-    const material = new THREE.MeshBasicMaterial({
-      color: SEGMENT_COLOR,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: (item as any).isSpacer ? 0 : SEGMENT_OPACITY,
-    });
+        const isFirstItem = index === 0;
+        const isLastItem = index === count - 1;
+        const isNotFull = layoutType !== 'full';
 
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.userData = { index, item, originalColor: SEGMENT_COLOR };
-    menuGroup.add(mesh);
-    segments.push(mesh);
+        // We want to round the CCW edge of the First Item (highest angle)
+        // and the CW edge of the Last Item (lowest angle).
+        const roundCCW = isNotFull && isFirstItem;
+        const roundCW = isNotFull && isLastItem;
+        
+        const cornerRadius = 20;
+        
+        let geometry: THREE.BufferGeometry;
 
-    // Icon - skip for spacer
-    if (!(item as any).isSpacer) {
-      const iconMesh = createIconAndLabel(item, segmentCenterAngle);
-      mesh.userData.iconMesh = iconMesh;
-    }
+        if (roundCCW || roundCW) {
+          const shape = new THREE.Shape();
+          const R_in = menuRadiusInner.value;
+          const R_out = MENU_RADIUS_OUTER;
+          const r = cornerRadius;
+          
+          // Calculate angular offsets for corners
+          // sin(delta) = r / (R +/- r)
+          const delta_out = Math.asin(r / (R_out - r));
+          const delta_in = Math.asin(r / (R_in + r));
+          
+          // 1. Outer Arc (CCW)
+          let outerStart = startAngle;
+          let outerEnd = endAngle;
+          
+          if (roundCW) outerStart += delta_out;
+          if (roundCCW) outerEnd -= delta_out;
+          
+          shape.absarc(0, 0, R_out, outerStart, outerEnd, false);
+          
+          // 2. CCW Edge (at endAngle)
+          if (roundCCW) {
+            // Outer corner
+            const cOut = endAngle - delta_out;
+            const cxOut = (R_out - r) * Math.cos(cOut);
+            const cyOut = (R_out - r) * Math.sin(cOut);
+            shape.absarc(cxOut, cyOut, r, cOut, endAngle + Math.PI/2, false);
+            
+            // Inner corner
+            const cIn = endAngle - delta_in;
+            const cxIn = (R_in + r) * Math.cos(cIn);
+            const cyIn = (R_in + r) * Math.sin(cIn);
+            shape.absarc(cxIn, cyIn, r, endAngle + Math.PI/2, cIn + Math.PI, false);
+          } else {
+            shape.lineTo(R_in * Math.cos(endAngle), R_in * Math.sin(endAngle));
+          }
+          
+          // 3. Inner Arc (CW)
+          let innerStart = endAngle;
+          let innerEnd = startAngle;
+          
+          if (roundCCW) innerStart -= delta_in;
+          if (roundCW) innerEnd += delta_in;
+          
+          shape.absarc(0, 0, R_in, innerStart, innerEnd, true);
+          
+          // 4. CW Edge (at startAngle)
+          if (roundCW) {
+            // Inner corner
+            const cIn = startAngle + delta_in;
+            const cxIn = (R_in + r) * Math.cos(cIn);
+            const cyIn = (R_in + r) * Math.sin(cIn);
+            shape.absarc(cxIn, cyIn, r, cIn + Math.PI, startAngle - Math.PI/2, false);
+            
+            // Outer corner
+            const cOut = startAngle + delta_out;
+            const cxOut = (R_out - r) * Math.cos(cOut);
+            const cyOut = (R_out - r) * Math.sin(cOut);
+            shape.absarc(cxOut, cyOut, r, startAngle - Math.PI/2, cOut, false);
+          }
+          
+          geometry = new THREE.ShapeGeometry(shape);
+        } else {
+          // Standard RingGeometry
+          geometry = new THREE.RingGeometry(
+            menuRadiusInner.value,
+            MENU_RADIUS_OUTER,
+            32,
+            1,
+            startAngle,
+            lengthAngle
+          );
+        }
+
+        // Material - make spacer invisible
+        const material = new THREE.MeshBasicMaterial({
+          color: SEGMENT_COLOR,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: (item as any).isSpacer ? 0 : SEGMENT_OPACITY,
+        });
+
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.userData = { index, item, originalColor: SEGMENT_COLOR };
+        menuGroup.add(mesh);
+        segments.push(mesh);
+
+        // Icon - skip for spacer
+        if (!(item as any).isSpacer) {
+          const iconMesh = createIconAndLabel(item, segmentCenterAngle);
+          mesh.userData.iconMesh = iconMesh;
+        }
+      });
   });
 };
 
@@ -491,11 +551,14 @@ const drawIconAndLabel = (canvas: HTMLCanvasElement, texture: THREE.CanvasTextur
   
   // Center vertically
   const startY = (canvas.height - totalHeight) / 2;
+
+  // Resolve color
+  const targetColor = item.active ? ACTIVE_ICON_COLOR : ICON_COLOR;
   
   // Draw Label (only if not narrow)
   if (showText) {
     ctx.font = `${fontSize}px FlexiIBM, sans-serif`;
-    ctx.fillStyle = ICON_COLOR;
+    ctx.fillStyle = targetColor;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     // Draw text below icon
@@ -506,8 +569,9 @@ const drawIconAndLabel = (canvas: HTMLCanvasElement, texture: THREE.CanvasTextur
   texture.needsUpdate = true;
 
   // Check cache first
-  if (iconCache.has(item.icon)) {
-    const img = iconCache.get(item.icon)!;
+  const cacheKey = item.icon + (item.active ? '_active' : '');
+  if (iconCache.has(cacheKey)) {
+    const img = iconCache.get(cacheKey)!;
     const x = (canvas.width - iconSize) / 2;
     ctx.drawImage(img, x, startY, iconSize, iconSize);
     texture.needsUpdate = true;
@@ -525,7 +589,7 @@ const drawIconAndLabel = (canvas: HTMLCanvasElement, texture: THREE.CanvasTextur
   
   // Safer SVG processing:
   // 1. Replace currentColor with white
-  let svgString = item.icon.replace(/currentColor/g, ICON_COLOR);
+  let svgString = item.icon.replace(/currentColor/g, targetColor);
   
   // 2. Ensure width/height attributes exist (using viewBox size or default 24)
   if (!svgString.includes('width=')) {
@@ -544,6 +608,12 @@ const drawIconAndLabel = (canvas: HTMLCanvasElement, texture: THREE.CanvasTextur
       const x = (canvas.width - iconSize) / 2;
       ctx.drawImage(img, x, startY, iconSize, iconSize);
       texture.needsUpdate = true;
+      
+      // Cache it
+      if (!iconCache.has(cacheKey)) {
+          iconCache.set(cacheKey, img);
+      }
+
       URL.revokeObjectURL(url);
       (texture as any)._pendingIconUrl = null;
     } else {

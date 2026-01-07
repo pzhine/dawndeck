@@ -24,6 +24,9 @@ const isDragging = ref(false);
 const dragOffset = ref(0);
 const startX = ref(0);
 const hasTriggered = ref(false);
+const screenTimer = ref<NodeJS.Timeout | null>(null);
+const shouldGoHome = ref(false);
+const HOME_TIMEOUT = 15000; // 15 seconds
 
 // Computed Styles
 const buttonStyle = computed(() => {
@@ -42,6 +45,56 @@ const buttonStyle = computed(() => {
   };
 });
 
+const executeBack = () => {
+    console.log('Execute Back Called', { shouldGoHome: shouldGoHome.value, history: window.history.length });
+    // If user has been on this screen for long enough, go home
+    if (shouldGoHome.value) {
+      console.log('Going Home due to timeout');
+      router.push('/');
+      return;
+    }
+
+    // Check if we should skip intermediate history entry
+    const skipIntermediate = (window as any).__skipIntermediateHistory;
+    
+    if (skipIntermediate) {
+      // Clear the flag
+      (window as any).__skipIntermediateHistory = false;
+      // Go back 2 steps to skip the automatic redirect
+      if (window.history.length > 2) {
+        window.history.go(-2);
+      } else {
+        router.push('/');
+      }
+    } else if (window.history.length <= 1) {
+      // Go to home if there's no history to go back to
+      router.push('/');
+    } else {
+      router.back();
+    }
+}
+
+const resetScreenTimer = () => {
+  // Clear any existing timer
+  if (screenTimer.value) {
+    clearTimeout(screenTimer.value);
+    screenTimer.value = null;
+  }
+  
+  // Reset state
+  shouldGoHome.value = false;
+  
+  // Don't set timer if we are already home
+  if (router.currentRoute.value.path === '/') return;
+
+  // Start new timer
+  console.log('Starting Screen Timer for Home Redirect');
+  screenTimer.value = setTimeout(() => {
+    console.log('Screen Timer Triggered - Next back goes Home');
+    shouldGoHome.value = true;
+  }, HOME_TIMEOUT);
+}
+
 // Touch Handlers
 const handleTouchStart = (e: TouchEvent) => {
   // Only start if near the left edge
@@ -53,7 +106,8 @@ const handleTouchStart = (e: TouchEvent) => {
 };
 
 const handleTouchMove = (e: TouchEvent) => {
-  if (!isDragging.value) return;
+  if (!isDragging.value || hasTriggered.value) return; // Stop updates if triggered
+  
   const currentX = e.touches[0].clientX;
   const delta = currentX - startX.value;
   
@@ -64,23 +118,7 @@ const handleTouchMove = (e: TouchEvent) => {
     // Trigger as soon as threshold is reached
     if (dragOffset.value >= TRIGGER_THRESHOLD && !hasTriggered.value) {
       hasTriggered.value = true;
-      // Check if we should skip intermediate history entry
-      const skipIntermediate = (window as any).__skipIntermediateHistory;
-      if (skipIntermediate) {
-        // Clear the flag
-        (window as any).__skipIntermediateHistory = false;
-        // Go back 2 steps to skip the automatic redirect
-        if (window.history.length > 2) {
-          window.history.go(-2);
-        } else {
-          router.push('/');
-        }
-      } else if (window.history.length <= 1) {
-        // Go to home if there's no history to go back to
-        router.push('/');
-      } else {
-        router.back();
-      }
+      executeBack();
     }
   }
 };
@@ -92,18 +130,25 @@ const handleTouchEnd = () => {
   hasTriggered.value = false;
 };
 
-// Reset on route change to prevent stuck state
-router.afterEach(() => {
-  isDragging.value = false;
-  dragOffset.value = 0;
-  hasTriggered.value = false;
-});
+let unregisterRouterHook: (() => void) | null = null;
 
 onMounted(() => {
   window.addEventListener('touchstart', handleTouchStart);
   window.addEventListener('touchmove', handleTouchMove);
   window.addEventListener('touchend', handleTouchEnd);
   window.addEventListener('touchcancel', handleTouchEnd);
+  
+  resetScreenTimer();
+  
+  // Reset on route change to prevent stuck state
+  // We use a local variable to store the cleanup function
+  unregisterRouterHook = router.afterEach(() => {
+    isDragging.value = false;
+    dragOffset.value = 0;
+    hasTriggered.value = false;
+    
+    resetScreenTimer();
+  });
 });
 
 onUnmounted(() => {
@@ -111,6 +156,15 @@ onUnmounted(() => {
   window.removeEventListener('touchmove', handleTouchMove);
   window.removeEventListener('touchend', handleTouchEnd);
   window.removeEventListener('touchcancel', handleTouchEnd);
+  
+  if (screenTimer.value) {
+      clearTimeout(screenTimer.value);
+      screenTimer.value = null;
+  }
+  
+  if (unregisterRouterHook) {
+    unregisterRouterHook();
+  }
 });
 
 // Mouse Handlers (for testing/desktop)
@@ -132,7 +186,7 @@ const handleMouseMove = (e: MouseEvent) => {
     // Trigger as soon as threshold is reached
     if (dragOffset.value >= TRIGGER_THRESHOLD && !hasTriggered.value) {
       hasTriggered.value = true;
-      router.back();
+      executeBack();
     }
   }
 };

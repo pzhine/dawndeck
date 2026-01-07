@@ -39,7 +39,7 @@ const mute = () => {
 
 const menuItems = computed<MenuItem[]>(() => [
   { label: 'Lamp', icon: lampIcon, route: '/level/lampBrightness' },
-  { label: 'Sounds & Music', icon: musicIcon, route: isBTConnected.value ? '/media-player' : '/sounds' },
+  { label: 'Sounds & Music', icon: musicIcon, route: '/media-player' },
   { label: 'Projector', icon: projectorIcon, route: '/projector' },
   { label: 'Alarm', icon: alarmIcon, route: '/alarm' },
   { label: 'Sleep', icon: sleepIcon, action: mute },

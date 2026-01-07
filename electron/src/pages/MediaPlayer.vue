@@ -1,8 +1,8 @@
 <template>
   <RadialMenu 
-    :items="menuItems" 
+    :lowerItems="lowerMenuItems" 
+    :upperItems="upperMenuItems"
     :width="'narrow'" 
-    :layout="'lower'" 
     :pinned="true"
   >
     <div class="w-full h-screen flex justify-center items-center relative">
@@ -69,7 +69,7 @@ import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import RadialMenu, { MenuItem } from '../components/RadialMenu.vue';
 import feather from 'feather-icons';
-import { getCurrentSoundInfo, isGlobalSoundPlaying, playGlobalSound, pauseGlobalSound, resumeGlobalSound, isGlobalSoundPaused } from '../services/audioService';
+import { getCurrentSoundInfo, isGlobalSoundPlaying, playGlobalSound, pauseGlobalSound, resumeGlobalSound, isGlobalSoundPaused, isGlobalSoundLooping, setGlobalSoundLoop } from '../services/audioService';
 import { useAppStore } from '../stores/appState';
 
 const router = useRouter();
@@ -81,6 +81,7 @@ const connectionStatus = ref<'connected' | 'connecting' | 'disconnected'>('disco
 const updateInterval = ref<ReturnType<typeof setInterval> | null>(null);
 const volume = ref(50);
 const soundInfoRefreshTrigger = ref(0); // Trigger to force computed refresh
+const isLooping = ref(isGlobalSoundLooping());
 
 // Computed property to show either global sound info or bluetooth metadata
 const displayMetadata = computed(() => {
@@ -114,6 +115,90 @@ const nextIcon = feather.icons['skip-forward'].toSvg();
 const playPauseIcon = feather.icons['play'].toSvg();
 const pauseIcon = feather.icons['pause'].toSvg();
 const prevIcon = feather.icons['skip-back'].toSvg();
+const heartIcon = feather.icons['heart'].toSvg();
+const bellIcon = feather.icons['bell'].toSvg();
+const repeatIcon = feather.icons['repeat'].toSvg();
+const listIcon = feather.icons['list'].toSvg();
+
+// Upper Menu Logic
+const currentGlobalSound = computed(() => {
+  soundInfoRefreshTrigger.value;
+  if (isGlobalSoundPlaying()) {
+    return getCurrentSoundInfo();
+  }
+  return null;
+});
+
+const isFavorite = computed(() => {
+  if (!currentGlobalSound.value) return false;
+  // Ensure we check reactivity of favorites list
+  appStore.favoriteSounds; 
+  const id = currentGlobalSound.value.soundId || currentGlobalSound.value.id;
+  return appStore.isSoundInFavorites(Number(id));
+});
+
+const isAlarmSound = computed(() => {
+  if (!currentGlobalSound.value) return false;
+  const alarmSound = appStore.alarmSound; 
+  if (!alarmSound) return false;
+  const currentId = currentGlobalSound.value.soundId || currentGlobalSound.value.id;
+  return Number(alarmSound.id) === Number(currentId);
+});
+
+const toggleFavorite = () => {
+  const sound = currentGlobalSound.value;
+  if (!sound) return;
+  
+  const id = Number(sound.soundId || sound.id);
+  
+  if (appStore.isSoundInFavorites(id)) {
+    appStore.removeSoundFromFavorites(id);
+  } else {
+    appStore.addSoundToFavorites({
+      id: id,
+      name: sound.name,
+      previewUrl: sound.previewUrl,
+      duration: sound.duration,
+      category: sound.category || '',
+      country: sound.country || '',
+    });
+  }
+  // Force refresh
+  soundInfoRefreshTrigger.value++;
+};
+
+const setAsAlarmSound = () => {
+  const sound = currentGlobalSound.value;
+  if (!sound) return;
+  
+  appStore.setAlarmSound({
+    id: Number(sound.soundId || sound.id),
+    name: sound.name,
+    previewUrl: sound.previewUrl,
+    duration: sound.duration,
+  });
+  // Force refresh
+  soundInfoRefreshTrigger.value++;
+};
+
+const upperMenuItems = computed<MenuItem[]>(() => {
+  if (!currentGlobalSound.value) return [];
+  
+  return [
+    {
+       label: isFavorite.value ? 'Favorite' : 'Favorite',
+       icon: heartIcon,
+       action: toggleFavorite,
+       active: isFavorite.value
+    },
+    {
+       label: 'Set Alarm',
+       icon: bellIcon,
+       action: setAsAlarmSound,
+       active: isAlarmSound.value
+    }
+  ];
+});
 
 // Actions
 const sendCommand = async (command: string) => {
@@ -132,12 +217,13 @@ const playNextSound = () => {
   
   if (nextSound) {
     const context = nextSound._context || {};
+    const previewUrl = nextSound.previews ? nextSound.previews['preview-hq-mp3'] : nextSound.previewUrl;
     
     playGlobalSound(
       {
         id: nextSound.id.toString(),
         name: nextSound.name,
-        previewUrl: nextSound.previews['preview-hq-mp3'],
+        previewUrl: previewUrl,
         duration: nextSound.duration,
         currentTime: 0,
         category: context.category || '',
@@ -167,6 +253,8 @@ const playPreviousSound = () => {
   
   if (prevSound) {
     const context = prevSound._context || {};
+    const previewUrl = prevSound.previews ? prevSound.previews['preview-hq-mp3'] : prevSound.previewUrl;
+
     console.log('Playing previous sound:', {
       name: prevSound.name,
       id: prevSound.id,
@@ -177,7 +265,7 @@ const playPreviousSound = () => {
       {
         id: prevSound.id.toString(),
         name: prevSound.name,
-        previewUrl: prevSound.previews['preview-hq-mp3'],
+        previewUrl: previewUrl,
         duration: prevSound.duration,
         currentTime: 0,
         category: context.category || '',
@@ -277,20 +365,32 @@ const getVolume = async () => {
   }
 };
 
-// Menu Items
+
+
+const toggleRepeat = () => {
+  const newLoopState = !isGlobalSoundLooping();
+  setGlobalSoundLoop(newLoopState);
+  isLooping.value = newLoopState;
+};
+
+const backToSoundsList = () => {
+  // Always navigate to Sound Categories page
+  router.push({ name: 'SoundCategories' });
+};
+
+// Lower Menu Items
 // Clockwise from upper left (10 o'clock):
-// 10: Vol Down (Index 5)
+// 10: Repeat (Index 5)
 // 12: Clock (Index 0)
-// 2: Vol Up (Index 1)
+// 2: Sound List (Index 1)
 // 4: Next (Index 2)
 // 6: Play/Pause (Index 3)
 // 8: Prev (Index 4)
-const menuItems = computed<MenuItem[]>(() => [
+const lowerMenuItems = computed<MenuItem[]>(() => [
   { 
-    label: 'Vol +', 
-    icon: volumeUpIcon, 
-    action: () => adjustVolume(2),
-    continuous: true
+    label: 'List', // Position 2 - moved here (previously Vol +)
+    icon: listIcon,
+    action: backToSoundsList,
   },
   { 
     label: 'Next', 
@@ -340,10 +440,10 @@ const menuItems = computed<MenuItem[]>(() => [
     },
   },
   { 
-    label: 'Vol -', 
-    icon: volumeDownIcon, 
-    action: () => adjustVolume(-2),
-    continuous: true
+    label: 'Repeat', // Position 10 - moved here (previously Vol -)
+    icon: repeatIcon, 
+    action: toggleRepeat,
+    active: isLooping.value
   },
 ]);
 

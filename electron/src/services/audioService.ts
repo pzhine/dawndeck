@@ -128,6 +128,25 @@ export function isGlobalSoundPaused(): boolean {
   return globalAudioElement !== null && globalAudioElement.paused;
 }
 
+// Check if global sound is looping
+export function isGlobalSoundLooping(): boolean {
+  return globalAudioElement !== null && globalAudioElement.loop;
+}
+
+// Set loop state for global sound
+export function setGlobalSoundLoop(loop: boolean): void {
+  if (globalAudioElement) {
+    globalAudioElement.loop = loop;
+    
+    // If we're enabling loop, we should remove the 'ended' listener that advances the playlist
+    // But since the listener is added with { once: true }, we can't easily remove specific ones
+    // However, if loop is true, the 'ended' event doesn't fire on most browsers
+    
+    // If we are disabling loop, we might need to re-add the ended listener if it's missing,
+    // but typically we toggle this for "single track repeat" vs "playlist advance"
+  }
+}
+
 // Set callback for when a sound ends (non-looping sounds only)
 export function setOnSoundEndedCallback(callback: (() => void) | null): void {
   onSoundEndedCallback = callback;

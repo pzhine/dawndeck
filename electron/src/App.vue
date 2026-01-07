@@ -93,11 +93,13 @@ onMounted(() => {
     const nextSound = appStore.moveToNextSound();
     if (nextSound) {
       const context = nextSound._context || {};
+      const previewUrl = nextSound.previews ? nextSound.previews['preview-hq-mp3'] : nextSound.previewUrl;
+      
       playGlobalSound(
         {
           id: nextSound.id.toString(),
           name: nextSound.name,
-          previewUrl: nextSound.previews['preview-hq-mp3'],
+          previewUrl: previewUrl,
           duration: nextSound.duration,
           currentTime: 0,
           category: context.category || '',
