@@ -22,7 +22,7 @@ const appStore = useAppStore();
 const clockContainer = ref<HTMLDivElement | null>(null);
 const inactivityTimer = ref<number | null>(null);
 const isDimmed = ref(false);
-const isBTConnected = ref(false);
+const isBTPlaying = ref(false);
 
 const lampIcon = feather.icons['sun'].toSvg();
 const musicIcon = feather.icons['music'].toSvg();
@@ -39,7 +39,7 @@ const mute = () => {
 
 const menuItems = computed<MenuItem[]>(() => [
   { label: 'Lamp', icon: lampIcon, route: '/level/lampBrightness' },
-  { label: 'Sounds & Music', icon: musicIcon, route: '/media-player' },
+  { label: 'Sounds & Music', icon: musicIcon, route: '/media-player', active: isGlobalSoundPlaying() || isBTPlaying.value },
   { label: 'Projector', icon: projectorIcon, route: '/projector' },
   { label: 'Alarm', icon: alarmIcon, route: '/alarm', active: appStore.alarmActive },
   { label: 'Sleep', icon: sleepIcon, action: mute },
@@ -91,22 +91,36 @@ onMounted(() => {
   window.addEventListener('mousedown', handleTap);
   window.addEventListener('wheel', handleWheelEvent, { passive: false });
   
-  // Listen for BT connection changes
+  // Listen for BT status changes
   if (window.ipcRenderer) {
+    window.ipcRenderer.on('bluetooth-media:statusChanged', (_event: any, status: string) => {
+      // console.log('BT status changed:', status);
+      isBTPlaying.value = status === 'playing';
+    });
+    
+    // Also update on connection change (if disconnected, stop playing)
+    window.ipcRenderer.on('bluetooth-media:connectionChanged', (_event: any, status: string) => {
+       if (status === 'disconnected') {
+         isBTPlaying.value = false;
+       }
+    });
+
+    // Handle legacy/kebab-case event just in case
     window.ipcRenderer.on('bluetooth-media:connection-changed', (_event: any, status: string) => {
-      console.log('BT connection status changed:', status);
-      isBTConnected.value = status === 'connected';
+       if (status === 'disconnected') {
+         isBTPlaying.value = false;
+       }
     });
   }
   
   // Check initial BT status
   if ((window as any).electronAPI?.bluetoothMedia?.getMetadata) {
     (window as any).electronAPI.bluetoothMedia.getMetadata().then((result: any) => {
-      if (result && result.connectionState === 'connected') {
-        isBTConnected.value = true;
+      if (result && result.metadata && result.metadata.status === 'playing') {
+        isBTPlaying.value = true;
       }
     }).catch(() => {
-      isBTConnected.value = false;
+      isBTPlaying.value = false;
     });
   }
 });

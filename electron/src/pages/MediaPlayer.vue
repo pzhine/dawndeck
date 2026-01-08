@@ -494,12 +494,6 @@ const refreshMetadata = async () => {
       if (result.error && result.error.includes('No Bluetooth media device connected')) {
         connectionStatus.value = 'disconnected';
         metadata.value = null;
-        // Redirect if no global sound is playing
-        if (!isGlobalSoundPlaying()) {
-          console.log('No BT device connected and no global sound, redirecting to sound categories');
-          (window as any).__skipIntermediateHistory = true;
-          router.push({ name: 'SoundCategories' });
-        }
       } else {
         metadata.value = result.metadata;
         connectionStatus.value = 'connected';
@@ -507,23 +501,11 @@ const refreshMetadata = async () => {
     } else {
       connectionStatus.value = 'disconnected';
       metadata.value = null;
-      // Redirect if no global sound is playing
-      if (!isGlobalSoundPlaying()) {
-        console.log('No metadata and no global sound, redirecting to sound categories');
-        (window as any).__skipIntermediateHistory = true;
-        router.push({ name: 'SoundCategories' });
-      }
     }
   } catch (error) {
     console.error('Failed to get metadata:', error);
     connectionStatus.value = 'disconnected';
     metadata.value = null;
-    // Redirect if no global sound is playing
-    if (!isGlobalSoundPlaying()) {
-      console.log('Metadata error and no global sound, redirecting to sound categories');
-      (window as any).__skipIntermediateHistory = true;
-      router.push({ name: 'SoundCategories' });
-    }
   }
 };
 
@@ -531,17 +513,6 @@ const refreshMetadata = async () => {
 
 // Lifecycle
 onMounted(() => {
-  // Check if we should be on this page - redirect if no BT and no global sound
-  const checkAndRedirect = () => {
-    // Don't redirect if BT is connected or global sound is playing
-    if (!isGlobalSoundPlaying() && connectionStatus.value === 'disconnected' && !metadata.value) {
-      console.log('No audio playing, redirecting to sound categories');
-      // Set flag to tell BackButton to skip intermediate history entry
-      (window as any).__skipIntermediateHistory = true;
-      router.push({ name: 'SoundCategories' });
-    }
-  };
-  
   // Listen for sound changes from global auto-advance
   window.addEventListener('sound-changed', () => {
     console.log('Sound changed event received, refreshing display');
@@ -551,9 +522,6 @@ onMounted(() => {
   // Initial load
   refreshMetadata();
   getVolume();
-  
-  // Check after giving time for metadata to load
-  setTimeout(checkAndRedirect, 500);
   
   // Set up periodic updates
   updateInterval.value = setInterval(refreshMetadata, 2000);
@@ -577,13 +545,6 @@ onMounted(() => {
       connectionStatus.value = status;
       if (status === 'disconnected') {
         metadata.value = null;
-        // Redirect to sound categories if BT disconnects while on this page
-        if (!isGlobalSoundPlaying()) {
-          console.log('BT disconnected and no global sound playing, redirecting to sound categories');
-          // Set flag to tell BackButton to skip intermediate history entry
-          (window as any).__skipIntermediateHistory = true;
-          router.push({ name: 'SoundCategories' });
-        }
       }
     });
   }
@@ -595,13 +556,6 @@ onMounted(() => {
       connectionStatus.value = status as 'connected' | 'disconnected';
       if (status === 'disconnected') {
         metadata.value = null;
-        // Redirect to sound categories if BT disconnects while on this page
-        if (!isGlobalSoundPlaying()) {
-          console.log('BT disconnected and no global sound playing, redirecting to sound categories');
-          // Set flag to tell BackButton to skip intermediate history entry
-          (window as any).__skipIntermediateHistory = true;
-          router.push({ name: 'SoundCategories' });
-        }
       }
     });
   }
