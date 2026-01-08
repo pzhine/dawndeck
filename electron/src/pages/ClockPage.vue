@@ -1,5 +1,5 @@
 <template>
-  <RadialMenu :items="menuItems" :skip-positions="[]">
+  <RadialMenu :items="menuItems" :skip-positions="[]" :on-show="onMenuShow">
     <div tabindex="0" ref="clockContainer" class="page-container">
       <div :class="['clock-wrapper', { dimmed: isDimmed }]">
         <ClockComponent ref="clockComponent" />
@@ -10,7 +10,7 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
-import { isGlobalSoundPlaying } from '../services/audioService';
+import { isGlobalSoundPlaying, getBluetoothStatus } from '../services/audioService';
 import ClockComponent from '../components/ClockComponent.vue';
 import RadialMenu, { MenuItem } from '../components/RadialMenu.vue';
 import { onMounted, onUnmounted, ref, computed } from 'vue';
@@ -86,43 +86,14 @@ const restoreBrightness = () => {
   isDimmed.value = false;
 };
 
+const onMenuShow = async () => {
+  isBTPlaying.value = await getBluetoothStatus();
+};
+
 onMounted(() => {
   window.addEventListener('mousedown', goToMenu);
   window.addEventListener('mousedown', handleTap);
   window.addEventListener('wheel', handleWheelEvent, { passive: false });
-  
-  // Listen for BT status changes
-  if (window.ipcRenderer) {
-    window.ipcRenderer.on('bluetooth-media:statusChanged', (_event: any, status: string) => {
-      // console.log('BT status changed:', status);
-      isBTPlaying.value = status === 'playing';
-    });
-    
-    // Also update on connection change (if disconnected, stop playing)
-    window.ipcRenderer.on('bluetooth-media:connectionChanged', (_event: any, status: string) => {
-       if (status === 'disconnected') {
-         isBTPlaying.value = false;
-       }
-    });
-
-    // Handle legacy/kebab-case event just in case
-    window.ipcRenderer.on('bluetooth-media:connection-changed', (_event: any, status: string) => {
-       if (status === 'disconnected') {
-         isBTPlaying.value = false;
-       }
-    });
-  }
-  
-  // Check initial BT status
-  if ((window as any).electronAPI?.bluetoothMedia?.getMetadata) {
-    (window as any).electronAPI.bluetoothMedia.getMetadata().then((result: any) => {
-      if (result && result.metadata && result.metadata.status === 'playing') {
-        isBTPlaying.value = true;
-      }
-    }).catch(() => {
-      isBTPlaying.value = false;
-    });
-  }
 });
 
 onUnmounted(() => {

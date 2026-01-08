@@ -57,6 +57,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  onShow: {
+    type: Function as PropType<() => void>,
+    default: undefined,
+  },
 });
 
 const router = useRouter();
@@ -293,6 +297,7 @@ const activateMenu = () => {
   setTimeout(() => { justOpened.value = false; }, 500);
   
   startAnimation();
+  props.onShow?.();
 };
 
 const hideMenu = () => {

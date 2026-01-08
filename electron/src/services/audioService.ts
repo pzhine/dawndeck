@@ -161,6 +161,21 @@ export function isGlobalSoundPlaying(): boolean {
   return globalAudioElement !== null;
 }
 
+// Check if bluetooth audio is playing
+export async function getBluetoothStatus(): Promise<boolean> {
+  if (typeof window !== 'undefined' && window.ipcRenderer) {
+    try {
+      const result = await window.ipcRenderer.invoke('bluetooth-media:get-metadata');
+      // console.log('Bluetooth metadata:', result);
+      return result?.metadata?.status === 'playing';
+    } catch (error) {
+      console.warn('Failed to get bluetooth status:', error);
+      return false;
+    }
+  }
+  return false;
+}
+
 // Get current playing sound info
 export function getCurrentSoundInfo(): SoundInfo | null {
   if (!globalAudioElement || !currentSoundInfo) {
