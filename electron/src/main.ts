@@ -32,7 +32,7 @@ const routes = [
   { path: '/menu', name: 'MainMenu', component: MainMenu },
   { path: '/sounds', name: 'SoundCategories', component: SoundCategories },
   {
-    path: '/media-player',
+    path: '/media-player/:soundId?',
     name: 'MediaPlayer',
     component: () => import('./pages/MediaPlayer.vue'),
   },

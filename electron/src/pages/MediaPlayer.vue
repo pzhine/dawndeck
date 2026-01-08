@@ -66,7 +66,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import RadialMenu, { MenuItem } from '../components/RadialMenu.vue';
 import feather from 'feather-icons';
 import { getCurrentSoundInfo, isGlobalSoundPlaying, playGlobalSound, pauseGlobalSound, resumeGlobalSound, isGlobalSoundPaused, isGlobalSoundLooping, setGlobalSoundLoop } from '../services/audioService';
@@ -167,16 +167,22 @@ const toggleFavorite = () => {
   soundInfoRefreshTrigger.value++;
 };
 
-const setAsAlarmSound = () => {
+const toggleAlarmSound = () => {
   const sound = currentGlobalSound.value;
   if (!sound) return;
-  
-  appStore.setAlarmSound({
-    id: Number(sound.soundId || sound.id),
-    name: sound.name,
-    previewUrl: sound.previewUrl,
-    duration: sound.duration,
-  });
+
+  if (sound.id === appStore.alarmSound?.id) {
+    // Unset alarm sound
+    appStore.setAlarmSound(null);
+  } else {
+    // Set as alarm sound
+    appStore.setAlarmSound({
+      id: Number(sound.soundId || sound.id),
+      name: sound.name,
+      previewUrl: sound.previewUrl,
+      duration: sound.duration,
+    });
+  }
   // Force refresh
   soundInfoRefreshTrigger.value++;
 };
@@ -194,7 +200,7 @@ const upperMenuItems = computed<MenuItem[]>(() => {
     {
        label: 'Set Alarm',
        icon: bellIcon,
-       action: setAsAlarmSound,
+       action: toggleAlarmSound,
        active: isAlarmSound.value
     }
   ];
@@ -372,6 +378,35 @@ const toggleRepeat = () => {
   setGlobalSoundLoop(newLoopState);
   isLooping.value = newLoopState;
 };
+
+// Check for deep link
+onMounted(async () => {
+  const route = useRoute();
+  const soundId = route.params.soundId;
+  
+  if (soundId) {
+    let soundToLoad = null;
+
+    // If the alarm sound is passed, load it
+    if (appStore.alarmSound && String(appStore.alarmSound.id) === String(soundId)) {
+       soundToLoad = appStore.alarmSound;
+    } 
+    // Otherwise try to find it in favorites
+    else {
+      const fav = appStore.favoriteSounds.find(s => String(s.id) === String(soundId));
+      if (fav) {
+        soundToLoad = fav;
+      }
+    }
+
+    if (soundToLoad) {
+       // Load but don't autoplay
+       await playGlobalSound({ ...soundToLoad }, false, false);
+       // Force UI update to show correct controls
+       soundInfoRefreshTrigger.value++;
+    }
+  }
+});
 
 const backToSoundsList = () => {
   // Always navigate to Sound Categories page

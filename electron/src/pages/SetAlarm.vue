@@ -1,64 +1,96 @@
 <template>
-  <!-- Header -->
-  <div class="flex flex-row py-4 w-full items-start z-10 absolute top-10 self-center justify-center">
-    <div v-html="bellIcon" />
-  </div>
+  <RadialMenu 
+    :lowerItems="lowerMenuItems" 
+    :upperItems="upperMenuItems"
+    :width="'narrow'" 
+    :pinned="true"
+  >
+    <!-- Content -->
+    <div class="flex-1 flex flex-col items-center justify-center relative touch-none">
+      <div class="flex flex-row items-center justify-center gap-4">
+        
+        <!-- Hours -->
+        <div class="w-16">
+          <ScrollSelector 
+            :items="hoursItems" 
+            v-model="selectedHour"
+            :format-label="formatHourLabel"
+          />
+        </div>
 
-  <!-- Content -->
-  <div class="flex-1 flex flex-col items-center justify-center relative touch-none">
-    <div class="flex flex-row items-center justify-center gap-4">
+        <div class="text-4xl font-bold mb-2 opacity-50">:</div>
+
+        <!-- Minutes -->
+        <div class="w-16">
+          <ScrollSelector 
+            :items="minutesItems" 
+            v-model="selectedMinute"
+          />
+        </div>
+
+        <!-- AM/PM (Only 12h) -->
+        <div v-if="is12h" class="w-24 ml-2 border-l border-white/10 pl-2">
+          <ScrollSelector 
+            :items="['AM', 'PM']" 
+            v-model="selectedAmPm"
+            :format-label="formatAmPm"
+          />
+        </div>
       
-      <!-- Hours -->
-      <div class="w-16">
-        <ScrollSelector 
-          :items="hoursItems" 
-          v-model="selectedHour"
-          :format-label="formatHourLabel"
-        />
       </div>
-
-      <div class="text-4xl font-bold mb-2 opacity-50">:</div>
-
-      <!-- Minutes -->
-      <div class="w-16">
-        <ScrollSelector 
-          :items="minutesItems" 
-          v-model="selectedMinute"
-        />
-      </div>
-
-      <!-- AM/PM (Only 12h) -->
-      <div v-if="is12h" class="w-24 ml-2 border-l border-white/10 pl-2">
-        <ScrollSelector 
-          :items="['AM', 'PM']" 
-          v-model="selectedAmPm"
-          :format-label="formatAmPm"
-        />
-      </div>
-    
     </div>
-  </div>
-  <!-- Footer -->
-  <div class="flex flex-row py-4 w-full items-start z-10 absolute bottom-10 self-center justify-center">
-    <h1 class="text-2xl font-light tracking-wide text-white">Set Alarm</h1>
-  </div>
+  </RadialMenu>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { useAppStore } from '../stores/appState';
 import ScrollSelector from '../components/ScrollSelector.vue';
-import BackButton from '../components/BackButton.vue';
+import RadialMenu from '../components/RadialMenu.vue';
 import feather from 'feather-icons';
 
-const bellIcon = feather.icons['bell'].toSvg({
-  width: 52,
-  height: 52,
-  color: 'white',
-  'stroke-width': 2
-});
+const router = useRouter();
+
+const volumeIcon = feather.icons['volume-2'].toSvg();
+const sunriseIcon = feather.icons['sunrise'].toSvg();
 
 const appStore = useAppStore();
+
+const upperMenuItems = computed(() => [
+  {
+    label: 'Alarm',
+    icon: feather.icons['bell'].toSvg(),
+    action: () => appStore.toggleAlarmActive(),
+    active: appStore.alarmActive,
+  }
+]);
+
+const lowerMenuItems = computed(() => {
+  // Ensure reactivity tracks the alarm ID
+  // This forces the computed property to re-evaluate when the specific ID changes,
+  // not just when the alarmSound object reference changes (though that should work too)
+  const _dep = appStore.alarmSound?.id;
+
+  return [
+  {
+    label: 'Sunrise',
+    icon: sunriseIcon,
+    action: () => router.push('/sunriseSettings')
+  },
+  {
+    label: 'Alarm Sound',
+    icon: volumeIcon,
+    active: !!appStore.alarmSound,
+    action: () => {
+      if (appStore.alarmSound) {
+        router.push({ name: 'MediaPlayer', params: { soundId: appStore.alarmSound.id } });
+      } else {
+        router.push({ name: 'MediaPlayer' });
+      }
+    }
+  },
+]});
 
 // Generate items
 const minutesItems = Array.from({ length: 60 }, (_, i) => i);

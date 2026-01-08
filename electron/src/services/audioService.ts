@@ -20,7 +20,7 @@ export function playPreview(previewUrl: string): HTMLAudioElement {
 }
 
 // Play audio without normalization
-function playNonNormalized(soundInfo: SoundInfo, loop: boolean = false): void {
+function playNonNormalized(soundInfo: SoundInfo, loop: boolean = false, autoplay: boolean = true): void {
   if (!globalAudioElement) return;
 
   // Configure volume
@@ -62,13 +62,17 @@ function playNonNormalized(soundInfo: SoundInfo, loop: boolean = false): void {
       }
     }, { once: true });
   }
-  globalAudioElement.play()
+  
+  if (autoplay) {
+    globalAudioElement.play();
+  }
 }
 
 // Play a sound globally so it persists across component navigation
 export async function playGlobalSound(
   soundInfo: SoundInfo,
   loop: boolean = false,
+  autoplay: boolean = true,
 ): Promise<void> {
   // Stop any currently playing sound
   if (globalAudioElement) {
@@ -83,7 +87,7 @@ export async function playGlobalSound(
   globalAudioElement.crossOrigin = 'anonymous'; // Allow cross-origin requests
 
   globalAudioElement.src = soundInfo.previewUrl;   
-  playNonNormalized(soundInfo, loop);
+  playNonNormalized(soundInfo, loop, autoplay);
 
   return;
 }

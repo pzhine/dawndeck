@@ -41,7 +41,7 @@ const menuItems = computed<MenuItem[]>(() => [
   { label: 'Lamp', icon: lampIcon, route: '/level/lampBrightness' },
   { label: 'Sounds & Music', icon: musicIcon, route: '/media-player' },
   { label: 'Projector', icon: projectorIcon, route: '/projector' },
-  { label: 'Alarm', icon: alarmIcon, route: '/alarm' },
+  { label: 'Alarm', icon: alarmIcon, route: '/alarm', active: appStore.alarmActive },
   { label: 'Sleep', icon: sleepIcon, action: mute },
   { label: 'Settings', icon: settingsIcon, route: '/wifi' },
 ]);
