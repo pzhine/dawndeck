@@ -65,8 +65,6 @@ const props = defineProps<{
   items?: ListItem[];
   title?: string;
   showTitle?: boolean;
-  showBackButton?: boolean;
-  backButtonLabel?: string;
 }>();
 
 const emit = defineEmits<{
