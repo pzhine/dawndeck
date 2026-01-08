@@ -84,9 +84,16 @@ const lowerMenuItems = computed(() => {
     active: !!appStore.alarmSound,
     action: () => {
       if (appStore.alarmSound) {
-        router.push({ name: 'MediaPlayer', params: { soundId: appStore.alarmSound.id } });
+        router.push({ 
+          name: 'MediaPlayer', 
+          params: { soundId: appStore.alarmSound.id },
+          query: { backRoute: '/alarm' }
+        });
       } else {
-        router.push({ name: 'MediaPlayer' });
+        router.push({ 
+          name: 'SoundCategories',
+          query: { backRoute: '/alarm' }
+        });
       }
     }
   },

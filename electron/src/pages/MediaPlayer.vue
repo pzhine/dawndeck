@@ -73,6 +73,7 @@ import { getCurrentSoundInfo, isGlobalSoundPlaying, playGlobalSound, pauseGlobal
 import { useAppStore } from '../stores/appState';
 
 const router = useRouter();
+const route = useRoute();
 const appStore = useAppStore();
 
 // Reactive state
@@ -381,7 +382,10 @@ const toggleRepeat = () => {
 
 // Check for deep link
 onMounted(async () => {
-  const route = useRoute();
+  if (!route.query.backRoute) {
+    router.replace({ ...route, query: { ...route.query, backRoute: '/' } });
+  }
+
   const soundId = route.params.soundId;
   
   if (soundId) {

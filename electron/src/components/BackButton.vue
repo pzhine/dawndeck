@@ -11,6 +11,10 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 
+const props = defineProps<{
+  backRoute?: string;
+}>();
+
 const router = useRouter();
 
 // Configuration
@@ -46,8 +50,30 @@ const buttonStyle = computed(() => {
 });
 
 const executeBack = () => {
-    console.log('Execute Back Called', { shouldGoHome: shouldGoHome.value, history: window.history.length });
-    // If user has been on this screen for long enough, go home
+    const queryBackRoute = router.currentRoute.value.query.backRoute as string;
+    
+    console.log('Execute Back Called', { 
+      shouldGoHome: shouldGoHome.value, 
+      history: window.history.length, 
+      backRouteProp: props.backRoute,
+      backRouteQuery: queryBackRoute
+    });
+    
+    // Explicit route override (Query param takes precedence, then prop)
+    const overrideRoute = queryBackRoute || props.backRoute;
+    
+    if (overrideRoute) {
+      console.log('Using backRoute override:', overrideRoute);
+      // 'true' is a special flag meaning "Use history back, but ignore timeout"
+      if (overrideRoute === 'true') {
+        router.back();
+      } else {
+        router.push(overrideRoute);
+      }
+      return;
+    }
+
+    // If user has been on this screen for long enough, go home.
     if (shouldGoHome.value) {
       console.log('Going Home due to timeout');
       router.push('/');
