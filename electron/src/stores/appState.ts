@@ -5,14 +5,6 @@ import { AppState } from '../../types/state';
 import { setGlobalVolume } from '../services/audioService';
 import defaultConfig from '../../config.example.json';
 
-// Throttled function to send lamp colors to IPC
-const throttledSendLampColors = throttle(
-  async (colors: { warmWhite: number; pink: number; orange: number }) => {
-    await window.ipcRenderer.invoke('set-lamp-colors', colors);
-  },
-  300
-);
-
 // Create a Pinia store for our application state
 export const useAppStore = defineStore('appState', {
   state: (): AppState => ({
@@ -79,6 +71,18 @@ export const useAppStore = defineStore('appState', {
   },
 
   actions: {
+    // Throttled function to send current lamp state to hardware
+    updateLampHardware: throttle(async function(this: any) {
+      if (!this.lampActive) return;
+      
+      const multiplier = this.lampBrightness / 100;
+      await window.ipcRenderer.invoke('set-lamp-colors', {
+        warmWhite: Math.round(this.lampColors.warmWhite * multiplier),
+        pink: Math.round(this.lampColors.pink * multiplier),
+        orange: Math.round(this.lampColors.orange * multiplier),
+      });
+    }, 300),
+    
     // Toggle lamp active state
     async toggleLampActive() {
       const newState = !this.lampActive;
@@ -204,16 +208,7 @@ export const useAppStore = defineStore('appState', {
     setLampBrightness(level: number): void {
       this.lampBrightness = Math.max(0, Math.min(100, level)); // Clamp between 0-100
       this.saveState();
-      
-      // If lamp is active, send updated brightness to hardware (throttled)
-      if (this.lampActive) {
-        const multiplier = this.lampBrightness / 100;
-        throttledSendLampColors({
-          warmWhite: Math.round(this.lampColors.warmWhite * multiplier),
-          pink: Math.round(this.lampColors.pink * multiplier),
-          orange: Math.round(this.lampColors.orange * multiplier),
-        });
-      }
+      this.updateLampHardware();
     },
 
     // Generic state update action
@@ -230,16 +225,7 @@ export const useAppStore = defineStore('appState', {
         orange: Math.max(0, Math.min(255, colors.orange)),
       };
       this.saveState();
-      
-      // If lamp is active, send updated colors to hardware (throttled)
-      if (this.lampActive) {
-        const multiplier = this.lampBrightness / 100;
-        throttledSendLampColors({
-          warmWhite: Math.round(this.lampColors.warmWhite * multiplier),
-          pink: Math.round(this.lampColors.pink * multiplier),
-          orange: Math.round(this.lampColors.orange * multiplier),
-        });
-      }
+      this.updateLampHardware();
     },
 
     // Set the time format
