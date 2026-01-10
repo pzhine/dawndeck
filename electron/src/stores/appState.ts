@@ -184,7 +184,6 @@ export const useAppStore = defineStore('appState', {
     // Set the lamp brightness
     setLampBrightness(level: number): void {
       this.lampBrightness = Math.max(0, Math.min(100, level)); // Clamp between 0-100
-      this.saveState();
     },
 
     // Generic state update action
