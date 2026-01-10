@@ -1,10 +1,10 @@
 <template>
-  <div class="relative flex flex-col items-center justify-center h-full w-full">
-    <div class="w-full aspect-square shrink-0 max-w-[620px] relative">
+  <div class="relative flex flex-col items-center justify-center w-full h-full">
+    <div class="w-full aspect-square relative flex-shrink">
       <svg
         ref="svgRef"
         class="w-full h-full bg-black rounded-full cursor-crosshair touch-none absolute inset-0"
-        style="filter: blur(70px)"
+        style="filter: blur(30px)"
         viewBox="-150 -150 1100 1050"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -146,7 +146,7 @@
     </div>
     
     <!-- Brightness slider -->
-    <div class="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-4 z-10 px-8">
+    <!-- <div class="flex items-center justify-center gap-4 w-full px-8">
       <div class="w-5 h-6 pointer-events-none opacity-50">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white">
           <path d="M9 18h6"/>
@@ -177,7 +177,7 @@
           <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/>
         </svg>
       </div>
-    </div>
+    </div> -->
   </div>
 </template>
 
