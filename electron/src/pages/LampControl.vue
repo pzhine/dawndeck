@@ -439,6 +439,7 @@ function updateLEDValues(x: number, y: number) {
   }, currentColorPosition.value ?? undefined);
 
   console.log('Updated lamp colors (base):', { warmWhiteValue, pinkValue, orangeValue });
+}
 
 /**
  * Handle pointer start (mouse or touch)
