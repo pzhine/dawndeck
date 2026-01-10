@@ -14,17 +14,17 @@
         <path
           d="M803 517C830.5 647.5 712.5 729.5 549 729.5C385.5 729.5 206.5 563.5 226 421.5C243.852 291.5 349 255.5 491 274.5C660.489 297.178 782.302 418.778 803 517Z"
           fill="#FF6B09"
-          fill-opacity="0.8"
+          :fill-opacity="0.8 * (brightness / 100)"
         />
         <path
           d="M580 375.5C597 553.5 404.071 730 266 730C144.5 756 0 694.571 0 556.5C0 418.429 107.611 294.527 252.5 236C354 195 563 197.5 580 375.5Z"
           fill="#FF2A70"
-          fill-opacity="0.8"
+          :fill-opacity="0.8 * (brightness / 100)"
         />
         <path
           d="M662 284C666.547 356 628.5 493.5 479 549C332 580.5 96 505.5 96 236C96 97.9288 222.929 0 361 0C499.071 0 651.931 124.562 662 284Z"
           fill="#FFD76D"
-          fill-opacity="0.8"
+          :fill-opacity="0.8 * (brightness / 100)"
         />
       </svg>
       
@@ -145,6 +145,40 @@
     
     <!-- Hidden canvas for pixel sampling -->
     <canvas ref="canvasRef" class="hidden" />
+    
+    <!-- Brightness slider -->
+    <div class="absolute bottom-8 left-0 right-0 flex items-center justify-center gap-4 z-10 px-8">
+      <div class="w-5 h-6 pointer-events-none opacity-50">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white">
+          <path d="M9 18h6"/>
+          <path d="M10 22h4"/>
+          <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/>
+        </svg>
+      </div>
+      <div 
+        ref="brightnessBarRef"
+        class="w-30 h-12 flex items-center justify-center cursor-pointer"
+        @mousedown="handleBrightnessInteraction"
+        @mousemove="handleBrightnessInteraction"
+        @touchstart.prevent="handleBrightnessInteraction"
+        @touchmove.prevent="handleBrightnessInteraction"
+        @click.stop
+      >
+        <div class="w-full h-2 bg-gray-700 rounded-full overflow-hidden pointer-events-none">
+          <div 
+            class="h-full bg-white transition-all duration-100 ease-out"
+            :style="{ width: `${brightness}%` }"
+          ></div>
+        </div>
+      </div>
+      <div class="w-5 h-6 pointer-events-none opacity-70">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white">
+          <path d="M9 18h6"/>
+          <path d="M10 22h4"/>
+          <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/>
+        </svg>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -161,6 +195,10 @@ const canvasRef = ref<HTMLCanvasElement | null>(null);
 const touchPosition = ref<{ x: number; y: number } | null>(null);
 const currentColorPosition = ref<{ x: number; y: number } | null>(null);
 const isDragging = ref(false);
+const brightnessBarRef = ref<HTMLElement | null>(null);
+
+// Brightness multiplier (0-100%)
+const brightness = ref(100);
 
 // Debug mode flag - set to true to enable rotation slider
 const DEBUG_MODE = false;
@@ -477,10 +515,11 @@ function updateLEDValues(x: number, y: number) {
  * Send LED values to Arduino via IPC
  */
 const sendToArduino = () => {
-  // Convert percentages to 0-255 range
-  const warmWhiteValue = Math.round((ledValues.warmWhite / 100) * 255);
-  const pinkValue = Math.round((ledValues.pink / 100) * 255);
-  const orangeValue = Math.round((ledValues.orange / 100) * 255);
+  // Convert percentages to 0-255 range and apply brightness multiplier
+  const multiplier = brightness.value / 100;
+  const warmWhiteValue = Math.round((ledValues.warmWhite / 100) * 255 * multiplier);
+  const pinkValue = Math.round((ledValues.pink / 100) * 255 * multiplier);
+  const orangeValue = Math.round((ledValues.orange / 100) * 255 * multiplier);
 
   // Save to app state
   appStore.setLampColors({
@@ -500,7 +539,7 @@ const sendToArduino = () => {
   console.log('Sent lamp colors:', { warmWhiteValue, pinkValue, orangeValue });
 };
 
-const throttledSendToArduino = throttle(sendToArduino, 50);
+const throttledSendToArduino = throttle(sendToArduino, 300);
 
 /**
  * Handle pointer start (mouse or touch)
@@ -562,6 +601,37 @@ function handlePointerEnd(event: MouseEvent | TouchEvent) {
 
   // Flush any pending updates
   throttledSendToArduino.flush();
+}
+
+/**
+ * Handle brightness slider interaction
+ */
+function handleBrightnessInteraction(event: MouseEvent | TouchEvent) {
+  event.stopPropagation();
+  if (!brightnessBarRef.value) return;
+  
+  const rect = brightnessBarRef.value.getBoundingClientRect();
+  let clientX;
+  
+  if (window.MouseEvent && event instanceof MouseEvent) {
+    clientX = event.clientX;
+    // Only handle if primary button is pressed for mousemove
+    if (event.type === 'mousemove' && event.buttons !== 1) return;
+  } else {
+    const touchEvent = event as TouchEvent;
+    if (touchEvent.touches && touchEvent.touches.length > 0) {
+      clientX = touchEvent.touches[0].clientX;
+    } else {
+      return;
+    }
+  }
+  
+  const x = clientX - rect.left;
+  const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
+  brightness.value = percentage;
+  
+  // Re-send current lamp colors with new brightness
+  throttledSendToArduino();
 }
 
 /**
