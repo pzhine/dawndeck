@@ -554,22 +554,14 @@ const sendToArduino = () => {
   const pinkValue = Math.round((ledValues.pink / 100) * 255 * multiplier);
   const orangeValue = Math.round((ledValues.orange / 100) * 255 * multiplier);
 
-  // Save to app state
+  // Save to app state - this will trigger the IPC call via store
   appStore.setLampColors({
     warmWhite: warmWhiteValue,
     pink: pinkValue,
     orange: orangeValue,
   });
 
-  // Send to main process - we'll update the IPC handler to accept RGB values
-  // For now, using the lamp control with RGB channels
-  window.ipcRenderer.invoke('set-lamp-colors', {
-    warmWhite: warmWhiteValue,
-    pink: pinkValue,
-    orange: orangeValue,
-  });
-
-  console.log('Sent lamp colors:', { warmWhiteValue, pinkValue, orangeValue });
+  console.log('Updated lamp colors:', { warmWhiteValue, pinkValue, orangeValue });
 };
 
 const throttledSendToArduino = throttle(sendToArduino, 300);

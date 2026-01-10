@@ -203,8 +203,9 @@ export const useAppStore = defineStore('appState', {
     // Set the lamp brightness
     setLampBrightness(level: number): void {
       this.lampBrightness = Math.max(0, Math.min(100, level)); // Clamp between 0-100
+      this.saveState();
       
-      // If lamp is active, update with new brightness (throttled)
+      // If lamp is active, send updated brightness to hardware (throttled)
       if (this.lampActive) {
         const multiplier = this.lampBrightness / 100;
         throttledSendLampColors({
@@ -228,6 +229,17 @@ export const useAppStore = defineStore('appState', {
         pink: Math.max(0, Math.min(255, colors.pink)),
         orange: Math.max(0, Math.min(255, colors.orange)),
       };
+      this.saveState();
+      
+      // If lamp is active, send updated colors to hardware (throttled)
+      if (this.lampActive) {
+        const multiplier = this.lampBrightness / 100;
+        throttledSendLampColors({
+          warmWhite: Math.round(this.lampColors.warmWhite * multiplier),
+          pink: Math.round(this.lampColors.pink * multiplier),
+          orange: Math.round(this.lampColors.orange * multiplier),
+        });
+      }
     },
 
     // Set the time format
