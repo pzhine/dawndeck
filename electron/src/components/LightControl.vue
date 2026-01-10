@@ -334,9 +334,23 @@ function updateLEDValues(x: number, y: number) {
 
   const colorPercentages = calculateColorWheelValues(x, y);
   
-  ledValues[0] = colorPercentages[0];
-  ledValues[1] = colorPercentages[1];
-  ledValues[2] = colorPercentages[2];
+  // Calculate distance from center to apply brightness multiplier
+  const dx = x - groupingCenter.x;
+  const dy = y - groupingCenter.y;
+  const distanceFromCenter = Math.sqrt(dx * dx + dy * dy);
+  
+  // Maximum reasonable distance (approximate radius of the interactive area)
+  const maxDistance = tapCircleRadius.value * 1.5;
+  
+  // Calculate multiplier: 3x at center, 1x at edge
+  // This makes center positions brighter across all LEDs
+  const normalizedDistance = Math.min(distanceFromCenter / maxDistance, 1);
+  const brightnessMultiplier = 1 + (1 - normalizedDistance) * 2;
+  
+  // Apply both the sector percentage and the brightness multiplier
+  ledValues[0] = Math.min(100, colorPercentages[0] * brightnessMultiplier);
+  ledValues[1] = Math.min(100, colorPercentages[1] * brightnessMultiplier);
+  ledValues[2] = Math.min(100, colorPercentages[2] * brightnessMultiplier);
 
   currentColorPosition.value = { x, y };
 
