@@ -1,9 +1,17 @@
 import { defineStore } from 'pinia';
-import { debounce } from 'lodash-es';
+import { debounce, throttle } from 'lodash-es';
 import { AlarmSound } from '../../types/sound';
 import { AppState } from '../../types/state';
 import { setGlobalVolume } from '../services/audioService';
 import defaultConfig from '../../config.example.json';
+
+// Throttled function to send lamp colors to IPC
+const throttledSendLampColors = throttle(
+  async (colors: { warmWhite: number; pink: number; orange: number }) => {
+    await window.ipcRenderer.invoke('set-lamp-colors', colors);
+  },
+  300
+);
 
 // Create a Pinia store for our application state
 export const useAppStore = defineStore('appState', {
@@ -117,6 +125,17 @@ export const useAppStore = defineStore('appState', {
 
         // Sync with system volume after loading state
         await this.syncWithSystemVolume();
+        
+        // Restore lamp state if active
+        if (this.lampActive) {
+          const multiplier = this.lampBrightness / 100;
+          await window.ipcRenderer.invoke('set-lamp-colors', {
+            warmWhite: Math.round(this.lampColors.warmWhite * multiplier),
+            pink: Math.round(this.lampColors.pink * multiplier),
+            orange: Math.round(this.lampColors.orange * multiplier),
+          });
+          console.log('Lamp state restored:', { brightness: this.lampBrightness, colors: this.lampColors });
+        }
       } catch (error) {
         console.error('Failed to load saved state:', error);
       }
@@ -182,14 +201,13 @@ export const useAppStore = defineStore('appState', {
     },
 
     // Set the lamp brightness
-    async setLampBrightness(level: number): Promise<void> {
+    setLampBrightness(level: number): void {
       this.lampBrightness = Math.max(0, Math.min(100, level)); // Clamp between 0-100
-      this.saveState();
       
-      // If lamp is active, immediately update with new brightness
+      // If lamp is active, update with new brightness (throttled)
       if (this.lampActive) {
         const multiplier = this.lampBrightness / 100;
-        await window.ipcRenderer.invoke('set-lamp-colors', {
+        throttledSendLampColors({
           warmWhite: Math.round(this.lampColors.warmWhite * multiplier),
           pink: Math.round(this.lampColors.pink * multiplier),
           orange: Math.round(this.lampColors.orange * multiplier),
