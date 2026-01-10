@@ -662,9 +662,6 @@ function handleBrightnessInteraction(event: MouseEvent | TouchEvent) {
   const x = clientX - rect.left;
   const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
   brightness.value = percentage;
-  
-  // Re-send current lamp colors with new brightness
-  throttledSendToArduino();
 }
 
 /**

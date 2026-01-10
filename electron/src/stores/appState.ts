@@ -182,8 +182,19 @@ export const useAppStore = defineStore('appState', {
     },
 
     // Set the lamp brightness
-    setLampBrightness(level: number): void {
+    async setLampBrightness(level: number): Promise<void> {
       this.lampBrightness = Math.max(0, Math.min(100, level)); // Clamp between 0-100
+      this.saveState();
+      
+      // If lamp is active, immediately update with new brightness
+      if (this.lampActive) {
+        const multiplier = this.lampBrightness / 100;
+        await window.ipcRenderer.invoke('set-lamp-colors', {
+          warmWhite: Math.round(this.lampColors.warmWhite * multiplier),
+          pink: Math.round(this.lampColors.pink * multiplier),
+          orange: Math.round(this.lampColors.orange * multiplier),
+        });
+      }
     },
 
     // Generic state update action
