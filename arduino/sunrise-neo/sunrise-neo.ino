@@ -118,6 +118,12 @@ void readSerialInput() {
     return;
   }
   char c = Serial.read(); // Read a single character
+
+  // Ignore carriage return characters to prevent empty commands/double newlines
+  if (c == '\r') {
+    return;
+  }
+
   if (c == '\n' || inputBufferIndex >= INPUT_BUFFER_SIZE - 1) { // End of line or buffer full
     inputBuffer[inputBufferIndex] = '\0'; // Null-terminate the string
     inputBufferReady = true; // flag the buffer ready to read
@@ -153,10 +159,15 @@ void readAndHandleSerialCommands() {
   if (inputBufferReady) {
     inputBufferReady = false;
     parseSerialCommand();
-    handleSerialCommand();
+    
+    // Only handle and ACK if we actually have parameters
+    if (inputParamCount > 0) {
+      handleSerialCommand();
+      Serial.print("ACK ");
+      Serial.println(inputBuffer);
+    }
+    
     freeInputParams();
-    Serial.print("ACK ");
-    Serial.println(inputBuffer);
   }
   // read from serial until newline
   readSerialInput();
