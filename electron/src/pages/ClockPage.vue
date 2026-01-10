@@ -19,7 +19,6 @@ import feather from 'feather-icons';
 
 const router = useRouter();
 const appStore = useAppStore();
-const clockContainer = ref<HTMLDivElement | null>(null);
 const inactivityTimer = ref<number | null>(null);
 const isDimmed = ref(false);
 const isBTPlaying = ref(false);
