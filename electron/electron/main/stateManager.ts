@@ -297,3 +297,64 @@ ipcMain.handle('set-strip-brightness', async (_, brightness: number) => {
   sendStripBrightnessToSerial(clampedBrightness);
   return true;
 });
+
+// Handler for setting lamp colors (3 RGB LEDs)
+ipcMain.handle(
+  'set-lamp-colors',
+  async (
+    _,
+    colors: { warmWhite: number; pink: number; orange: number }
+  ) => {
+    // Ensure values are within valid range (0-255)
+    const warmWhite = Math.max(0, Math.min(255, colors.warmWhite));
+    const pink = Math.max(0, Math.min(255, colors.pink));
+    const orange = Math.max(0, Math.min(255, colors.orange));
+
+    console.log('[stateManager] Setting lamp colors:', { warmWhite, pink, orange });
+
+    // The lamp has 3 LEDs (RGB channels), each controlled as a separate "pixel"
+    // Warm white: #ffcc00 - primarily R and G channels
+    // Pink: #ff2a20 - primarily R channel
+    // Orange: #ff6b09 - primarily R and G channels
+
+    // For a simple RGB strip, we can blend the three colors
+    // by combining their contributions to each channel
+    
+    // Parse hex colors to get RGB ratios
+    const warmWhiteRGB = { r: 0xff, g: 0xcc, b: 0x00 }; // #ffcc00
+    const pinkRGB = { r: 0xff, g: 0x2a, b: 0x20 }; // #ff2a20
+    const orangeRGB = { r: 0xff, g: 0x6b, b: 0x09 }; // #ff6b09
+
+    // Calculate blended RGB values based on individual LED intensities
+    const r = Math.round(
+      (warmWhite / 255) * warmWhiteRGB.r +
+      (pink / 255) * pinkRGB.r +
+      (orange / 255) * orangeRGB.r
+    ) / 3;
+    
+    const g = Math.round(
+      (warmWhite / 255) * warmWhiteRGB.g +
+      (pink / 255) * pinkRGB.g +
+      (orange / 255) * orangeRGB.g
+    ) / 3;
+    
+    const b = Math.round(
+      (warmWhite / 255) * warmWhiteRGB.b +
+      (pink / 255) * pinkRGB.b +
+      (orange / 255) * orangeRGB.b
+    ) / 3;
+
+    // Clamp final values
+    const finalR = Math.max(0, Math.min(255, Math.round(r)));
+    const finalG = Math.max(0, Math.min(255, Math.round(g)));
+    const finalB = Math.max(0, Math.min(255, Math.round(b)));
+
+    console.log('[stateManager] Blended RGB:', { r: finalR, g: finalG, b: finalB });
+
+    // Send to Arduino - STRIP_LAMP, pixel 0, RGB values, no white channel, short transition
+    sendLEDToSerial(STRIP_LAMP, 0, finalR, finalG, finalB, -1, 100);
+
+    return true;
+  }
+);
+

@@ -64,6 +64,11 @@ export interface AppState {
   screenBrightness: number;
   projectorBrightness: number;
   lampBrightness: number;
+  lampColors: {
+    warmWhite: number; // 0-255
+    pink: number; // 0-255
+    orange: number; // 0-255
+  };
   timeFormat: '12h' | '24h'; // Add time format preference
   listPositions: ListPositions; // Store InteractiveList positions by route
   alarmSound: AlarmSound | null;

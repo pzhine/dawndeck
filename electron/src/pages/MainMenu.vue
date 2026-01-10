@@ -81,7 +81,7 @@ const menuItems = computed(() => {
     {
       label: 'Lamp Brightness',
       value: `${appStore.lampBrightness}%`,
-      onSelect: () => router.push('/level/lampBrightness'),
+      onSelect: () => router.push('/lamp-control'),
     },
     // {
     //   label: 'Projector Preview',

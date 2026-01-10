@@ -14,6 +14,11 @@ export const useAppStore = defineStore('appState', {
     screenBrightness: 80, // Default screen brightness (0-100)
     projectorBrightness: 70, // Default projector brightness (0-100)
     lampBrightness: 50, // Default lamp brightness (0-100)
+    lampColors: {
+      warmWhite: 0,
+      pink: 0,
+      orange: 0,
+    }, // Individual LED color values (0-255)
     timeFormat: '24h', // Default time format
     listPositions: {}, // Empty object to store list positions by route
     alarmSound: null, // Default to no alarm sound selected
@@ -153,6 +158,15 @@ export const useAppStore = defineStore('appState', {
     // Set the lamp brightness
     setLampBrightness(level: number): void {
       this.lampBrightness = Math.max(0, Math.min(100, level)); // Clamp between 0-100
+    },
+
+    // Set individual lamp colors (RGB values 0-255)
+    setLampColors(colors: { warmWhite: number; pink: number; orange: number }): void {
+      this.lampColors = {
+        warmWhite: Math.max(0, Math.min(255, colors.warmWhite)),
+        pink: Math.max(0, Math.min(255, colors.pink)),
+        orange: Math.max(0, Math.min(255, colors.orange)),
+      };
     },
 
     // Set the time format

@@ -79,10 +79,9 @@ const routes = [
     props: { type: 'screenBrightness' },
   },
   {
-    path: '/level/lampBrightness',
-    name: 'LampBrightness',
-    component: () => import('./pages/LevelControl.vue'),
-    props: { type: 'lampBrightness' },
+    path: '/lamp-control',
+    name: 'LampControl',
+    component: () => import('./pages/LampControl.vue'),
   },
   {
     path: '/projector',
