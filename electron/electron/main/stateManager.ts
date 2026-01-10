@@ -202,11 +202,10 @@ export function sendLEDToSerial(
   red: number,
   green: number,
   blue: number,
-  white: number,
   duration: number
 ) {
   // Format for LERP_LED: stripId, pixel, r, g, b, w, duration
-  const command = `LERP_LED ${stripId} ${pixel} ${red} ${green} ${blue} ${white} ${duration}`;
+  const command = `LERP_LED ${stripId} ${pixel} ${red} ${green} ${blue} ${duration}`;
 
   console.log(`[stateManager] Sending LED command: ${command}`);
   sendMessage(command);
@@ -233,7 +232,6 @@ export function sendProjectorLEDToSerial(
     red,
     green,
     blue,
-    white,
     PROJECTOR_TRANSITION_TIME
   );
 }
@@ -317,7 +315,7 @@ ipcMain.handle(
     // Pixel 1: Pink LED
     // Pixel 2: Orange LED
     
-    sendLEDToSerial(STRIP_LAMP, 0, warmWhite, pink, orange, -1, 100);
+    sendLEDToSerial(STRIP_LAMP, 0, warmWhite, pink, orange, 100);
 
     return true;
   }
