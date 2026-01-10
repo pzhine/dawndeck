@@ -20,6 +20,7 @@ export const useAppStore = defineStore('appState', {
       pink: 0,
       orange: 0,
     }, // Individual LED color values (0-255)
+    lampPosition: undefined, // SVG coordinates for lamp color picker
     timeFormat: '24h', // Default time format
     listPositions: {}, // Empty object to store list positions by route
     alarmSound: null, // Default to no alarm sound selected
@@ -218,12 +219,15 @@ export const useAppStore = defineStore('appState', {
     },
 
     // Set individual lamp colors (RGB values 0-255)
-    setLampColors(colors: { warmWhite: number; pink: number; orange: number }): void {
+    setLampColors(colors: { warmWhite: number; pink: number; orange: number }, position?: { x: number; y: number }): void {
       this.lampColors = {
         warmWhite: Math.max(0, Math.min(255, colors.warmWhite)),
         pink: Math.max(0, Math.min(255, colors.pink)),
         orange: Math.max(0, Math.min(255, colors.orange)),
       };
+      if (position) {
+        this.lampPosition = position;
+      }
       this.saveState();
       this.updateLampHardware();
     },

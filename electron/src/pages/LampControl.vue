@@ -558,7 +558,7 @@ const sendToArduino = () => {
     warmWhite: warmWhiteValue,
     pink: pinkValue,
     orange: orangeValue,
-  });
+  }, currentColorPosition.value ?? undefined);
 
   console.log('Updated lamp colors (base):', { warmWhiteValue, pinkValue, orangeValue });
 };
@@ -681,13 +681,10 @@ onMounted(() => {
     ledValues.pink = (appStore.lampColors.pink / 255) * 100;
     ledValues.orange = (appStore.lampColors.orange / 255) * 100;
     
-    // Calculate and set the position for the saved colors
-    const position = calculatePositionFromColors(
-      appStore.lampColors.warmWhite,
-      appStore.lampColors.pink,
-      appStore.lampColors.orange
-    );
-    currentColorPosition.value = position;
+    // Restore the saved position if available
+    if (appStore.lampPosition) {
+      currentColorPosition.value = appStore.lampPosition;
+    }
   } else {
     // Default to all LEDs off
     ledValues.warmWhite = 0;

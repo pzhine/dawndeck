@@ -70,6 +70,7 @@ export interface AppState {
     pink: number; // 0-255
     orange: number; // 0-255
   };
+  lampPosition?: { x: number; y: number }; // SVG coordinates for lamp color picker
   timeFormat: '12h' | '24h'; // Add time format preference
   listPositions: ListPositions; // Store InteractiveList positions by route
   alarmSound: AlarmSound | null;
