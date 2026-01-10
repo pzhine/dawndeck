@@ -37,7 +37,7 @@ const mute = () => {
 };
 
 const menuItems = computed<MenuItem[]>(() => [
-  { label: 'Lamp', icon: lampIcon, route: '/lamp-control' },
+  { label: 'Lamp', icon: lampIcon, route: '/lamp-control', active: appStore.lampActive },
   { label: 'Sounds & Music', icon: musicIcon, route: '/media-player', active: isGlobalSoundPlaying() || isBTPlaying.value },
   { label: 'Projector', icon: projectorIcon, route: '/projector' },
   { label: 'Alarm', icon: alarmIcon, route: '/alarm', active: appStore.alarmActive },

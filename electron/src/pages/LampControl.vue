@@ -249,7 +249,7 @@ const circles = {
     rx: 280,
     ry: 260,
     rotation: 0,
-    color: '#FFD76D',
+    color: '#ffb86d',
   },
   pink: {
     cx: 280,
@@ -265,7 +265,7 @@ const circles = {
     rx: 280,
     ry: 240,
     rotation: -30,
-    color: '#FF6B09',
+    color: '#ff4209',
   },
 };
 
