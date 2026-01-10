@@ -14,6 +14,7 @@ export const useAppStore = defineStore('appState', {
     screenBrightness: 80, // Default screen brightness (0-100)
     projectorBrightness: 70, // Default projector brightness (0-100)
     lampBrightness: 50, // Default lamp brightness (0-100)
+    lampActive: true, // Whether the lamp is currently active
     lampColors: {
       warmWhite: 0,
       pink: 0,
@@ -70,6 +71,31 @@ export const useAppStore = defineStore('appState', {
   },
 
   actions: {
+    // Toggle lamp active state
+    async toggleLampActive() {
+      const newState = !this.lampActive;
+      this.lampActive = newState;
+      this.saveState();
+      
+      if (newState) {
+        // Lamp activated - restore colors with current brightness
+        const multiplier = this.lampBrightness / 100;
+        await window.ipcRenderer.invoke('set-lamp-colors', {
+          warmWhite: Math.round(this.lampColors.warmWhite * multiplier),
+          pink: Math.round(this.lampColors.pink * multiplier),
+          orange: Math.round(this.lampColors.orange * multiplier),
+        });
+        console.log('Lamp activated - colors restored with brightness', this.lampBrightness);
+      } else {
+        // Lamp deactivated - zero out all colors
+        await window.ipcRenderer.invoke('set-lamp-colors', {
+          warmWhite: 0,
+          pink: 0,
+          orange: 0,
+        });
+        console.log('Lamp deactivated - colors zeroed');
+      }
+    },
     // Save state to Electron via IPC
     saveState: debounce(function (this: any) {
       // Send the entire state to the main process
@@ -158,6 +184,12 @@ export const useAppStore = defineStore('appState', {
     // Set the lamp brightness
     setLampBrightness(level: number): void {
       this.lampBrightness = Math.max(0, Math.min(100, level)); // Clamp between 0-100
+    },
+
+    // Generic state update action
+    updateState<K extends keyof AppState>(key: K, value: AppState[K]): void {
+      (this as any)[key] = value;
+      this.saveState();
     },
 
     // Set individual lamp colors (RGB values 0-255)

@@ -64,6 +64,7 @@ export interface AppState {
   screenBrightness: number;
   projectorBrightness: number;
   lampBrightness: number;
+  lampActive: boolean; // Whether the lamp is currently active
   lampColors: {
     warmWhite: number; // 0-255
     pink: number; // 0-255

@@ -1,6 +1,7 @@
 <template>
+  <RadialMenu :upper-items="upperMenuItems" :pinned="true" width="narrow">
   <div class="relative flex flex-col items-center justify-center h-full w-full">
-    <div class="w-full aspect-square shrink-0 max-w-[650px] relative bottom-8">
+    <div class="w-full aspect-square shrink-0 max-w-[620px] relative bottom-4">
       <svg
         ref="svgRef"
         class="w-full h-full bg-black rounded-full cursor-crosshair touch-none absolute inset-0"
@@ -147,7 +148,7 @@
     <canvas ref="canvasRef" class="hidden" />
     
     <!-- Brightness slider -->
-    <div class="absolute bottom-8 left-0 right-0 flex items-center justify-center gap-4 z-10 px-8">
+    <div class="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-4 z-10 px-8">
       <div class="w-5 h-6 pointer-events-none opacity-50">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white">
           <path d="M9 18h6"/>
@@ -180,13 +181,16 @@
       </div>
     </div>
   </div>
+  </RadialMenu>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onBeforeUnmount } from 'vue';
+import { ref, reactive, onMounted, onBeforeUnmount, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAppStore } from '../stores/appState';
 import { throttle } from 'lodash-es';
+import RadialMenu, { MenuItem } from '../components/RadialMenu.vue';
+import feather from 'feather-icons';
 
 const router = useRouter();
 const appStore = useAppStore();
@@ -197,8 +201,25 @@ const currentColorPosition = ref<{ x: number; y: number } | null>(null);
 const isDragging = ref(false);
 const brightnessBarRef = ref<HTMLElement | null>(null);
 
-// Brightness multiplier (0-100%)
-const brightness = ref(100);
+// Lamp active state
+const lampActive = computed(() => appStore.lampActive ?? true);
+
+const sunIcon = feather.icons['sun'].toSvg();
+
+const upperMenuItems = computed<MenuItem[]>(() => [
+  { 
+    label: 'Lamp', 
+    icon: sunIcon, 
+    action: toggleLampActive,
+    active: lampActive.value
+  },
+]);
+
+// Brightness multiplier (0-100%) - synced with store
+const brightness = computed({
+  get: () => appStore.lampBrightness,
+  set: (value: number) => appStore.setLampBrightness(value),
+});
 
 // Debug mode flag - set to true to enable rotation slider
 const DEBUG_MODE = false;
@@ -492,6 +513,13 @@ function getSVGCoordinates(event: MouseEvent | TouchEvent): { x: number; y: numb
 }
 
 /**
+ * Toggle lamp active state
+ */
+function toggleLampActive() {
+  appStore.toggleLampActive();
+}
+
+/**
  * Update LED values based on touch position
  */
 function updateLEDValues(x: number, y: number) {
@@ -515,6 +543,11 @@ function updateLEDValues(x: number, y: number) {
  * Send LED values to Arduino via IPC
  */
 const sendToArduino = () => {
+  // Don't send if lamp is not active
+  if (!lampActive.value) {
+    return;
+  }
+  
   // Convert percentages to 0-255 range and apply brightness multiplier
   const multiplier = brightness.value / 100;
   const warmWhiteValue = Math.round((ledValues.warmWhite / 100) * 255 * multiplier);
@@ -629,6 +662,7 @@ function handleBrightnessInteraction(event: MouseEvent | TouchEvent) {
   const x = clientX - rect.left;
   const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
   brightness.value = percentage;
+  appStore.saveState();
   
   // Re-send current lamp colors with new brightness
   throttledSendToArduino();
