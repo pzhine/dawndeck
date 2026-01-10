@@ -14,7 +14,7 @@
       >
         <path
           d="M803 517C830.5 647.5 712.5 729.5 549 729.5C385.5 729.5 206.5 563.5 226 421.5C243.852 291.5 349 255.5 491 274.5C660.489 297.178 782.302 418.778 803 517Z"
-          fill="#FF6B09"
+          fill="#ff4b09"
           :fill-opacity="0.8 * (brightness / 100)"
         />
         <path
@@ -24,7 +24,7 @@
         />
         <path
           d="M662 284C666.547 356 628.5 493.5 479 549C332 580.5 96 505.5 96 236C96 97.9288 222.929 0 361 0C499.071 0 651.931 124.562 662 284Z"
-          fill="#FFD76D"
+          fill="#ffb86d"
           :fill-opacity="0.8 * (brightness / 100)"
         />
       </svg>
@@ -45,7 +45,7 @@
                  L ${groupingCenter.x + 400 * Math.cos(((300 + rotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((300 + rotationOffset) * Math.PI) / 180)}
                  A 400 400 0 0 1 ${groupingCenter.x + 400 * Math.cos(((60 + rotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((60 + rotationOffset) * Math.PI) / 180)}
                  Z`"
-            stroke="#FF6B09"
+            stroke="#ff4b09"
             stroke-width="3"
           />
           <!-- Pink slice: 60° to 180° -->
@@ -63,7 +63,7 @@
                  L ${groupingCenter.x + 400 * Math.cos(((180 + rotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((180 + rotationOffset) * Math.PI) / 180)}
                  A 400 400 0 0 1 ${groupingCenter.x + 400 * Math.cos(((300 + rotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((300 + rotationOffset) * Math.PI) / 180)}
                  Z`"
-            stroke="#FFD76D"
+            stroke="#ffb86d"
             stroke-width="3"
           />
         </g>
@@ -265,7 +265,7 @@ const circles = {
     rx: 280,
     ry: 240,
     rotation: -30,
-    color: '#ff4209',
+    color: '#ff4b09',
   },
 };
 
