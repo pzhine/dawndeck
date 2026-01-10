@@ -221,6 +221,8 @@ export const useAppStore = defineStore('appState', {
     // Set the projector brightness
     setProjectorBrightness(level: number): void {
       this.projectorBrightness = Math.max(0, Math.min(100, level)); // Clamp between 0-100
+      this.saveState();
+      this.updateProjectorHardware();
     },
 
     // Set the lamp brightness
