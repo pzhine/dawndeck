@@ -13,9 +13,6 @@ const STATE_FILE_PATH = path.join(app.getPath('userData'), 'app-state.json');
 // State cache to avoid unnecessary file reads
 let stateCache: AppState | null = null;
 
-// Constants for lamp brightness control
-const LAMP_BRIGHTNESS_DEBOUNCE_DELAY = 100; // ms
-const LAMP_BRIGHTNESS_TRANSITION_TIME = 300; // ms
 // Strip identifiers matching Arduino constants
 const STRIP_LAMP = 0;
 const STRIP_SUN_CENTER = 0;
@@ -62,16 +59,6 @@ export function getState(): AppState | null {
 export function saveState(state: AppState): Promise<boolean> {
   return new Promise((resolve) => {
     try {
-      // Check for lamp brightness changes
-      const currentState = stateCache;
-      if (
-        state.lampBrightness !== undefined &&
-        (!currentState || state.lampBrightness !== currentState.lampBrightness)
-      ) {
-        // Send the updated lamp brightness to Arduino
-        debouncedSendLampBrightness(state.lampBrightness);
-      }
-
       // Remove the config before saving to disk - we don't want to persist it
       // as it's managed separately by configManager
       const stateToPersist = { ...state };
@@ -115,12 +102,6 @@ ipcMain.handle('load-app-state', async () => {
   return getState();
 });
 
-// Create a debounced version of the sendLampBrightnessToSerial function
-const debouncedSendLampBrightness = debounce(
-  sendLampBrightnessToSerial,
-  LAMP_BRIGHTNESS_DEBOUNCE_DELAY
-);
-
 // Handler for updating a specific state property
 ipcMain.handle(
   'update-app-state',
@@ -136,11 +117,7 @@ export function initStateManagement() {
 
   // Check for initial lamp brightness setting
   const initialState = getState();
-  if (initialState && typeof initialState.lampBrightness !== 'undefined') {
-    // Send initial brightness on startup
-    sendLampBrightnessToSerial(initialState.lampBrightness);
-  }
-
+  
   // Add config to the state if not there already
   try {
     if (initialState) {
@@ -152,38 +129,6 @@ export function initStateManagement() {
   } catch (error) {
     console.error('Failed to add config to state:', error);
   }
-}
-
-/**
- * Sends a LERP_LED command to update the lamp brightness
- * @param brightness Value between 0-100 representing lamp brightness percentage
- */
-function sendLampBrightnessToSerial(brightness: number) {
-  // Convert brightness percentage (0-100) to LED white value (0-255)
-  const whiteValue = Math.floor((brightness / 100) * 255);
-
-  // Format for LERP_LED: stripId, pixel, r, g, b, w, duration
-  // Using STRIP_BOTTOM (1), pixel 0, color values 0,0,0 (no RGB) and duration from constant
-  const command = `LERP_LED ${STRIP_LAMP} 0 0 0 0 ${whiteValue} ${LAMP_BRIGHTNESS_TRANSITION_TIME}`;
-
-  console.log(`[stateManager] Sending lamp brightness command: ${command}`);
-  sendMessage(command);
-}
-
-/**
- * Sends a SET_BRIGHTNESS command to update the sunrise strip brightness
- * @param brightness Value between 0-100 representing strip brightness percentage
- */
-function sendStripBrightnessToSerial(brightness: number) {
-  // Scale the brightness from 0-100 to 0-255 for the Arduino
-  const brightnessValue = Math.round((brightness / 100) * 255);
-
-  // Send to sun center strip (ID 0)
-  sendMessage(`SET_BRIGHTNESS ${STRIP_SUN_CENTER} ${brightnessValue}`);
-
-  console.log(
-    `[stateManager] Set sun center brightness to ${brightness}% (${brightnessValue}/255)`
-  );
 }
 
 /**
@@ -283,16 +228,6 @@ export function resetAllProjectorLEDs() {
 // Handler for resetting all projector LEDs
 ipcMain.handle('reset-all-projector-leds', async () => {
   resetAllProjectorLEDs();
-  return true;
-});
-
-// Handler for setting sunrise strip brightness
-ipcMain.handle('set-strip-brightness', async (_, brightness: number) => {
-  // Ensure brightness is within valid range (0-100)
-  const clampedBrightness = Math.max(0, Math.min(100, brightness));
-
-  // Send the command to the Arduino
-  sendStripBrightnessToSerial(clampedBrightness);
   return true;
 });
 
