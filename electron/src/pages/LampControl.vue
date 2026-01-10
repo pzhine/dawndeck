@@ -1,7 +1,7 @@
 <template>
   <RadialMenu :upper-items="upperMenuItems" :pinned="true" width="narrow">
   <div class="relative flex flex-col items-center justify-center h-full w-full">
-    <div class="w-full aspect-square shrink-0 max-w-[620px] relative bottom-4">
+    <div class="w-full aspect-square shrink-0 max-w-[620px] relative">
       <svg
         ref="svgRef"
         class="w-full h-full bg-black rounded-full cursor-crosshair touch-none absolute inset-0"
@@ -662,7 +662,6 @@ function handleBrightnessInteraction(event: MouseEvent | TouchEvent) {
   const x = clientX - rect.left;
   const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
   brightness.value = percentage;
-  appStore.saveState();
   
   // Re-send current lamp colors with new brightness
   throttledSendToArduino();
