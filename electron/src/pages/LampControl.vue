@@ -91,6 +91,25 @@
           stroke-width="2"
         />
       </svg>
+      
+      <!-- Persistent color indicator (non-debug mode) -->
+      <svg
+        v-if="!DEBUG_MODE && currentColorPosition"
+        class="w-full h-full rounded-full absolute inset-0 pointer-events-none"
+        viewBox="-150 -150 1100 1050"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <circle
+          :cx="currentColorPosition.x"
+          :cy="currentColorPosition.y"
+          r="15"
+          fill="white"
+          opacity="0.6"
+          stroke="black"
+          stroke-width="2"
+        />
+      </svg>
     </div>
 
     <!-- Display current color values -->
@@ -133,13 +152,14 @@
 import { ref, reactive, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAppStore } from '../stores/appState';
-import { debounce } from 'lodash-es';
+import { throttle } from 'lodash-es';
 
 const router = useRouter();
 const appStore = useAppStore();
 const svgRef = ref<SVGSVGElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const touchPosition = ref<{ x: number; y: number } | null>(null);
+const currentColorPosition = ref<{ x: number; y: number } | null>(null);
 const isDragging = ref(false);
 
 // Debug mode flag - set to true to enable rotation slider
@@ -357,6 +377,56 @@ function calculateColorWheelValues(x: number, y: number): { pink: number; orange
 }
 
 /**
+ * Calculate a representative position from LED color values
+ * This is an approximation - multiple positions could produce the same color values
+ * @param warmWhite Warm white value (0-255)
+ * @param pink Pink value (0-255)
+ * @param orange Orange value (0-255)
+ * @returns Approximate position { x, y }
+ */
+function calculatePositionFromColors(warmWhite: number, pink: number, orange: number): { x: number; y: number } {
+  // Convert to percentages
+  const total = warmWhite + pink + orange;
+  if (total === 0) {
+    // If all zeros, return center
+    return { x: groupingCenter.x, y: groupingCenter.y };
+  }
+  
+  const warmWhitePct = warmWhite / total;
+  const pinkPct = pink / total;
+  const orangePct = orange / total;
+  
+  // Find dominant color and its sector angle
+  let dominantAngle: number;
+  if (orangePct > pinkPct && orangePct > warmWhitePct) {
+    // Orange sector center: 0° (with rotation offset)
+    dominantAngle = 0;
+  } else if (pinkPct > warmWhitePct) {
+    // Pink sector center: 120° (with rotation offset)
+    dominantAngle = 120;
+  } else {
+    // Warm white sector center: 240° (with rotation offset)
+    dominantAngle = 240;
+  }
+  
+  // Apply rotation offset
+  dominantAngle = (dominantAngle + rotationOffset.value) % 360;
+  
+  // Calculate distance from center based on color intensity
+  // Higher total intensity = further from center
+  const maxPossible = 255 * 3;
+  const intensity = total / maxPossible;
+  const distance = intensity * tapCircleRadius.value * 0.8; // 80% of tap radius
+  
+  // Convert polar to cartesian coordinates
+  const angleRad = (dominantAngle * Math.PI) / 180;
+  const x = groupingCenter.x + distance * Math.cos(angleRad);
+  const y = groupingCenter.y + distance * Math.sin(angleRad);
+  
+  return { x, y };
+}
+
+/**
  * Convert SVG coordinates from event
  */
 function getSVGCoordinates(event: MouseEvent | TouchEvent): { x: number; y: number } | null {
@@ -396,8 +466,11 @@ function updateLEDValues(x: number, y: number) {
   ledValues.orange = orange;
   ledValues.warmWhite = warmWhite;
 
+  // Update persistent color position
+  currentColorPosition.value = { x, y };
+
   // Send values to Arduino
-  debouncedSendToArduino();
+  throttledSendToArduino();
 }
 
 /**
@@ -427,7 +500,7 @@ const sendToArduino = () => {
   console.log('Sent lamp colors:', { warmWhiteValue, pinkValue, orangeValue });
 };
 
-const debouncedSendToArduino = debounce(sendToArduino, 50);
+const throttledSendToArduino = throttle(sendToArduino, 50);
 
 /**
  * Handle pointer start (mouse or touch)
@@ -488,7 +561,7 @@ function handlePointerEnd(event: MouseEvent | TouchEvent) {
   window.removeEventListener('touchend', handlePointerEnd);
 
   // Flush any pending updates
-  debouncedSendToArduino.flush();
+  throttledSendToArduino.flush();
 }
 
 /**
@@ -498,7 +571,7 @@ function handleRightClick(event: MouseEvent) {
   if (event.button === 2) {
     event.preventDefault();
     event.stopPropagation();
-    debouncedSendToArduino.flush();
+    throttledSendToArduino.flush();
     router.back();
   }
 }
@@ -516,6 +589,14 @@ onMounted(() => {
     ledValues.warmWhite = (appStore.lampColors.warmWhite / 255) * 100;
     ledValues.pink = (appStore.lampColors.pink / 255) * 100;
     ledValues.orange = (appStore.lampColors.orange / 255) * 100;
+    
+    // Calculate and set the position for the saved colors
+    const position = calculatePositionFromColors(
+      appStore.lampColors.warmWhite,
+      appStore.lampColors.pink,
+      appStore.lampColors.orange
+    );
+    currentColorPosition.value = position;
   } else {
     // Default to all LEDs off
     ledValues.warmWhite = 0;
@@ -526,7 +607,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   // Flush any pending changes
-  debouncedSendToArduino.flush();
+  throttledSendToArduino.flush();
 
   // Clean up listeners
   window.removeEventListener('mousedown', handleRightClick);

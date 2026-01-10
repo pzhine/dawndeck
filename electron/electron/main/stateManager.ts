@@ -315,7 +315,7 @@ ipcMain.handle(
     // Pixel 1: Pink LED
     // Pixel 2: Orange LED
     
-    sendLEDToSerial(STRIP_LAMP, 0, warmWhite, pink, orange, 100);
+    sendLEDToSerial(STRIP_LAMP, 0, orange, warmWhite, pink, 100);
 
     return true;
   }
