@@ -548,20 +548,19 @@ const sendToArduino = () => {
     return;
   }
   
-  // Convert percentages to 0-255 range and apply brightness multiplier
-  const multiplier = brightness.value / 100;
-  const warmWhiteValue = Math.round((ledValues.warmWhite / 100) * 255 * multiplier);
-  const pinkValue = Math.round((ledValues.pink / 100) * 255 * multiplier);
-  const orangeValue = Math.round((ledValues.orange / 100) * 255 * multiplier);
+  // Convert percentages to 0-255 range WITHOUT brightness
+  const warmWhiteValue = Math.round((ledValues.warmWhite / 100) * 255);
+  const pinkValue = Math.round((ledValues.pink / 100) * 255);
+  const orangeValue = Math.round((ledValues.orange / 100) * 255);
 
-  // Save to app state - this will trigger the IPC call via store
+  // Save BASE colors to app state (brightness will be applied when sending to hardware)
   appStore.setLampColors({
     warmWhite: warmWhiteValue,
     pink: pinkValue,
     orange: orangeValue,
   });
 
-  console.log('Updated lamp colors:', { warmWhiteValue, pinkValue, orangeValue });
+  console.log('Updated lamp colors (base):', { warmWhiteValue, pinkValue, orangeValue });
 };
 
 const throttledSendToArduino = throttle(sendToArduino, 300);
