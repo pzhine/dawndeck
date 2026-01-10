@@ -188,7 +188,6 @@
 import { ref, reactive, onMounted, onBeforeUnmount, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAppStore } from '../stores/appState';
-import { throttle } from 'lodash-es';
 import RadialMenu, { MenuItem } from '../components/RadialMenu.vue';
 import feather from 'feather-icons';
 
@@ -274,64 +273,6 @@ const groupingCenter = {
   x: (circles.warmWhite.cx + circles.pink.cx + circles.orange.cx) / 3,
   y: (circles.warmWhite.cy + circles.pink.cy + circles.orange.cy) / 3,
 };
-
-/**
- * Render SVG to canvas for pixel sampling
- */
-function renderSVGToCanvas() {
-  if (!svgRef.value || !canvasRef.value) return;
-
-  const canvas = canvasRef.value;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-
-  // Set canvas size to match viewBox
-  canvas.width = 1100;
-  canvas.height = 1050;
-
-  // Clear canvas
-  ctx.fillStyle = '#000000';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Draw each path with blur
-  ctx.filter = 'blur(70px)';
-
-  // Orange path
-  const orangePath = new Path2D('M803 517C830.5 647.5 712.5 729.5 549 729.5C385.5 729.5 206.5 563.5 226 421.5C243.852 291.5 349 255.5 491 274.5C660.489 297.178 782.302 418.778 803 517Z');
-  ctx.fillStyle = 'rgba(255, 107, 9, 0.8)';
-  ctx.fill(orangePath);
-
-  // Pink path
-  const pinkPath = new Path2D('M580 375.5C597 553.5 404.071 730 266 730C144.5 756 0 694.571 0 556.5C0 418.429 107.611 294.527 252.5 236C354 195 563 197.5 580 375.5Z');
-  ctx.fillStyle = 'rgba(255, 42, 112, 0.8)';
-  ctx.fill(pinkPath);
-
-  // Yellow/Warm White path
-  const yellowPath = new Path2D('M662 284C666.547 356 628.5 493.5 479 549C332 580.5 96 505.5 96 236C96 97.9288 222.929 0 361 0C499.071 0 651.931 124.562 662 284Z');
-  ctx.fillStyle = 'rgba(255, 215, 109, 0.8)';
-  ctx.fill(yellowPath);
-}
-
-/**
- * Sample pixel color at cursor position and derive LED values
- */
-function sampleColorAtPosition(x: number, y: number): { r: number; g: number; b: number } {
-  if (!canvasRef.value) return { r: 0, g: 0, b: 0 };
-
-  const canvas = canvasRef.value;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return { r: 0, g: 0, b: 0 };
-
-  // Adjust coordinates for canvas (viewBox offset)
-  const canvasX = Math.round(x + 150);
-  const canvasY = Math.round(y + 150);
-
-  // Sample pixel
-  const imageData = ctx.getImageData(canvasX, canvasY, 1, 1);
-  const [r, g, b] = imageData.data;
-
-  return { r, g, b };
-}
 
 /**
  * Calculate LED values based on pie slice overlap
@@ -436,56 +377,6 @@ function calculateColorWheelValues(x: number, y: number): { pink: number; orange
 }
 
 /**
- * Calculate a representative position from LED color values
- * This is an approximation - multiple positions could produce the same color values
- * @param warmWhite Warm white value (0-255)
- * @param pink Pink value (0-255)
- * @param orange Orange value (0-255)
- * @returns Approximate position { x, y }
- */
-function calculatePositionFromColors(warmWhite: number, pink: number, orange: number): { x: number; y: number } {
-  // Convert to percentages
-  const total = warmWhite + pink + orange;
-  if (total === 0) {
-    // If all zeros, return center
-    return { x: groupingCenter.x, y: groupingCenter.y };
-  }
-  
-  const warmWhitePct = warmWhite / total;
-  const pinkPct = pink / total;
-  const orangePct = orange / total;
-  
-  // Find dominant color and its sector angle
-  let dominantAngle: number;
-  if (orangePct > pinkPct && orangePct > warmWhitePct) {
-    // Orange sector center: 0° (with rotation offset)
-    dominantAngle = 0;
-  } else if (pinkPct > warmWhitePct) {
-    // Pink sector center: 120° (with rotation offset)
-    dominantAngle = 120;
-  } else {
-    // Warm white sector center: 240° (with rotation offset)
-    dominantAngle = 240;
-  }
-  
-  // Apply rotation offset
-  dominantAngle = (dominantAngle + rotationOffset.value) % 360;
-  
-  // Calculate distance from center based on color intensity
-  // Higher total intensity = further from center
-  const maxPossible = 255 * 3;
-  const intensity = total / maxPossible;
-  const distance = intensity * tapCircleRadius.value * 0.8; // 80% of tap radius
-  
-  // Convert polar to cartesian coordinates
-  const angleRad = (dominantAngle * Math.PI) / 180;
-  const x = groupingCenter.x + distance * Math.cos(angleRad);
-  const y = groupingCenter.y + distance * Math.sin(angleRad);
-  
-  return { x, y };
-}
-
-/**
  * Convert SVG coordinates from event
  */
 function getSVGCoordinates(event: MouseEvent | TouchEvent): { x: number; y: number } | null {
@@ -535,19 +426,6 @@ function updateLEDValues(x: number, y: number) {
   // Update persistent color position
   currentColorPosition.value = { x, y };
 
-  // Send values to Arduino
-  throttledSendToArduino();
-}
-
-/**
- * Send LED values to Arduino via IPC
- */
-const sendToArduino = () => {
-  // Don't send if lamp is not active
-  if (!lampActive.value) {
-    return;
-  }
-  
   // Convert percentages to 0-255 range WITHOUT brightness
   const warmWhiteValue = Math.round((ledValues.warmWhite / 100) * 255);
   const pinkValue = Math.round((ledValues.pink / 100) * 255);
@@ -561,9 +439,6 @@ const sendToArduino = () => {
   }, currentColorPosition.value ?? undefined);
 
   console.log('Updated lamp colors (base):', { warmWhiteValue, pinkValue, orangeValue });
-};
-
-const throttledSendToArduino = throttle(sendToArduino, 300);
 
 /**
  * Handle pointer start (mouse or touch)
@@ -622,9 +497,6 @@ function handlePointerEnd(event: MouseEvent | TouchEvent) {
   window.removeEventListener('mouseup', handlePointerEnd);
   window.removeEventListener('touchmove', handlePointerMove);
   window.removeEventListener('touchend', handlePointerEnd);
-
-  // Flush any pending updates
-  throttledSendToArduino.flush();
 }
 
 /**
@@ -655,26 +527,7 @@ function handleBrightnessInteraction(event: MouseEvent | TouchEvent) {
   brightness.value = percentage;
 }
 
-/**
- * Handle right click to go back
- */
-function handleRightClick(event: MouseEvent) {
-  if (event.button === 2) {
-    event.preventDefault();
-    event.stopPropagation();
-    throttledSendToArduino.flush();
-    router.back();
-  }
-}
-
 onMounted(() => {
-  // Add right-click listener
-  window.addEventListener('mousedown', handleRightClick);
-  window.addEventListener('contextmenu', (e) => e.preventDefault());
-
-  // Render SVG to canvas for pixel sampling
-  renderSVGToCanvas();
-
   // Initialize with current lamp state if available
   if (appStore.lampColors) {
     ledValues.warmWhite = (appStore.lampColors.warmWhite / 255) * 100;
@@ -694,12 +547,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  // Flush any pending changes
-  throttledSendToArduino.flush();
-
   // Clean up listeners
-  window.removeEventListener('mousedown', handleRightClick);
-  window.removeEventListener('contextmenu', (e) => e.preventDefault());
   window.removeEventListener('mousemove', handlePointerMove);
   window.removeEventListener('mouseup', handlePointerEnd);
   window.removeEventListener('touchmove', handlePointerMove);
