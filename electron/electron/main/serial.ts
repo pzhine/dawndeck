@@ -60,12 +60,14 @@ export async function closeSerialPorts(): Promise<void> {
 messageQueueInterval = setInterval(processMessageQueue, MESSAGE_INTERVAL);
 
 export function startSerialComms() {
-  if (process.env.VITE_DEV_SERVER_URL && getConfig().dev.mockSerial) {
+  // Only skip serial on non-Linux platforms (macOS, Windows)
+  if (process.platform !== 'linux') {
     console.log(
-      '[serial] Skipping serial port initialization in development mode'
+      `[serial] Skipping serial port initialization on ${process.platform}`
     );
-    return; // Don't start serial in dev mode
+    return;
   }
+  
   // Don't try to open if already open
   if (port) {
     console.log('[serial] Port already open');
