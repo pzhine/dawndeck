@@ -13,17 +13,17 @@
       >
         <path
           d="M803 517C830.5 647.5 712.5 729.5 549 729.5C385.5 729.5 206.5 563.5 226 421.5C243.852 291.5 349 255.5 491 274.5C660.489 297.178 782.302 418.778 803 517Z"
-          :fill="circleColors.orange"
+          :fill="circleColors[2]"
           :fill-opacity="0.8 * (brightness / 100)"
         />
         <path
           d="M580 375.5C597 553.5 404.071 730 266 730C144.5 756 0 694.571 0 556.5C0 418.429 107.611 294.527 252.5 236C354 195 563 197.5 580 375.5Z"
-          :fill="circleColors.pink"
+          :fill="circleColors[1]"
           :fill-opacity="0.8 * (brightness / 100)"
         />
         <path
           d="M662 284C666.547 356 628.5 493.5 479 549C332 580.5 96 505.5 96 236C96 97.9288 222.929 0 361 0C499.071 0 651.931 124.562 662 284Z"
-          :fill="circleColors.warmWhite"
+          :fill="circleColors[0]"
           :fill-opacity="0.8 * (brightness / 100)"
         />
       </svg>
@@ -38,31 +38,31 @@
       >
         <!-- Debug: Pie slices -->
         <g opacity="0.8" stroke="white" stroke-width="2" fill="none">
-          <!-- Orange slice: -60° to 60° (300° to 60°) -->
+          <!-- Color 2 slice: -60° to 60° (300° to 60°) -->
           <path
             :d="`M ${groupingCenter.x} ${groupingCenter.y} 
                  L ${groupingCenter.x + 400 * Math.cos(((300 + rotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((300 + rotationOffset) * Math.PI) / 180)}
                  A 400 400 0 0 1 ${groupingCenter.x + 400 * Math.cos(((60 + rotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((60 + rotationOffset) * Math.PI) / 180)}
                  Z`"
-            :stroke="circleColors.orange"
+            :stroke="circleColors[2]"
             stroke-width="3"
           />
-          <!-- Pink slice: 60° to 180° -->
+          <!-- Color 1 slice: 60° to 180° -->
           <path
             :d="`M ${groupingCenter.x} ${groupingCenter.y} 
                  L ${groupingCenter.x + 400 * Math.cos(((60 + rotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((60 + rotationOffset) * Math.PI) / 180)}
                  A 400 400 0 0 1 ${groupingCenter.x + 400 * Math.cos(((180 + rotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((180 + rotationOffset) * Math.PI) / 180)}
                  Z`"
-            :stroke="circleColors.pink"
+            :stroke="circleColors[1]"
             stroke-width="3"
           />
-          <!-- White slice: 180° to 300° -->
+          <!-- Color 0 slice: 180° to 300° -->
           <path
             :d="`M ${groupingCenter.x} ${groupingCenter.y} 
                  L ${groupingCenter.x + 400 * Math.cos(((180 + rotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((180 + rotationOffset) * Math.PI) / 180)}
                  A 400 400 0 0 1 ${groupingCenter.x + 400 * Math.cos(((300 + rotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((300 + rotationOffset) * Math.PI) / 180)}
                  Z`"
-            :stroke="circleColors.warmWhite"
+            :stroke="circleColors[0]"
             stroke-width="3"
           />
         </g>
@@ -114,9 +114,9 @@
 
     <!-- Display current color values -->
     <div v-if="DEBUG_MODE" class="absolute bottom-8 flex justify-center gap-6 w-full text-gray-400 text-sm">
-      <span>White: {{ Math.round((ledValues.warmWhite / 100) * 255) }}</span>
-      <span>Pink: {{ Math.round((ledValues.pink / 100) * 255) }}</span>
-      <span>Orange: {{ Math.round((ledValues.orange / 100) * 255) }}</span>
+      <span>Color 0: {{ Math.round((ledValues[0] / 100) * 255) }}</span>
+      <span>Color 1: {{ Math.round((ledValues[1] / 100) * 255) }}</span>
+      <span>Color 2: {{ Math.round((ledValues[2] / 100) * 255) }}</span>
     </div>
     
     <!-- Debug rotation slider -->
@@ -182,26 +182,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onBeforeUnmount, watch } from 'vue';
+import { ref, reactive, onBeforeUnmount, watch } from 'vue';
 
 interface Props {
-  circleColors: {
-    warmWhite: string;
-    pink: string;
-    orange: string;
-  };
-  colors: {
-    warmWhite: number;
-    pink: number;
-    orange: number;
-  };
+  circleColors: [string, string, string]; // Array of 3 color hex strings
+  colors: [number, number, number]; // Array of 3 color values (0-255)
   position?: { x: number; y: number };
   active: boolean;
   brightness: number;
 }
 
 interface Emits {
-  (e: 'update:colors', colors: { warmWhite: number; pink: number; orange: number }, position: { x: number; y: number }): void;
+  (e: 'update:colors', colors: [number, number, number], position: { x: number; y: number }): void;
   (e: 'update:brightness', value: number): void;
 }
 
@@ -224,11 +216,10 @@ const rotationOffset = ref(30);
 const tapCircleRadius = ref(190);
 
 // LED color values (0-100 percentage)
-const ledValues = reactive({
-  warmWhite: 0,
-  pink: 0,
-  orange: 0,
-});
+// Index 0: Color at 180°-300° (bottom-left)
+// Index 1: Color at 60°-180° (top-left) 
+// Index 2: Color at 300°-60° (right)
+const ledValues = reactive([0, 0, 0]);
 
 // Calculate the center of the grouping (centroid of all three circles)
 const groupingCenter = {
@@ -238,8 +229,9 @@ const groupingCenter = {
 
 /**
  * Calculate LED values based on pie slice overlap
+ * Returns [color0, color1, color2] percentages (0-100)
  */
-function calculateColorWheelValues(x: number, y: number): { pink: number; orange: number; warmWhite: number } {
+function calculateColorWheelValues(x: number, y: number): [number, number, number] {
   const tapRadius = tapCircleRadius.value;
   
   function isInSector(px: number, py: number, startAngle: number, endAngle: number): boolean {
@@ -263,9 +255,9 @@ function calculateColorWheelValues(x: number, y: number): { pink: number; orange
   const gridSize = 40;
   const step = (tapRadius * 2) / gridSize;
   
-  let warmWhiteCount = 0;
-  let pinkCount = 0;
-  let orangeCount = 0;
+  let color0Count = 0; // 180°-300° sector
+  let color1Count = 0; // 60°-180° sector
+  let color2Count = 0; // 300°-60° sector
   let totalCount = 0;
   
   for (let i = 0; i <= gridSize; i++) {
@@ -276,37 +268,37 @@ function calculateColorWheelValues(x: number, y: number): { pink: number; orange
       if (isInTapCircle(px, py)) {
         totalCount++;
         
-        const orangeStart = (300 + rotationOffset.value) % 360;
-        const orangeEnd = (60 + rotationOffset.value) % 360;
-        const pinkStart = (60 + rotationOffset.value) % 360;
-        const pinkEnd = (180 + rotationOffset.value) % 360;
-        const whiteStart = (180 + rotationOffset.value) % 360;
-        const whiteEnd = (300 + rotationOffset.value) % 360;
+        const color2Start = (300 + rotationOffset.value) % 360;
+        const color2End = (60 + rotationOffset.value) % 360;
+        const color1Start = (60 + rotationOffset.value) % 360;
+        const color1End = (180 + rotationOffset.value) % 360;
+        const color0Start = (180 + rotationOffset.value) % 360;
+        const color0End = (300 + rotationOffset.value) % 360;
         
-        if (isInSector(px, py, orangeStart, orangeEnd)) {
-          orangeCount++;
-        } else if (isInSector(px, py, pinkStart, pinkEnd)) {
-          pinkCount++;
-        } else if (isInSector(px, py, whiteStart, whiteEnd)) {
-          warmWhiteCount++;
+        if (isInSector(px, py, color2Start, color2End)) {
+          color2Count++;
+        } else if (isInSector(px, py, color1Start, color1End)) {
+          color1Count++;
+        } else if (isInSector(px, py, color0Start, color0End)) {
+          color0Count++;
         }
       }
     }
   }
   
   if (totalCount === 0) {
-    return { pink: 0, orange: 0, warmWhite: 0 };
+    return [0, 0, 0];
   }
   
-  const warmWhite = (warmWhiteCount / totalCount) * 100;
-  const pink = (pinkCount / totalCount) * 100;
-  const orange = (orangeCount / totalCount) * 100;
+  const color0 = (color0Count / totalCount) * 100;
+  const color1 = (color1Count / totalCount) * 100;
+  const color2 = (color2Count / totalCount) * 100;
   
-  return {
-    pink: Math.round(pink),
-    orange: Math.round(orange),
-    warmWhite: Math.round(warmWhite)
-  };
+  return [
+    Math.round(color0),
+    Math.round(color1),
+    Math.round(color2)
+  ];
 }
 
 /**
@@ -340,23 +332,23 @@ function getSVGCoordinates(event: MouseEvent | TouchEvent): { x: number; y: numb
 function updateLEDValues(x: number, y: number) {
   touchPosition.value = { x, y };
 
-  const { pink, orange, warmWhite } = calculateColorWheelValues(x, y);
+  const colorPercentages = calculateColorWheelValues(x, y);
   
-  ledValues.pink = pink;
-  ledValues.orange = orange;
-  ledValues.warmWhite = warmWhite;
+  ledValues[0] = colorPercentages[0];
+  ledValues[1] = colorPercentages[1];
+  ledValues[2] = colorPercentages[2];
 
   currentColorPosition.value = { x, y };
 
-  const warmWhiteValue = Math.round((ledValues.warmWhite / 100) * 255);
-  const pinkValue = Math.round((ledValues.pink / 100) * 255);
-  const orangeValue = Math.round((ledValues.orange / 100) * 255);
+  const color0Value = Math.round((ledValues[0] / 100) * 255);
+  const color1Value = Math.round((ledValues[1] / 100) * 255);
+  const color2Value = Math.round((ledValues[2] / 100) * 255);
 
-  emit('update:colors', {
-    warmWhite: warmWhiteValue,
-    pink: pinkValue,
-    orange: orangeValue,
-  }, currentColorPosition.value);
+  emit('update:colors', [
+    color0Value,
+    color1Value,
+    color2Value
+  ], currentColorPosition.value);
 }
 
 /**
@@ -443,9 +435,9 @@ function handleBrightnessInteraction(event: MouseEvent | TouchEvent) {
 
 // Initialize LED values from props
 watch(() => props.colors, (newColors) => {
-  ledValues.warmWhite = (newColors.warmWhite / 255) * 100;
-  ledValues.pink = (newColors.pink / 255) * 100;
-  ledValues.orange = (newColors.orange / 255) * 100;
+  ledValues[0] = (newColors[0] / 255) * 100;
+  ledValues[1] = (newColors[1] / 255) * 100;
+  ledValues[2] = (newColors[2] / 255) * 100;
 }, { immediate: true });
 
 // Restore position from props

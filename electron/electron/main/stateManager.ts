@@ -117,7 +117,7 @@ export function initStateManagement() {
 
   // Check for initial lamp brightness setting
   const initialState = getState();
-  
+
   // Add config to the state if not there already
   try {
     if (initialState) {
@@ -246,11 +246,36 @@ ipcMain.handle(
     console.log('[stateManager] Setting lamp colors:', { warmWhite, pink, orange });
 
     // Send each color to its corresponding pixel
-    // Pixel 0: Warm White LED
-    // Pixel 1: Pink LED
-    // Pixel 2: Orange LED
+    // Pixel 0: Orange LED
+    // Pixel 1: Warm White LED
+    // Pixel 2: Pink LED
     
     sendLEDToSerial(STRIP_LAMP, 0, orange, warmWhite, pink, 100);
+
+    return true;
+  }
+);
+
+// Handler for setting projector colors (3 separate LEDs/pixels)
+ipcMain.handle(
+  'set-projector-colors',
+  async (
+    _,
+    colors: { color0: number; color1: number; color2: number }
+  ) => {
+    // Ensure values are within valid range (0-255)
+    const color0 = Math.max(0, Math.min(255, colors.color0));
+    const color1 = Math.max(0, Math.min(255, colors.color1));
+    const color2 = Math.max(0, Math.min(255, colors.color2));
+
+    console.log('[stateManager] Setting projector colors:', { color0, color1, color2 });
+
+    // Send to strip 1 (projector)
+    // Pixel 0: color2
+    // Pixel 1: color0
+    // Pixel 2: color1
+    
+    sendLEDToSerial(1, 0, color2, color0, color1, 100);
 
     return true;
   }

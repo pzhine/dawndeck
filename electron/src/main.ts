@@ -84,9 +84,9 @@ const routes = [
     component: () => import('./pages/LampControl.vue'),
   },
   {
-    path: '/projector',
-    name: 'ProjectorPreview',
-    component: () => import('./pages/ProjectorPreview.vue'),
+    path: '/projector-control',
+    name: 'ProjectorControl',
+    component: () => import('./pages/ProjectorControl.vue'),
   },
   {
     path: '/projector/:ledIndex',

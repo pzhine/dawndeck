@@ -38,18 +38,19 @@ const upperMenuItems = computed<MenuItem[]>(() => [
 // Brightness multiplier (0-100%) - synced with store
 const brightness = computed(() => appStore.lampBrightness);
 
-// Lamp colors
-const lampColors = computed(() => appStore.lampColors || { warmWhite: 0, pink: 0, orange: 0 });
+// Lamp colors as array [color0, color1, color2]
+// color0 (warmWhite), color1 (pink), color2 (orange)
+const lampColors = computed<[number, number, number]>(() => {
+  const colors = appStore.lampColors || { warmWhite: 0, pink: 0, orange: 0 };
+  return [colors.warmWhite, colors.pink, colors.orange];
+});
 
 // Lamp position
 const lampPosition = computed(() => appStore.lampPosition);
 
-// Circle colors for the UI
-const circleColors = {
-  warmWhite: '#ffb86d',
-  pink: '#FF2A70',
-  orange: '#ff4b09',
-};
+// Circle colors for the UI as array [color0, color1, color2]
+// color0 (warmWhite), color1 (pink), color2 (orange)
+const circleColors: [string, string, string] = ['#ffb86d', '#FF2A70', '#ff4b09'];
 
 /**
  * Toggle lamp active state
@@ -61,8 +62,12 @@ function toggleLampActive() {
 /**
  * Handle color updates from LightControl
  */
-function handleColorsUpdate(colors: { warmWhite: number; pink: number; orange: number }, position: { x: number; y: number }) {
-  appStore.setLampColors(colors, position);
+function handleColorsUpdate(colors: [number, number, number], position: { x: number; y: number }) {
+  appStore.setLampColors({
+    warmWhite: colors[0],
+    pink: colors[1],
+    orange: colors[2],
+  }, position);
   console.log('Updated lamp colors (base):', colors);
 }
 

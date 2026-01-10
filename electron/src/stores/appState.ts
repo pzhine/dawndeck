@@ -21,6 +21,13 @@ export const useAppStore = defineStore('appState', {
       orange: 0,
     }, // Individual LED color values (0-255)
     lampPosition: undefined, // SVG coordinates for lamp color picker
+    projectorActive: true, // Whether the projector is currently active
+    projectorColors: {
+      color0: 0,
+      color1: 0,
+      color2: 0,
+    }, // Individual LED color values (0-255)
+    projectorPosition: undefined, // SVG coordinates for projector color picker
     timeFormat: '24h', // Default time format
     listPositions: {}, // Empty object to store list positions by route
     alarmSound: null, // Default to no alarm sound selected
@@ -141,6 +148,17 @@ export const useAppStore = defineStore('appState', {
           });
           console.log('Lamp state restored:', { brightness: this.lampBrightness, colors: this.lampColors });
         }
+        
+        // Restore projector state if active
+        if (this.projectorActive) {
+          const multiplier = this.projectorBrightness / 100;
+          await window.ipcRenderer.invoke('set-projector-colors', {
+            color0: Math.round(this.projectorColors.color0 * multiplier),
+            color1: Math.round(this.projectorColors.color1 * multiplier),
+            color2: Math.round(this.projectorColors.color2 * multiplier),
+          });
+          console.log('Projector state restored:', { brightness: this.projectorBrightness, colors: this.projectorColors });
+        }
       } catch (error) {
         console.error('Failed to load saved state:', error);
       }
@@ -230,6 +248,58 @@ export const useAppStore = defineStore('appState', {
       }
       this.saveState();
       this.updateLampHardware();
+    },
+
+    // Throttled function to send current projector state to hardware
+    updateProjectorHardware: throttle(async function(this: any) {
+      if (!this.projectorActive) return;
+      
+      const multiplier = this.projectorBrightness / 100;
+      await window.ipcRenderer.invoke('set-projector-colors', {
+        color0: Math.round(this.projectorColors.color0 * multiplier),
+        color1: Math.round(this.projectorColors.color1 * multiplier),
+        color2: Math.round(this.projectorColors.color2 * multiplier),
+      });
+    }, 300),
+    
+    // Toggle projector active state
+    async toggleProjectorActive() {
+      const newState = !this.projectorActive;
+      this.projectorActive = newState;
+      this.saveState();
+      
+      if (newState) {
+        // Projector activated - restore colors with current brightness
+        const multiplier = this.projectorBrightness / 100;
+        await window.ipcRenderer.invoke('set-projector-colors', {
+          color0: Math.round(this.projectorColors.color0 * multiplier),
+          color1: Math.round(this.projectorColors.color1 * multiplier),
+          color2: Math.round(this.projectorColors.color2 * multiplier),
+        });
+        console.log('Projector activated - colors restored with brightness', this.projectorBrightness);
+      } else {
+        // Projector deactivated - zero out all colors
+        await window.ipcRenderer.invoke('set-projector-colors', {
+          color0: 0,
+          color1: 0,
+          color2: 0,
+        });
+        console.log('Projector deactivated - colors zeroed');
+      }
+    },
+
+    // Set individual projector colors (RGB values 0-255)
+    setProjectorColors(colors: { color0: number; color1: number; color2: number }, position?: { x: number; y: number }): void {
+      this.projectorColors = {
+        color0: Math.max(0, Math.min(255, colors.color0)),
+        color1: Math.max(0, Math.min(255, colors.color1)),
+        color2: Math.max(0, Math.min(255, colors.color2)),
+      };
+      if (position) {
+        this.projectorPosition = position;
+      }
+      this.saveState();
+      this.updateProjectorHardware();
     },
 
     // Set the time format

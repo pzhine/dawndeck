@@ -71,6 +71,13 @@ export interface AppState {
     orange: number; // 0-255
   };
   lampPosition?: { x: number; y: number }; // SVG coordinates for lamp color picker
+  projectorActive: boolean; // Whether the projector is currently active
+  projectorColors: {
+    color0: number; // 0-255
+    color1: number; // 0-255
+    color2: number; // 0-255
+  };
+  projectorPosition?: { x: number; y: number }; // SVG coordinates for projector color picker
   timeFormat: '12h' | '24h'; // Add time format preference
   listPositions: ListPositions; // Store InteractiveList positions by route
   alarmSound: AlarmSound | null;

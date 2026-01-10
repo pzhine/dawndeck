@@ -39,7 +39,7 @@ const mute = () => {
 const menuItems = computed<MenuItem[]>(() => [
   { label: 'Lamp', icon: lampIcon, route: '/lamp-control', active: appStore.lampActive },
   { label: 'Sounds & Music', icon: musicIcon, route: '/media-player', active: isGlobalSoundPlaying() || isBTPlaying.value },
-  { label: 'Projector', icon: projectorIcon, route: '/projector' },
+  { label: 'Projector', icon: projectorIcon, route: '/projector-control', active: appStore.projectorActive },
   { label: 'Alarm', icon: alarmIcon, route: '/alarm', active: appStore.alarmActive },
   { label: 'Sleep', icon: sleepIcon, action: mute },
   { label: 'Settings', icon: settingsIcon, route: '/wifi' },
