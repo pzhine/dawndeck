@@ -84,6 +84,11 @@ const routes = [
     component: () => import('./pages/AmbienceControl.vue'),
   },
   {
+    path: '/ambience-favorites',
+    name: 'AmbienceFavorites',
+    component: () => import('./pages/AmbienceFavorites.vue'),
+  },
+  {
     path: '/projector-control',
     name: 'ProjectorControl',
     component: () => import('./pages/ProjectorControl.vue'),

@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia';
 import { debounce, throttle } from 'lodash-es';
 import { AlarmSound } from '../../types/sound';
-import { AppState } from '../../types/state';
+import { AppState, ColorFavorite } from '../../types/state';
 import { setGlobalVolume } from '../services/audioService';
+import { generateColorFavoriteName, generateColorSlug } from '../services/colorNaming';
+import { mixColorsRgb } from '../services/colorUtils';
 import defaultConfig from '../../config.example.json';
 
 // Create a Pinia store for our application state
@@ -28,6 +30,7 @@ export const useAppStore = defineStore('appState', {
       color2: 0,
     }, // Individual LED color values (0-255)
     projectorPosition: undefined, // SVG coordinates for projector color picker
+    ambienceFavorites: [], // Array to store ambience color favorites (lamp + projector)
     timeFormat: '24h', // Default time format
     listPositions: {}, // Empty object to store list positions by route
     alarmSound: null, // Default to no alarm sound selected
@@ -470,6 +473,85 @@ export const useAppStore = defineStore('appState', {
       if (this.currentPlaylist.length === 0) return null;
       this.currentPlaylistIndex = (this.currentPlaylistIndex - 1 + this.currentPlaylist.length) % this.currentPlaylist.length;
       return this.currentPlaylist[this.currentPlaylistIndex];
+    },
+
+    // Remove ambience (lamp + projector) from favorites by id
+    removeAmbienceFromFavorites(id: string): void {
+      this.ambienceFavorites = this.ambienceFavorites.filter(fav => fav.id !== id);
+      this.saveState();
+    },
+
+    // Add current ambience (lamp + projector) to favorites
+    addAmbienceToFavorites(): void {
+      // Define circle colors for lamp and projector
+      const lampCircleColors: [string, string, string] = ['#ffb86d', '#FF2A70', '#ff4b09'];
+      const projectorCircleColors: [string, string, string] = ['#9d09ff', '#ff8409', '#0058f0'];
+      
+      // Mix lamp LED values with lamp circle colors
+      const lampRgb = mixColorsRgb(lampCircleColors, [
+        this.lampColors.warmWhite,
+        this.lampColors.pink,
+        this.lampColors.orange
+      ]);
+      
+      // Mix projector LED values with projector circle colors
+      const projectorRgb = mixColorsRgb(projectorCircleColors, [
+        this.projectorColors.color0,
+        this.projectorColors.color1,
+        this.projectorColors.color2
+      ]);
+      
+      // Pass both colors separately to generate a combined name (e.g. "Strawberry-Teal")
+      const name = generateColorFavoriteName(projectorRgb, lampRgb);
+      
+      // Convert name to kebab-case for slug-friendly ID
+      const slug = generateColorSlug(name);
+      
+      const favorite: ColorFavorite = {
+        id: slug,
+        name,
+        lamp: {
+          colors: [this.lampColors.warmWhite, this.lampColors.pink, this.lampColors.orange],
+          position: this.lampPosition || { x: 0, y: 0 },
+          brightness: this.lampBrightness,
+        },
+        projector: {
+          colors: [this.projectorColors.color0, this.projectorColors.color1, this.projectorColors.color2],
+          position: this.projectorPosition || { x: 0, y: 0 },
+          brightness: this.projectorBrightness,
+        },
+        timestamp: Date.now(),
+      };
+      this.ambienceFavorites.push(favorite);
+      this.saveState();
+    },
+
+    // Remove ambience favorite by id
+    removeAmbienceFavorite(id: string): void {
+      this.ambienceFavorites = this.ambienceFavorites.filter(fav => fav.id !== id);
+      this.saveState();
+    },
+
+    // Load ambience favorite (apply both lamp and projector colors/positions)
+    loadAmbienceFavorite(id: string): void {
+      const favorite = this.ambienceFavorites.find(fav => fav.id === id);
+      if (favorite) {
+        // Load lamp settings
+        this.setLampColors({
+          warmWhite: favorite.lamp.colors[0],
+          pink: favorite.lamp.colors[1],
+          orange: favorite.lamp.colors[2],
+        }, favorite.lamp.position);
+        this.setLampBrightness(favorite.lamp.brightness);
+        
+        // Load projector settings
+        this.setProjectorColors({
+          color0: favorite.projector.colors[0],
+          color1: favorite.projector.colors[1],
+          color2: favorite.projector.colors[2],
+        }, favorite.projector.position);
+        this.setProjectorBrightness(favorite.projector.brightness);
+      }
     },
   },
 });

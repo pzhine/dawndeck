@@ -1,31 +1,33 @@
 <template>
   <div class="relative flex flex-col items-center justify-center w-full h-full">
-    <div class="w-full aspect-square relative flex-shrink">
+    <div class="w-full aspect-square relative flex-shrink" :style="{ opacity: brightness / 100 }">
       <svg
         ref="svgRef"
         class="w-full h-full bg-black rounded-full cursor-crosshair touch-none absolute inset-0"
-        style="filter: blur(30px)"
+        style="filter: blur(25px);"
         viewBox="-150 -150 1100 1050"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         @mousedown="handlePointerStart"
         @touchstart="handlePointerStart"
       >
+        <g :transform="`rotate(${props.rotate || 0} ${groupingCenter.x} ${groupingCenter.y})`">
         <path
           d="M803 517C830.5 647.5 712.5 729.5 549 729.5C385.5 729.5 206.5 563.5 226 421.5C243.852 291.5 349 255.5 491 274.5C660.489 297.178 782.302 418.778 803 517Z"
           :fill="circleColors[2]"
-          :fill-opacity="0.8 * (brightness / 100)"
+          style="mix-blend-mode: screen;"
         />
         <path
           d="M580 375.5C597 553.5 404.071 730 266 730C144.5 756 0 694.571 0 556.5C0 418.429 107.611 294.527 252.5 236C354 195 563 197.5 580 375.5Z"
           :fill="circleColors[1]"
-          :fill-opacity="0.8 * (brightness / 100)"
+          style="mix-blend-mode: screen;"
         />
         <path
           d="M662 284C666.547 356 628.5 493.5 479 549C332 580.5 96 505.5 96 236C96 97.9288 222.929 0 361 0C499.071 0 651.931 124.562 662 284Z"
           :fill="circleColors[0]"
-          :fill-opacity="0.8 * (brightness / 100)"
+          style="mix-blend-mode: screen;"
         />
+        </g>
       </svg>
       
       <!-- Debug overlay (not blurred) -->
@@ -190,6 +192,7 @@ interface Props {
   position?: { x: number; y: number };
   active: boolean;
   brightness: number;
+  rotate?: number; // Rotation in degrees (default 0)
 }
 
 interface Emits {
@@ -209,8 +212,8 @@ const brightnessBarRef = ref<HTMLElement | null>(null);
 // Debug mode flag - set to true to enable rotation slider
 const DEBUG_MODE = false;
 
-// Rotation offset in degrees (clockwise)
-const rotationOffset = ref(30);
+// Rotation offset in degrees (clockwise) - use prop value or debug default
+const rotationOffset = ref(props.rotate ?? 30);
 
 // Tap circle radius in pixels
 const tapCircleRadius = ref(190);
@@ -320,8 +323,38 @@ function getSVGCoordinates(event: MouseEvent | TouchEvent): { x: number; y: numb
     clientY = event.touches[0].clientY;
   }
 
-  const x = ((clientX - rect.left) / rect.width) * 1100 - 150;
-  const y = ((clientY - rect.top) / rect.height) * 1050 - 150;
+  // ViewBox: "-150 -150 1100 1050"
+  const viewBoxMinX = -150;
+  const viewBoxMinY = -150;
+  const viewBoxWidth = 1100;
+  const viewBoxHeight = 1050;
+  
+  // The container is square (aspect-square), but viewBox is not (1100x1050)
+  // Browser scales to fit, maintaining aspect ratio (preserveAspectRatio="xMidYMid meet")
+  // Since viewBox is wider than tall, it fits to width, leaving vertical padding
+  const viewBoxAspect = viewBoxWidth / viewBoxHeight; // 1100/1050 ≈ 1.048
+  const containerAspect = rect.width / rect.height; // Should be 1.0 (square)
+  
+  let effectiveWidth = rect.width;
+  let effectiveHeight = rect.height;
+  let offsetX = 0;
+  let offsetY = 0;
+  
+  if (containerAspect > viewBoxAspect) {
+    // Container is wider - will have horizontal padding
+    effectiveWidth = rect.height * viewBoxAspect;
+    offsetX = (rect.width - effectiveWidth) / 2;
+  } else {
+    // Container is taller - will have vertical padding
+    effectiveHeight = rect.width / viewBoxAspect;
+    offsetY = (rect.height - effectiveHeight) / 2;
+  }
+  
+  const relativeX = (clientX - rect.left - offsetX) / effectiveWidth;
+  const relativeY = (clientY - rect.top - offsetY) / effectiveHeight;
+  
+  const x = viewBoxMinX + relativeX * viewBoxWidth;
+  const y = viewBoxMinY + relativeY * viewBoxHeight;
 
   return { x, y };
 }
@@ -458,6 +491,13 @@ watch(() => props.colors, (newColors) => {
 watch(() => props.position, (newPosition) => {
   if (newPosition) {
     currentColorPosition.value = newPosition;
+  }
+}, { immediate: true });
+
+// Update rotation offset when rotate prop changes
+watch(() => props.rotate, (newRotate) => {
+  if (newRotate !== undefined) {
+    rotationOffset.value = newRotate;
   }
 }, { immediate: true });
 

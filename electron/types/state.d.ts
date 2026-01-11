@@ -28,6 +28,23 @@ export interface SunriseStep {
   duration: number;
 }
 
+// Define the interface for color favorites
+export interface ColorFavorite {
+  id: string;
+  name: string;
+  lamp: {
+    colors: [number, number, number]; // RGB values 0-255
+    position: { x: number; y: number };
+    brightness: number;
+  };
+  projector: {
+    colors: [number, number, number]; // RGB values 0-255
+    position: { x: number; y: number };
+    brightness: number;
+  };
+  timestamp: number;
+}
+
 // Define the interface for application configuration
 export interface AppConfig {
   freesound: {
@@ -78,6 +95,7 @@ export interface AppState {
     color2: number; // 0-255
   };
   projectorPosition?: { x: number; y: number }; // SVG coordinates for projector color picker
+  ambienceFavorites: ColorFavorite[]; // Array of ambience color favorites (lamp + projector)
   timeFormat: '12h' | '24h'; // Add time format preference
   listPositions: ListPositions; // Store InteractiveList positions by route
   alarmSound: AlarmSound | null;
