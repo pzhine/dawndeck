@@ -1,9 +1,9 @@
 <template>
   <div class="relative flex flex-col items-center justify-center w-full h-full">
-    <div class="w-full aspect-square relative flex-shrink" :style="{ opacity: brightness / 100 }">
+    <div class="max-w-md aspect-square relative flex-shrink mx-auto" :style="{ opacity: Math.min(1, (brightness / 100) + 0.2) }">
       <svg
         ref="svgRef"
-        class="w-full h-full bg-black rounded-full cursor-crosshair touch-none absolute inset-0"
+        class="w-full h-full bg-black rounded-full cursor-crosshair touch-none"
         style="filter: blur(25px);"
         viewBox="-150 -150 1100 1050"
         fill="none"
@@ -43,8 +43,8 @@
           <!-- Color 2 slice: -60° to 60° (300° to 60°) -->
           <path
             :d="`M ${groupingCenter.x} ${groupingCenter.y} 
-                 L ${groupingCenter.x + 400 * Math.cos(((300 + rotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((300 + rotationOffset) * Math.PI) / 180)}
-                 A 400 400 0 0 1 ${groupingCenter.x + 400 * Math.cos(((60 + rotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((60 + rotationOffset) * Math.PI) / 180)}
+                 L ${groupingCenter.x + 400 * Math.cos(((300 + sliceRotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((300 + sliceRotationOffset) * Math.PI) / 180)}
+                 A 400 400 0 0 1 ${groupingCenter.x + 400 * Math.cos(((60 + sliceRotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((60 + sliceRotationOffset) * Math.PI) / 180)}
                  Z`"
             :stroke="circleColors[2]"
             stroke-width="3"
@@ -52,8 +52,8 @@
           <!-- Color 1 slice: 60° to 180° -->
           <path
             :d="`M ${groupingCenter.x} ${groupingCenter.y} 
-                 L ${groupingCenter.x + 400 * Math.cos(((60 + rotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((60 + rotationOffset) * Math.PI) / 180)}
-                 A 400 400 0 0 1 ${groupingCenter.x + 400 * Math.cos(((180 + rotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((180 + rotationOffset) * Math.PI) / 180)}
+                 L ${groupingCenter.x + 400 * Math.cos(((60 + sliceRotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((60 + sliceRotationOffset) * Math.PI) / 180)}
+                 A 400 400 0 0 1 ${groupingCenter.x + 400 * Math.cos(((180 + sliceRotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((180 + sliceRotationOffset) * Math.PI) / 180)}
                  Z`"
             :stroke="circleColors[1]"
             stroke-width="3"
@@ -61,8 +61,8 @@
           <!-- Color 0 slice: 180° to 300° -->
           <path
             :d="`M ${groupingCenter.x} ${groupingCenter.y} 
-                 L ${groupingCenter.x + 400 * Math.cos(((180 + rotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((180 + rotationOffset) * Math.PI) / 180)}
-                 A 400 400 0 0 1 ${groupingCenter.x + 400 * Math.cos(((300 + rotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((300 + rotationOffset) * Math.PI) / 180)}
+                 L ${groupingCenter.x + 400 * Math.cos(((180 + sliceRotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((180 + sliceRotationOffset) * Math.PI) / 180)}
+                 A 400 400 0 0 1 ${groupingCenter.x + 400 * Math.cos(((300 + sliceRotationOffset) * Math.PI) / 180)} ${groupingCenter.y + 400 * Math.sin(((300 + sliceRotationOffset) * Math.PI) / 180)}
                  Z`"
             :stroke="circleColors[0]"
             stroke-width="3"
@@ -124,10 +124,10 @@
     <!-- Debug rotation slider -->
     <div v-if="DEBUG_MODE" class="absolute bottom-20 flex flex-col items-center gap-2 w-full text-white text-sm">
       <label class="flex items-center gap-4">
-        {{ rotationOffset }}°
+        Pie: {{ sliceRotationOffset }}°
         <input 
           type="range" 
-          v-model.number="rotationOffset" 
+          v-model.number="sliceRotationOffset" 
           min="-180" 
           max="180" 
           step="1"
@@ -192,7 +192,8 @@ interface Props {
   position?: { x: number; y: number };
   active: boolean;
   brightness: number;
-  rotate?: number; // Rotation in degrees (default 0)
+  rotate?: number; // Visual rotation in degrees (default 0)
+  rotateSlices?: number; // Pie slice rotation in degrees (default 0)
 }
 
 interface Emits {
@@ -212,8 +213,11 @@ const brightnessBarRef = ref<HTMLElement | null>(null);
 // Debug mode flag - set to true to enable rotation slider
 const DEBUG_MODE = false;
 
-// Rotation offset in degrees (clockwise) - use prop value or debug default
+// Visual rotation offset in degrees (clockwise) - for UI display
 const rotationOffset = ref(props.rotate ?? 30);
+
+// Pie slice rotation offset in degrees (clockwise) - for calculations
+const sliceRotationOffset = ref(props.rotateSlices ?? 0);
 
 // Tap circle radius in pixels
 const tapCircleRadius = ref(190);
@@ -224,10 +228,11 @@ const tapCircleRadius = ref(190);
 // Index 2: Color at 300°-60° (right)
 const ledValues = reactive([0, 0, 0]);
 
-// Calculate the center of the grouping (centroid of all three circles)
+// Calculate the center of the viewBox (-150, -150, 1100, 1050)
+// ViewBox center: x = -150 + 1100/2 = 400, y = -150 + 1050/2 = 375
 const groupingCenter = {
-  x: (379 + 280 + 520) / 3,
-  y: (260 + 480 + 500) / 3,
+  x: 400,
+  y: 375,
 };
 
 /**
@@ -271,12 +276,15 @@ function calculateColorWheelValues(x: number, y: number): [number, number, numbe
       if (isInTapCircle(px, py)) {
         totalCount++;
         
-        const color2Start = (300 + rotationOffset.value) % 360;
-        const color2End = (60 + rotationOffset.value) % 360;
-        const color1Start = (60 + rotationOffset.value) % 360;
-        const color1End = (180 + rotationOffset.value) % 360;
-        const color0Start = (180 + rotationOffset.value) % 360;
-        const color0End = (300 + rotationOffset.value) % 360;
+        // Normalize angles to 0-360 range (handle negative values correctly)
+        const normalizeAngle = (angle: number) => ((angle % 360) + 360) % 360;
+        
+        const color2Start = normalizeAngle(300 + sliceRotationOffset.value);
+        const color2End = normalizeAngle(60 + sliceRotationOffset.value);
+        const color1Start = normalizeAngle(60 + sliceRotationOffset.value);
+        const color1End = normalizeAngle(180 + sliceRotationOffset.value);
+        const color0Start = normalizeAngle(180 + sliceRotationOffset.value);
+        const color0End = normalizeAngle(300 + sliceRotationOffset.value);
         
         if (isInSector(px, py, color2Start, color2End)) {
           color2Count++;

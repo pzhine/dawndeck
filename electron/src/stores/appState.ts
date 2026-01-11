@@ -7,6 +7,12 @@ import { generateColorFavoriteName, generateColorSlug } from '../services/colorN
 import { mixColorsRgb } from '../services/colorUtils';
 import defaultConfig from '../../config.example.json';
 
+// Pending hardware update queues (max length 1 - only latest values matter)
+let pendingLampUpdate: { colors: { warmWhite: number; pink: number; orange: number }; brightness: number } | null = null;
+let pendingProjectorUpdate: { colors: { color0: number; color1: number; color2: number }; brightness: number } | null = null;
+let lampUpdateInterval: NodeJS.Timeout | null = null;
+let projectorUpdateInterval: NodeJS.Timeout | null = null;
+
 // Create a Pinia store for our application state
 export const useAppStore = defineStore('appState', {
   state: (): AppState => ({
@@ -82,17 +88,42 @@ export const useAppStore = defineStore('appState', {
   },
 
   actions: {
-    // Throttled function to send current lamp state to hardware
-    updateLampHardware: throttle(async function(this: any) {
-      if (!this.lampActive) return;
+    // Queue a lamp hardware update (batched with 300ms interval)
+    queueLampHardwareUpdate(): void {
+      // Update or create pending update with latest values
+      pendingLampUpdate = {
+        colors: { ...this.lampColors },
+        brightness: this.lampBrightness
+      };
       
-      const multiplier = this.lampBrightness / 100;
+      // Start interval if not already running
+      if (!lampUpdateInterval) {
+        lampUpdateInterval = setInterval(() => {
+          this.flushLampHardwareUpdate();
+        }, 300);
+      }
+    },
+    
+    // Flush pending lamp update to hardware
+    async flushLampHardwareUpdate(): Promise<void> {
+      if (!pendingLampUpdate || !this.lampActive) return;
+      
+      const update = pendingLampUpdate;
+      pendingLampUpdate = null;
+      
+      const multiplier = update.brightness / 100;
       await window.ipcRenderer.invoke('set-lamp-colors', {
-        warmWhite: Math.round(this.lampColors.warmWhite * multiplier),
-        pink: Math.round(this.lampColors.pink * multiplier),
-        orange: Math.round(this.lampColors.orange * multiplier),
+        warmWhite: Math.round(update.colors.warmWhite * multiplier),
+        pink: Math.round(update.colors.pink * multiplier),
+        orange: Math.round(update.colors.orange * multiplier),
       });
-    }, 300),
+      
+      // Clear interval if no pending update
+      if (!pendingLampUpdate && lampUpdateInterval) {
+        clearInterval(lampUpdateInterval);
+        lampUpdateInterval = null;
+      }
+    },
     
     // Toggle lamp active state
     async toggleLampActive() {
@@ -225,14 +256,14 @@ export const useAppStore = defineStore('appState', {
     setProjectorBrightness(level: number): void {
       this.projectorBrightness = Math.max(0, Math.min(100, level)); // Clamp between 0-100
       this.saveState();
-      this.updateProjectorHardware();
+      this.queueProjectorHardwareUpdate();
     },
 
     // Set the lamp brightness
     setLampBrightness(level: number): void {
       this.lampBrightness = Math.max(0, Math.min(100, level)); // Clamp between 0-100
       this.saveState();
-      this.updateLampHardware();
+      this.queueLampHardwareUpdate();
     },
 
     // Generic state update action
@@ -252,20 +283,46 @@ export const useAppStore = defineStore('appState', {
         this.lampPosition = position;
       }
       this.saveState();
-      this.updateLampHardware();
+      this.queueLampHardwareUpdate();
     },
 
     // Throttled function to send current projector state to hardware
-    updateProjectorHardware: throttle(async function(this: any) {
-      if (!this.projectorActive) return;
+    // Queue a projector hardware update (batched with 300ms interval)
+    queueProjectorHardwareUpdate(): void {
+      // Update or create pending update with latest values
+      pendingProjectorUpdate = {
+        colors: { ...this.projectorColors },
+        brightness: this.projectorBrightness
+      };
       
-      const multiplier = this.projectorBrightness / 100;
+      // Start interval if not already running
+      if (!projectorUpdateInterval) {
+        projectorUpdateInterval = setInterval(() => {
+          this.flushProjectorHardwareUpdate();
+        }, 300);
+      }
+    },
+    
+    // Flush pending projector update to hardware
+    async flushProjectorHardwareUpdate(): Promise<void> {
+      if (!pendingProjectorUpdate || !this.projectorActive) return;
+      
+      const update = pendingProjectorUpdate;
+      pendingProjectorUpdate = null;
+      
+      const multiplier = update.brightness / 100;
       await window.ipcRenderer.invoke('set-projector-colors', {
-        color0: Math.round(this.projectorColors.color0 * multiplier),
-        color1: Math.round(this.projectorColors.color1 * multiplier),
-        color2: Math.round(this.projectorColors.color2 * multiplier),
+        color0: Math.round(update.colors.color0 * multiplier),
+        color1: Math.round(update.colors.color1 * multiplier),
+        color2: Math.round(update.colors.color2 * multiplier),
       });
-    }, 300),
+      
+      // Clear interval if no pending update
+      if (!pendingProjectorUpdate && projectorUpdateInterval) {
+        clearInterval(projectorUpdateInterval);
+        projectorUpdateInterval = null;
+      }
+    },
     
     // Toggle projector active state
     async toggleProjectorActive() {
@@ -304,7 +361,7 @@ export const useAppStore = defineStore('appState', {
         this.projectorPosition = position;
       }
       this.saveState();
-      this.updateProjectorHardware();
+      this.queueProjectorHardwareUpdate();
     },
 
     // Set the time format

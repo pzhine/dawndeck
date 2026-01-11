@@ -38,6 +38,7 @@
             :active="projectorActive"
             :brightness="projectorBrightness"
             :rotate="-115"
+            :rotate-slices="-90"
             @update:colors="handleProjectorColorsUpdate"
             @update:brightness="handleProjectorBrightnessUpdate"
           />
@@ -63,6 +64,7 @@
             :position="lampPosition"
             :active="lampActive"
             :brightness="lampBrightness"
+            :rotate-slices="30"
             @update:colors="handleLampColorsUpdate"
             @update:brightness="handleLampBrightnessUpdate"
           />
