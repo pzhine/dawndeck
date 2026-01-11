@@ -94,6 +94,7 @@ export type ListItem =
       onEdit?: (increment: number) => void;
       canEdit?: boolean;
       customClass?: string;
+      gradient?: string; // CSS gradient string for background
     };
 
 const props = defineProps<{

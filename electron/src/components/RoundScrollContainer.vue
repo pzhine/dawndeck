@@ -29,14 +29,16 @@
         <div
           v-for="(item, index) in items"
           :key="index"
-          class="round-item-wrapper flex justify-center items-center py-1 w-full origin-center border-b border-white/20"
+          class="round-item-wrapper flex justify-center items-center py-1 w-full origin-center border-b border-white/20 cursor-pointer transition-transform hover:scale-105 active:scale-95"
+          :style="{ background: isObject(item) && item.gradient ? item.gradient : undefined }"
           @click="handleItemClick(item)"
         >
           <div 
             class="round-item-content flex items-center w-[90%] text-[1.2rem] leading-relaxed"
             :class="[
               hasAnyValues ? 'justify-between' : 'justify-center',
-              isObject(item) && item.customClass ? item.customClass : ''
+              isObject(item) && item.customClass ? item.customClass : '',
+              isObject(item) && item.gradient ? 'text-white font-semibold drop-shadow-lg' : ''
             ]"
           >
             <span class="truncate">{{ isObject(item) ? item.label : item }}</span>

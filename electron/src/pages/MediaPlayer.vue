@@ -1,4 +1,5 @@
 <template>
+  <BackToHome />
   <RadialMenu 
     :lowerItems="lowerMenuItems" 
     :upperItems="upperMenuItems"
@@ -68,6 +69,7 @@
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import RadialMenu, { MenuItem } from '../components/RadialMenu.vue';
+import BackToHome from '../components/BackToHome.vue';
 import feather from 'feather-icons';
 import { getCurrentSoundInfo, isGlobalSoundPlaying, playGlobalSound, pauseGlobalSound, resumeGlobalSound, isGlobalSoundPaused, isGlobalSoundLooping, setGlobalSoundLoop } from '../services/audioService';
 import { useAppStore } from '../stores/appState';
@@ -382,10 +384,6 @@ const toggleRepeat = () => {
 
 // Check for deep link
 onMounted(async () => {
-  if (!route.query.backRoute) {
-    router.replace({ ...route, query: { ...route.query, backRoute: '/' } });
-  }
-
   const soundId = route.params.soundId;
   
   if (soundId) {

@@ -1,4 +1,5 @@
 <template>
+  <BackToHome />
   <RadialMenu :upper-items="upperMenuItems" :pinned="true" width="narrow">
     <div class="relative flex flex-col h-full w-full">
       <!-- Projector Brightness Control (Left) -->
@@ -82,6 +83,7 @@ import BrightnessControl from '../components/BrightnessControl.vue';
 import feather from 'feather-icons';
 import { mixColorsRgb } from '../services/colorUtils';
 import { generateColorSlug, getColorName } from '../services/colorNaming';
+import BackToHome from '../components/BackToHome.vue';
 
 const appStore = useAppStore();
 const router = useRouter();
@@ -100,10 +102,7 @@ const upperMenuItems = computed<MenuItem[]>(() => [
     label: 'Add to Favorites', 
     icon: favoriteIcon,
     action: toggleFavorite,
-    active: appStore.ambienceFavorites.find(fav => {
-      console.log('Checking fav', fav.id, 'against', currentColorSlug.value);
-      return fav.id === currentColorSlug.value
-    }) !== undefined
+    active: currentIsFavorite.value
   },
   { 
     label: 'Favorites', 
@@ -138,6 +137,12 @@ const currentColorSlug = computed(() => {
   return generateColorSlug(`${colorNameProjector.value} ${colorNameLamp.value}`)
 });
 
+const currentIsFavorite = computed(() => {
+  return appStore.ambienceFavorites.find(
+    fav => fav.id === currentColorSlug.value
+  ) !== undefined;
+});
+
 // Debounced function to update color name
 const updateColorNames = debounce(() => {
   colorNameLamp.value = getColorName(...lampBrightnessColor.value);
@@ -148,6 +153,21 @@ const updateColorNames = debounce(() => {
 watch([lampColors, projectorColors], () => {
   updateColorNames();
 }, { immediate: true });
+
+// Debounced function to update favorite if slug matches an existing one
+const updateFavoriteIfExists = debounce(() => {
+  if (currentIsFavorite.value) {
+    appStore.updateAmbienceFavorite(currentColorSlug.value);
+  }
+}, 500);
+
+// Watch for changes to colors or brightness and update favorite if it exists
+watch(
+  [lampColors, lampBrightness, projectorColors, projectorBrightness],
+  () => {
+    updateFavoriteIfExists();
+  }
+);
 
 /**
  * Computed lamp brightness control color
@@ -203,7 +223,7 @@ function handleProjectorBrightnessUpdate(value: number) {
  * Add current lamp and projector colors to favorites
  */
 function toggleFavorite() {
-  if (appStore.ambienceFavorites.find(fav => fav.id === currentColorSlug.value)) {
+  if (currentIsFavorite.value) {
     appStore.removeAmbienceFromFavorites(currentColorSlug.value);
     return;
   }

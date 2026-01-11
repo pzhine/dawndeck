@@ -532,6 +532,30 @@ export const useAppStore = defineStore('appState', {
       this.saveState();
     },
 
+    // Update an existing ambience favorite with current color and brightness values
+    updateAmbienceFavorite(id: string): void {
+      const existingIndex = this.ambienceFavorites.findIndex(fav => fav.id === id);
+      if (existingIndex === -1) return;
+
+      // Keep the existing favorite but update colors, positions, and brightness
+      const existing = this.ambienceFavorites[existingIndex];
+      this.ambienceFavorites[existingIndex] = {
+        ...existing,
+        lamp: {
+          colors: [this.lampColors.warmWhite, this.lampColors.pink, this.lampColors.orange],
+          position: this.lampPosition || { x: 0, y: 0 },
+          brightness: this.lampBrightness,
+        },
+        projector: {
+          colors: [this.projectorColors.color0, this.projectorColors.color1, this.projectorColors.color2],
+          position: this.projectorPosition || { x: 0, y: 0 },
+          brightness: this.projectorBrightness,
+        },
+        timestamp: Date.now(),
+      };
+      this.saveState();
+    },
+
     // Load ambience favorite (apply both lamp and projector colors/positions)
     loadAmbienceFavorite(id: string): void {
       const favorite = this.ambienceFavorites.find(fav => fav.id === id);
