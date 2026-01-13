@@ -37,6 +37,12 @@ const route = useRoute();
 
 // Computed property to get text brightness as a CSS filter value
 const brightnessFilter = computed(() => {
+  // On Linux (production), hardware controls brightness directly - skip CSS filter
+  // In dev mode (macOS), use CSS filter since we don't have hardware control
+  if (!appStore.config.dev.mockSystemAudio) {
+    return 'brightness(1)'; // No CSS brightness adjustment on Linux
+  }
+  
   // Convert brightness percentage to a curve that starts fast and decelerates
   // Map input range [0-100] to output range [0.3-1.0] with square root scaling
   const normalizedInput = appStore.screenBrightness / 100; // Convert to 0-1 range

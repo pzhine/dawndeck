@@ -172,6 +172,12 @@ export const useAppStore = defineStore('appState', {
         // Sync with system volume after loading state
         await this.syncWithSystemVolume();
         
+        // Restore screen brightness
+        if (this.screenBrightness !== undefined) {
+          await window.ipcRenderer.invoke('set-screen-brightness', this.screenBrightness);
+          console.log('Screen brightness restored:', this.screenBrightness);
+        }
+        
         // Restore lamp state if active
         if (this.lampActive) {
           const multiplier = this.lampBrightness / 100;
@@ -248,8 +254,16 @@ export const useAppStore = defineStore('appState', {
     },
 
     // Set the screen brightness
-    setScreenBrightness(level: number): void {
+    async setScreenBrightness(level: number): Promise<void> {
       this.screenBrightness = Math.max(0, Math.min(100, level)); // Clamp between 0-100
+      this.saveState();
+      
+      // Apply brightness to hardware on Linux
+      try {
+        await window.ipcRenderer.invoke('set-screen-brightness', this.screenBrightness);
+      } catch (error) {
+        console.error('Failed to set screen brightness:', error);
+      }
     },
 
     // Set the projector brightness

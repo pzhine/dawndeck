@@ -90,7 +90,7 @@ const lowerMenuItems = computed<MenuItem[]>(() => [
       appStore.toggleAlarmActive();
     }
   },
-  { label: 'Settings', icon: settingsIcon, route: '/wifi' },
+  { label: 'Settings', icon: settingsIcon, route: '/settings' },
 ]);
 
 // Navigation function
@@ -101,38 +101,6 @@ const goToMenu = (event: MouseEvent) => {
   router.push('/menu');
 };
 
-// Handle wheel event for volume or brightness control
-const handleWheelEvent = (event: WheelEvent) => {
-  event.preventDefault();
-
-  // Determine mode based on whether sound is playing
-  const mode = isGlobalSoundPlaying() ? 'volume' : 'lampBrightness';
-
-  // Navigate to LevelControl page with appropriate mode
-  router.push(`/level/${mode}`);
-};
-
-// Handle any tap/click on the screen to restore brightness
-const handleTap = (event: MouseEvent) => {
-  // If it's a right-click, let goToMenu handle it
-  if (event.button === 2) return;
-
-  // Otherwise, restore brightness if dimmed
-  if (isDimmed.value) {
-    restoreBrightness();
-  }
-};
-
-// Dim the clock brightness to 15%
-const dimBrightness = () => {
-  isDimmed.value = true;
-};
-
-// Restore the clock brightness to 100%
-const restoreBrightness = () => {
-  isDimmed.value = false;
-};
-
 const onMenuShow = async () => {
   isBTPlaying.value = await getBluetoothStatus();
   isSoundPlaying.value = isGlobalSoundPlaying();
@@ -140,14 +108,10 @@ const onMenuShow = async () => {
 
 onMounted(() => {
   window.addEventListener('mousedown', goToMenu);
-  window.addEventListener('mousedown', handleTap);
-  window.addEventListener('wheel', handleWheelEvent, { passive: false });
 });
 
 onUnmounted(() => {
   window.removeEventListener('mousedown', goToMenu);
-  window.removeEventListener('mousedown', handleTap);
-  window.removeEventListener('wheel', handleWheelEvent);
 
   // Clean up the timer if it exists
   if (inactivityTimer.value !== null) {

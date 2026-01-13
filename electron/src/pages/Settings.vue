@@ -1,0 +1,58 @@
+<template>
+  <div class="w-full h-full">
+    <RoundScrollContainer
+      :items="menuItems"
+      :title="'DawnDeck'"
+      :show-title="true"
+      :showBackButton="true"
+      @back="router.push('/')"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue';
+import { useRouter } from 'vue-router';
+import RoundScrollContainer, { ListItem } from '../components/RoundScrollContainer.vue';
+import { useAppStore } from '../stores/appState';
+
+const router = useRouter();
+const appStore = useAppStore();
+
+// Define menu items with their current values from the app store
+const menuItems = computed(() => {
+  const items: ListItem[] = [];
+
+  items.push(
+    {
+      label: 'Screen Brightness',
+      value: appStore.screenBrightness,
+      range: [0, 100],
+      onChange: (value: number) => {
+        appStore.setScreenBrightness(value);
+      },
+    },
+    {
+      label: 'Time Format',
+      value: appStore.timeFormat,
+      onSelect: () => {
+        // Toggle between 12h and 24h format
+        appStore.setTimeFormat(appStore.timeFormat === '12h' ? '24h' : '12h');
+      },
+    },
+    {
+      label: 'Bluetooth',
+      value: 'Add Device',
+      onSelect: () => router.push('/bluetooth-pairing'),
+    },
+    {
+      label: 'Wi-Fi',
+      value: appStore.lastConnectedWifi || 'Not Connected',
+      onSelect: () => router.push('/wifi'),
+    },
+  )
+
+  return items;
+});
+
+</script>

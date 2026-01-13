@@ -551,6 +551,30 @@ ipcMain.handle('navigate-to-page', async (_, pageName: string) => {
   }
 });
 
+// IPC handler for setting screen brightness
+ipcMain.handle('set-screen-brightness', async (_, brightness: number) => {
+  try {
+    // Only apply on Linux
+    if (os.platform() !== 'linux') {
+      console.log('Screen brightness control only supported on Linux');
+      return { success: false, error: 'Platform not supported' };
+    }
+    
+    // Convert 0-100 range to 0-255
+    const brightnessValue = Math.round((brightness / 100) * 255);
+    const brightnessPath = '/sys/waveshare/rpi_backlight/brightness';
+    
+    // Write to sysfs path
+    fs.writeFileSync(brightnessPath, brightnessValue.toString());
+    console.log(`Screen brightness set to ${brightness}% (${brightnessValue}/255)`);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to set screen brightness:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Create the application menu with update options
 function createApplicationMenu() {
   const template = [

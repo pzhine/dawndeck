@@ -14,9 +14,8 @@ import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAppStore } from '../stores/appState';
 import RadialMenu, { MenuItem } from '../components/RadialMenu.vue';
-import RoundScrollContainer from '../components/RoundScrollContainer.vue';
+import RoundScrollContainer, { ListItem } from '../components/RoundScrollContainer.vue';
 import type { ColorFavorite } from '../../types/state';
-import type { ListItem } from '../components/InteractiveList.vue';
 
 const appStore = useAppStore();
 const router = useRouter();

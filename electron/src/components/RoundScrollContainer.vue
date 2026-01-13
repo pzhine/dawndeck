@@ -29,7 +29,7 @@
         <div
           v-for="(item, index) in items"
           :key="index"
-          class="round-item-wrapper flex justify-center items-center py-1 w-full origin-center border-b border-white/20 cursor-pointer transition-transform hover:scale-105 active:scale-95"
+          class="round-item-wrapper flex justify-center items-center py-1 w-full origin-center border-b border-white/20 cursor-pointer transition-transform"
           :style="{ background: isObject(item) && item.gradient ? item.gradient : undefined }"
           @click="handleItemClick(item)"
         >
@@ -42,7 +42,31 @@
             ]"
           >
             <span class="truncate">{{ isObject(item) ? item.label : item }}</span>
-            <span v-if="isObject(item) && 'value' in item" class="value-text ml-2.5 opacity-80">
+            <!-- Slider for range items -->
+            <div 
+              v-if="isObject(item) && item.range" 
+              class="flex items-center gap-2 ml-2.5"
+              @click.stop
+            >
+              <div
+                :ref="(el) => setSliderRef(el as HTMLElement, index)"
+                class="slider-container relative h-8 w-40 bg-white/10 rounded-full overflow-hidden cursor-pointer"
+                @mousedown="(e) => handleSliderInteraction(e, item, index)"
+                @mousemove="(e) => handleSliderInteraction(e, item, index)"
+                @touchstart.prevent="(e) => handleSliderInteraction(e, item, index)"
+                @touchmove.prevent="(e) => handleSliderInteraction(e, item, index)"
+              >
+                <div 
+                  class="absolute top-0 left-0 h-full bg-gradient-to-r from-yellow-400 to-yellow-500 transition-all duration-75"
+                  :style="{ width: getSliderPercentage(item) + '%' }"
+                ></div>
+              </div>
+              <!-- <span class="value-text opacity-80 min-w-[3rem] text-right">
+                {{ item.value }}
+              </span> -->
+            </div>
+            <!-- Regular value display -->
+            <span v-else-if="isObject(item) && 'value' in item" class="value-text ml-2.5 opacity-80">
               {{ item.value }}
             </span>
           </div>
@@ -61,7 +85,20 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue';
-import type { ListItem } from './InteractiveList.vue';
+
+
+// Define item type
+export type ListItem =
+  | string
+  | {
+      label: string;
+      value?: any;
+      onSelect?: () => void;
+      customClass?: string;
+      gradient?: string; // CSS gradient string for background
+      range?: [number, number]; // [min, max] for slider
+      onChange?: (value: number) => void; // Called when slider value changes
+    };
 
 const props = defineProps<{
   items?: ListItem[];
@@ -78,6 +115,15 @@ const containerRef = ref<HTMLElement | null>(null);
 const contentRef = ref<HTMLElement | null>(null);
 const slotContainerRef = ref<HTMLElement | null>(null);
 const spacerHeight = ref(300);
+const sliderRefs = ref<Map<number, HTMLElement>>(new Map());
+
+const setSliderRef = (el: HTMLElement | null, index: number) => {
+  if (el) {
+    sliderRefs.value.set(index, el);
+  } else {
+    sliderRefs.value.delete(index);
+  }
+};
 
 // Scroll state
 const scrollTop = ref(0);
@@ -100,9 +146,53 @@ const hasAnyValues = computed(() => {
   return props.items.some(item => isObject(item) && 'value' in item && item.value !== undefined);
 });
 
+// Get slider percentage for range items
+const getSliderPercentage = (item: Extract<ListItem, object>): number => {
+  if (!item.range || typeof item.value !== 'number') return 0;
+  const [min, max] = item.range;
+  return ((item.value - min) / (max - min)) * 100;
+};
+
+// Handle slider interaction
+const handleSliderInteraction = (event: MouseEvent | TouchEvent, item: Extract<ListItem, object>, index: number) => {
+  event.stopPropagation();
+  if (!item.range || !item.onChange) return;
+  
+  const sliderEl = sliderRefs.value.get(index);
+  if (!sliderEl) return;
+  
+  const rect = sliderEl.getBoundingClientRect();
+  let clientX;
+  
+  if (window.MouseEvent && event instanceof MouseEvent) {
+    clientX = event.clientX;
+    // Only handle if primary button is pressed for mousemove
+    if (event.type === 'mousemove' && event.buttons !== 1) return;
+  } else {
+    const touchEvent = event as TouchEvent;
+    if (touchEvent.touches && touchEvent.touches.length > 0) {
+      clientX = touchEvent.touches[0].clientX;
+    } else {
+      return;
+    }
+  }
+  
+  const x = clientX - rect.left;
+  const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
+  const [min, max] = item.range;
+  const value = Math.round(min + (percentage / 100) * (max - min));
+  
+  item.onChange(value);
+};
+
 const handleItemClick = (item: ListItem) => {
   // Prevent click if we were dragging
   if (Math.abs(lastTouchY.value - startTouchY.value) > 10) {
+    return;
+  }
+  
+  // Don't trigger onSelect for range items (slider only)
+  if (isObject(item) && item.range) {
     return;
   }
   

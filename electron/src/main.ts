@@ -6,7 +6,7 @@ import Wifi from './pages/Wifi.vue';
 import WifiPassword from './pages/WifiPassword.vue';
 import WifiConnect from './pages/WifiConnect.vue';
 import ClockPage from './pages/ClockPage.vue';
-import MainMenu from './pages/MainMenu.vue';
+import Settings from './pages/Settings.vue';
 import SoundCategories from './pages/SoundCategories.vue';
 import { nextTick } from 'vue';
 import { useAppStore } from './stores/appState';
@@ -29,7 +29,7 @@ const routes = [
     name: 'WifiConnect',
     component: WifiConnect,
   },
-  { path: '/menu', name: 'MainMenu', component: MainMenu },
+  { path: '/settings', name: 'Settings', component: Settings },
   { path: '/sounds', name: 'SoundCategories', component: SoundCategories },
   {
     path: '/media-player/:soundId?',
@@ -67,18 +67,6 @@ const routes = [
     component: () => import('./pages/SetAlarm.vue'),
   },
   {
-    path: '/level/volume',
-    name: 'Volume',
-    component: () => import('./pages/LevelControl.vue'),
-    props: { type: 'volume' },
-  },
-  {
-    path: '/level/screenBrightness',
-    name: 'ScreenBrightness',
-    component: () => import('./pages/LevelControl.vue'),
-    props: { type: 'screenBrightness' },
-  },
-  {
     path: '/ambience-control',
     name: 'AmbienceControl',
     component: () => import('./pages/AmbienceControl.vue'),
@@ -92,11 +80,6 @@ const routes = [
     path: '/projector-control',
     name: 'ProjectorControl',
     component: () => import('./pages/ProjectorControl.vue'),
-  },
-  {
-    path: '/projector/:ledIndex',
-    name: 'ProjectorLEDControl',
-    component: () => import('./pages/ProjectorLEDControl.vue'),
   },
   {
     path: '/sunriseSettings',
