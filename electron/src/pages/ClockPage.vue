@@ -1,5 +1,9 @@
 <template>
-  <RadialMenu :items="menuItems" :skip-positions="[]" :on-show="onMenuShow">
+  <RadialMenu 
+    :upper-items="upperMenuItems" 
+    :lower-items="lowerMenuItems"
+    :on-show="onMenuShow"
+  >
     <div tabindex="0" ref="clockContainer" class="page-container">
       <div :class="['clock-wrapper', { dimmed: isDimmed }]">
         <ClockComponent ref="clockComponent" />
@@ -22,26 +26,70 @@ const appStore = useAppStore();
 const inactivityTimer = ref<number | null>(null);
 const isDimmed = ref(false);
 const isBTPlaying = ref(false);
+const isSoundPlaying = ref(false);
 
 const lampIcon = feather.icons['sun'].toSvg();
-const musicIcon = feather.icons['music'].toSvg();
-const projectorIcon = feather.icons['sunrise'].toSvg();
+const musicIcon = feather.icons['volume-2'].toSvg();
 const alarmIcon = feather.icons['bell'].toSvg();
-const sleepIcon = feather.icons['moon'].toSvg();
 const settingsIcon = feather.icons['settings'].toSvg();
 
-const mute = () => {
-  appStore.setVolume(0);
-  appStore.setLampBrightness(0);
-  appStore.setProjectorBrightness(0);
-};
-
-const menuItems = computed<MenuItem[]>(() => [
-  { label: 'Lamp', icon: lampIcon, route: '/ambience-control' },
-  { label: 'Sounds & Music', icon: musicIcon, route: '/media-player', active: isGlobalSoundPlaying() || isBTPlaying.value },
-  { label: 'Projector', icon: projectorIcon, route: '/projector-control', active: appStore.projectorActive },
-  { label: 'Alarm', icon: alarmIcon, route: '/alarm', active: appStore.alarmActive },
-  { label: 'Sleep', icon: sleepIcon, action: mute },
+const upperMenuItems = computed<MenuItem[]>(() => [
+  { 
+    label: 'Lights', 
+    icon: lampIcon, 
+    route: '/ambience-control',
+    hold: true,
+    active: appStore.lampActive || appStore.projectorActive,
+    quickAction: async () => {
+      // Toggle both lamp and projector
+      await appStore.toggleLampActive();
+      await appStore.toggleProjectorActive();
+    }
+  },
+  { 
+    label: 'Sounds', 
+    icon: musicIcon, 
+    route: '/media-player', 
+    active: isSoundPlaying.value || isBTPlaying.value,
+    hold: true,
+    quickAction: async () => {
+      // If sound or bluetooth is playing, pause/resume. Otherwise go to media player
+      if (isGlobalSoundPlaying()) {
+        const { pauseGlobalSound, resumeGlobalSound, isGlobalSoundPaused } = await import('../services/audioService');
+        if (isGlobalSoundPaused()) {
+          resumeGlobalSound();
+        } else {
+          pauseGlobalSound();
+        }
+        // Update state after a short delay to reflect the change
+        setTimeout(() => {
+          isSoundPlaying.value = isGlobalSoundPlaying();
+        }, 100);
+      } else if (isBTPlaying.value) {
+        // Toggle bluetooth playback
+        await (window as any).electronAPI?.bluetoothMedia?.sendCommand('pause');
+        // Update state after a short delay
+        setTimeout(async () => {
+          isBTPlaying.value = await getBluetoothStatus();
+        }, 100);
+      } else {
+        // No sound playing, go to media player
+        router.push('/media-player');
+      }
+    }
+  },
+]);
+const lowerMenuItems = computed<MenuItem[]>(() => [
+  { 
+    label: 'Alarm', 
+    icon: alarmIcon, 
+    route: '/alarm', 
+    active: appStore.alarmActive,
+    hold: true,
+    quickAction: () => {
+      appStore.toggleAlarmActive();
+    }
+  },
   { label: 'Settings', icon: settingsIcon, route: '/wifi' },
 ]);
 
@@ -87,6 +135,7 @@ const restoreBrightness = () => {
 
 const onMenuShow = async () => {
   isBTPlaying.value = await getBluetoothStatus();
+  isSoundPlaying.value = isGlobalSoundPlaying();
 };
 
 onMounted(() => {

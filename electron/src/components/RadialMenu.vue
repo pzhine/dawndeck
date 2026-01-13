@@ -22,7 +22,8 @@ export interface MenuItem {
   icon: string; // SVG string
   route?: string;
   action?: () => void;
-  hold?: boolean; // If true, action triggers after a brief hold
+  hold?: boolean; // If true, action triggers after a brief hold (long press)
+  quickAction?: () => void; // If hold is true, this fires on short tap
   continuous?: boolean; // If true, action triggers repeatedly while holding
   active?: boolean; // If true, icon is colored yellow
 }
@@ -757,11 +758,23 @@ const handleInputStart = (clientX: number, clientY: number) => {
 };
 
 const handleInputEnd = () => {
+  // Check if we had a timer running (hold or continuous case)
+  const hadTimer = inputTimer !== null;
+  
   if (inputTimer) {
     clearTimeout(inputTimer);
     clearInterval(inputTimer);
     inputTimer = null;
   }
+  
+  // If we had a hold timer and it was cancelled (short tap), fire quickAction
+  if (hadTimer && hoveredSegment) {
+    const item = hoveredSegment.userData.item as MenuItem;
+    if (item.hold && item.quickAction && !item.continuous) {
+      item.quickAction();
+    }
+  }
+  
   highlightSegment(null);
 };
 
