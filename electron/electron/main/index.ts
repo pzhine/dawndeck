@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import { startSerialComms, closeSerialPorts } from './serial';
 import { getState, initStateManagement, updateState } from './stateManager';
 import { initVolumeControl } from './volumeControl';
@@ -562,10 +564,12 @@ ipcMain.handle('set-screen-brightness', async (_, brightness: number) => {
     
     // Convert 0-100 range to 0-255
     const brightnessValue = Math.round((brightness / 100) * 255);
-    const brightnessPath = '/sys/waveshare/rpi_backlight/brightness';
     
-    // Write to sysfs path
-    fs.writeFileSync(brightnessPath, brightnessValue.toString());
+    // Use the command from the docs: echo X | sudo tee /sys/class/backlight/*/brightness
+    const execAsync = promisify(exec);
+    const command = `echo ${brightnessValue} | sudo tee /sys/class/backlight/*/brightness`;
+    
+    await execAsync(command);
     console.log(`Screen brightness set to ${brightness}% (${brightnessValue}/255)`);
     
     return { success: true };

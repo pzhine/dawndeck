@@ -13,6 +13,15 @@ let pendingProjectorUpdate: { colors: { color0: number; color1: number; color2: 
 let lampUpdateInterval: NodeJS.Timeout | null = null;
 let projectorUpdateInterval: NodeJS.Timeout | null = null;
 
+// Throttled screen brightness update function
+const throttledSetScreenBrightness = throttle(async (brightness: number) => {
+  try {
+    await window.ipcRenderer.invoke('set-screen-brightness', brightness);
+  } catch (error) {
+    console.error('Failed to set screen brightness:', error);
+  }
+}, 200);
+
 // Create a Pinia store for our application state
 export const useAppStore = defineStore('appState', {
   state: (): AppState => ({
@@ -254,16 +263,12 @@ export const useAppStore = defineStore('appState', {
     },
 
     // Set the screen brightness
-    async setScreenBrightness(level: number): Promise<void> {
+    setScreenBrightness(level: number): void {
       this.screenBrightness = Math.max(0, Math.min(100, level)); // Clamp between 0-100
       this.saveState();
       
-      // Apply brightness to hardware on Linux
-      try {
-        await window.ipcRenderer.invoke('set-screen-brightness', this.screenBrightness);
-      } catch (error) {
-        console.error('Failed to set screen brightness:', error);
-      }
+      // Apply brightness to hardware on Linux (throttled)
+      throttledSetScreenBrightness(this.screenBrightness);
     },
 
     // Set the projector brightness
