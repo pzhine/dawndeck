@@ -1,5 +1,15 @@
 @import 'tailwindcss';
 
+/* Block pointer events on all elements during knob drag */
+body.knob-dragging * {
+  pointer-events: none !important;
+}
+
+/* Re-enable pointer events only on the dragging knob */
+body.knob-dragging .dragging-knob {
+  pointer-events: auto !important;
+}
+
 @font-face {
   font-family: 'Old-School-Adventures';
   src: url('./assets/fonts/Old-School-Adventures-847a.woff') format('woff');

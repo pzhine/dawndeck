@@ -7,6 +7,99 @@ import { generateColorFavoriteName, generateColorSlug } from '../services/colorN
 import { mixColorsRgb } from '../services/colorUtils';
 import defaultConfig from '../../config.example.json';
 
+// Sunrise presets with fixed names and colors
+const SUNRISE_PRESETS: ColorFavorite[] = [
+  {
+    id: 'night',
+    name: 'Night',
+    isPreset: true,
+    lamp: {
+      colors: [0, 0, 0], // All off
+      position: { x: 0, y: 0 },
+      brightness: 0,
+    },
+    projector: {
+      colors: [30, 0, 30], // Deep blue/purple
+      position: { x: 0, y: 0 },
+      brightness: 20,
+    },
+    timestamp: 0,
+  },
+  {
+    id: 'first-light',
+    name: 'First Light',
+    isPreset: true,
+    lamp: {
+      colors: [0, 0, 0],
+      position: { x: 0, y: 0 },
+      brightness: 0,
+    },
+    projector: {
+      colors: [80, 30, 100], // Deep blue with a hint of purple
+      position: { x: 0, y: 0 },
+      brightness: 40,
+    },
+    timestamp: 0,
+  },
+  {
+    id: 'dawn',
+    name: 'Dawn',
+    isPreset: true,
+    lamp: {
+      colors: [50, 20, 0], // Warm dim light
+      position: { x: 0, y: 0 },
+      brightness: 20,
+    },
+    projector: {
+      colors: [150, 100, 200], // Purple-pink blend
+      position: { x: 0, y: 0 },
+      brightness: 60,
+    },
+    timestamp: 0,
+  },
+  {
+    id: 'sunrise',
+    name: 'Sunrise',
+    isPreset: true,
+    lamp: {
+      colors: [180, 100, 50], // Warm amber
+      position: { x: 0, y: 0 },
+      brightness: 50,
+    },
+    projector: {
+      colors: [255, 180, 120], // Orange-pink sunrise colors
+      position: { x: 0, y: 0 },
+      brightness: 80,
+    },
+    timestamp: 0,
+  },
+  {
+    id: 'day',
+    name: 'Day',
+    isPreset: true,
+    lamp: {
+      colors: [255, 150, 100], // Bright warm light
+      position: { x: 0, y: 0 },
+      brightness: 80,
+    },
+    projector: {
+      colors: [255, 220, 180], // Bright warm white-yellow
+      position: { x: 0, y: 0 },
+      brightness: 100,
+    },
+    timestamp: 0,
+  },
+];
+
+// Helper function to ensure sunrise presets exist in favorites
+function ensureSunrisePresets(favorites: ColorFavorite[]): ColorFavorite[] {
+  // Filter out any old presets that might have been modified
+  const nonPresets = favorites.filter(fav => !fav.isPreset);
+  
+  // Return presets first, then user favorites
+  return [...SUNRISE_PRESETS, ...nonPresets];
+}
+
 // Pending hardware update queues (max length 1 - only latest values matter)
 let pendingLampUpdate: { colors: { warmWhite: number; pink: number; orange: number }; brightness: number } | null = null;
 let pendingProjectorUpdate: { colors: { color0: number; color1: number; color2: number }; brightness: number } | null = null;
@@ -178,6 +271,9 @@ export const useAppStore = defineStore('appState', {
           this.$patch(savedState);
         }
 
+        // Ensure sunrise presets are always present
+        this.ambienceFavorites = ensureSunrisePresets(this.ambienceFavorites);
+
         // Sync with system volume after loading state
         await this.syncWithSystemVolume();
         
@@ -269,6 +365,12 @@ export const useAppStore = defineStore('appState', {
       
       // Apply brightness to hardware on Linux (throttled)
       throttledSetScreenBrightness(this.screenBrightness);
+    },
+
+    // set the sunrise duration
+    setSunriseDuration(durationSeconds: number): void {
+      this.sunriseDuration = durationSeconds;
+      this.saveState();
     },
 
     // Set the projector brightness
@@ -553,6 +655,12 @@ export const useAppStore = defineStore('appState', {
 
     // Remove ambience (lamp + projector) from favorites by id
     removeAmbienceFromFavorites(id: string): void {
+      // Don't allow deletion of sunrise presets
+      const favorite = this.ambienceFavorites.find(fav => fav.id === id);
+      if (favorite?.isPreset) {
+        console.warn('Cannot delete sunrise preset:', id);
+        return;
+      }
       this.ambienceFavorites = this.ambienceFavorites.filter(fav => fav.id !== id);
       this.saveState();
     },
@@ -604,6 +712,12 @@ export const useAppStore = defineStore('appState', {
 
     // Remove ambience favorite by id
     removeAmbienceFavorite(id: string): void {
+      // Don't allow deletion of sunrise presets
+      const favorite = this.ambienceFavorites.find(fav => fav.id === id);
+      if (favorite?.isPreset) {
+        console.warn('Cannot delete sunrise preset:', id);
+        return;
+      }
       this.ambienceFavorites = this.ambienceFavorites.filter(fav => fav.id !== id);
       this.saveState();
     },

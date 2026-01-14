@@ -27,7 +27,7 @@ const menuItems = computed(() => {
     {
       label: 'Screen Brightness',
       value: appStore.screenBrightness,
-      range: [0, 100],
+      range: [5, 100],
       onChange: (value: number) => {
         appStore.setScreenBrightness(value);
       },

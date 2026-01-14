@@ -67,7 +67,7 @@ const routes = [
     component: () => import('./pages/SetAlarm.vue'),
   },
   {
-    path: '/ambience-control',
+    path: '/ambience-control/:favoriteId?',
     name: 'AmbienceControl',
     component: () => import('./pages/AmbienceControl.vue'),
   },

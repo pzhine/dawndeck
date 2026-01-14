@@ -42,9 +42,31 @@
             ]"
           >
             <span class="truncate">{{ isObject(item) ? item.label : item }}</span>
+            <!-- Knob for knob items -->
+            <div 
+              v-if="isObject(item) && item.knob" 
+              class="flex items-center gap-3 ml-2.5"
+              @click.stop
+            >
+              <span v-if="item.value !== undefined" class="value-text opacity-80 min-w-[3rem] text-right">
+                {{ item.value }}
+              </span>
+              <KnobControl
+                :value="typeof item.knob.value === 'number' ? item.knob.value : 0"
+                :min="item.knob.min || 0"
+                :max="item.knob.max || 100"
+                :icon="item.knob.icon || ''"
+                :color="item.knob.color || '#ffffff'"
+                :size="item.knob.size || 50"
+                :stroke-width="item.knob.strokeWidth || 6"
+                :step-function="item.knob.stepFunction"
+                :progress-function="item.knob.progressFunction"
+                @update:value="(value: number) => item.knob?.onChange?.(value)"
+              />
+            </div>
             <!-- Slider for range items -->
             <div 
-              v-if="isObject(item) && item.range" 
+              v-else-if="isObject(item) && item.range" 
               class="flex items-center gap-2 ml-2.5"
               @click.stop
             >
@@ -85,6 +107,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue';
+import KnobControl from './KnobControl.vue';
 
 
 // Define item type
@@ -98,6 +121,18 @@ export type ListItem =
       gradient?: string; // CSS gradient string for background
       range?: [number, number]; // [min, max] for slider
       onChange?: (value: number) => void; // Called when slider value changes
+      knob?: {
+        value: number;
+        min?: number;
+        max?: number;
+        icon?: string;
+        color?: string | number[];
+        size?: number;
+        strokeWidth?: number;
+        stepFunction?: (currentValue: number, delta: number) => number;
+        progressFunction?: (value: number, min: number, max: number) => number;
+        onChange?: (value: number) => void;
+      };
     };
 
 const props = defineProps<{

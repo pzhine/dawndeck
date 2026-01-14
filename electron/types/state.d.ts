@@ -32,6 +32,7 @@ export interface SunriseStep {
 export interface ColorFavorite {
   id: string;
   name: string;
+  isPreset?: boolean; // True for sunrise presets that can be edited but not deleted
   lamp: {
     colors: [number, number, number]; // RGB values 0-255
     position: { x: number; y: number };

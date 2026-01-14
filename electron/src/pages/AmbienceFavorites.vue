@@ -103,6 +103,13 @@ function handleSelect(item: ListItem) {
  */
 function loadFavorite(id: string) {
   appStore.loadAmbienceFavorite(id);
-  router.push('/ambience-control');
+  
+  // Only pass favoriteId for presets to maintain their fixed identity
+  const favorite = appStore.ambienceFavorites.find(fav => fav.id === id);
+  if (favorite?.isPreset) {
+    router.push({ name: 'AmbienceControl', params: { favoriteId: id } });
+  } else {
+    router.push({ name: 'AmbienceControl' });
+  }
 }
 </script>

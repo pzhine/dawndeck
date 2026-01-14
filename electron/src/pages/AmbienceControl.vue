@@ -30,7 +30,7 @@
       </div>
 
       <!-- Projector Control -->
-      <div class="h-1/2 flex flex-col relative top-2">
+      <div class="h-1/2 flex flex-col relative top-4">
         <LightControl
             :circle-colors="projectorCircleColors"
             :colors="projectorColors"
@@ -44,13 +44,20 @@
           />
       </div>
 
-      <!-- Color Name Display -->
-      <div class="absolute top-1/2 left-22 -translate-y-1/2 z-20 pointer-events-none opacity-70">
-        <div class="text-left text-white text-sm whitespace-nowrap relative top-1" :style="{ color: `rgb(${projectorBrightnessColor.join(',')})`}">
+      <!-- Favorite Name Display (shown when editing a preset) -->
+      <div v-if="editingFavoriteName" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
+        <div class="text-center text-white text-xl font-bold whitespace-nowrap drop-shadow-lg relative top-4">
+          {{ editingFavoriteName }}
+        </div>
+      </div>
+
+      <!-- Color Name Display (hidden when editing a preset) -->
+      <div v-if="!editingFavoriteName" class="absolute top-1/2 left-22 -translate-y-1/2 z-20 pointer-events-none opacity-70">
+        <div class="text-left text-white text-sm whitespace-nowrap relative top-1" :style="{ color: `rgb(${projectorBrightnessColor.join(',')})` }">
           {{ colorNameProjector }}
         </div>
       </div>
-      <div class="absolute top-1/2 right-20 -translate-y-1/2 z-20 pointer-events-none opacity-70">
+      <div v-if="!editingFavoriteName" class="absolute top-1/2 right-20 -translate-y-1/2 z-20 pointer-events-none opacity-70">
         <div class="text-right text-white text-sm whitespace-nowrap relative top-5" :style="{ color: `rgb(${lampBrightnessColor.join(',')})`}">
           {{ colorNameLamp }}
         </div>
@@ -76,7 +83,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { debounce } from 'lodash-es';
 import { useAppStore } from '../stores/appState';
 import RadialMenu, { MenuItem } from '../components/RadialMenu.vue';
@@ -89,6 +96,7 @@ import BackToHome from '../components/BackToHome.vue';
 
 const appStore = useAppStore();
 const router = useRouter();
+const route = useRoute();
 
 // Active states
 const lampActive = computed(() => appStore.lampActive ?? true);
@@ -139,7 +147,24 @@ const currentColorSlug = computed(() => {
   return generateColorSlug(`${colorNameProjector.value} ${colorNameLamp.value}`)
 });
 
+// Get the favorite ID being edited from route params
+const editingFavoriteId = computed(() => route.params.favoriteId as string | undefined);
+
+// Get the name of the favorite being edited (only for presets)
+const editingFavoriteName = computed(() => {
+  if (!editingFavoriteId.value) return null;
+  const favorite = appStore.ambienceFavorites.find(fav => fav.id === editingFavoriteId.value);
+  return favorite?.name || null;
+});
+
 const currentIsFavorite = computed(() => {
+  // If we're editing a specific favorite (came from favorites list), check by that ID
+  if (editingFavoriteId.value) {
+    return appStore.ambienceFavorites.find(
+      fav => fav.id === editingFavoriteId.value
+    ) !== undefined;
+  }
+  // Otherwise, check if current color matches any favorite by slug
   return appStore.ambienceFavorites.find(
     fav => fav.id === currentColorSlug.value
   ) !== undefined;
@@ -156,9 +181,14 @@ watch([lampColors, projectorColors], () => {
   updateColorNames();
 }, { immediate: true });
 
-// Debounced function to update favorite if slug matches an existing one
+// Debounced function to update favorite if we're editing one
 const updateFavoriteIfExists = debounce(() => {
-  if (currentIsFavorite.value) {
+  // If we're editing a specific favorite, always update it
+  if (editingFavoriteId.value && currentIsFavorite.value) {
+    appStore.updateAmbienceFavorite(editingFavoriteId.value);
+  }
+  // Otherwise, only update if the generated slug matches an existing favorite
+  else if (!editingFavoriteId.value && currentIsFavorite.value) {
     appStore.updateAmbienceFavorite(currentColorSlug.value);
   }
 }, 500);
@@ -226,7 +256,13 @@ function handleProjectorBrightnessUpdate(value: number) {
  */
 function toggleFavorite() {
   if (currentIsFavorite.value) {
-    appStore.removeAmbienceFromFavorites(currentColorSlug.value);
+    // Use the editing favorite ID if available, otherwise use the computed slug
+    const idToRemove = editingFavoriteId.value || currentColorSlug.value;
+    appStore.removeAmbienceFromFavorites(idToRemove);
+    // Clear the route param after removing
+    if (editingFavoriteId.value) {
+      router.replace({ name: 'AmbienceControl' });
+    }
     return;
   }
   appStore.addAmbienceToFavorites();
@@ -236,6 +272,6 @@ function toggleFavorite() {
  * Navigate to favorites page
  */
 function goToFavorites() {
-  router.push('/ambience-favorites?backRoute=/ambience-control');
+  router.push('/ambience-favorites');
 }
 </script>
