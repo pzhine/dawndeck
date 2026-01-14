@@ -4,7 +4,6 @@ import fs from 'node:fs';
 import { app } from 'electron';
 import { AppState } from '../../types/state';
 import { sendMessage } from './serial';
-import { debounce } from 'lodash-es';
 import { getConfig } from './configManager';
 
 // Define the file path for storing application state
@@ -15,9 +14,7 @@ let stateCache: AppState | null = null;
 
 // Strip identifiers matching Arduino constants
 const STRIP_LAMP = 0;
-const STRIP_SUN_CENTER = 0;
-const STRIP_SUN_RING = 1;
-const PROJECTOR_TRANSITION_TIME = 100; // ms
+const STRIP_PROJECTOR = 1;
 
 /**
  * Get current application state
@@ -156,81 +153,6 @@ export function sendLEDToSerial(
   sendMessage(command);
 }
 
-/**
- * Sends a LERP_LED command to update a projector LED color
- * @param ledIndex The LED index (0 or 1)
- * @param red Red value (0-255)
- * @param green Green value (0-255)
- * @param blue Blue value (0-255)
- * @param white White value (0-255)
- */
-export function sendProjectorLEDToSerial(
-  ledIndex: number,
-  red: number,
-  green: number,
-  blue: number,
-  white: number
-) {
-  sendLEDToSerial(
-    STRIP_SUN_CENTER,
-    ledIndex,
-    red,
-    green,
-    blue,
-    PROJECTOR_TRANSITION_TIME
-  );
-}
-
-// Handler for updating projector LED colors
-ipcMain.handle(
-  'update-projector-led',
-  async (
-    _,
-    ledIndex: number,
-    red: number,
-    green: number,
-    blue: number,
-    white: number
-  ) => {
-    // Ensure values are within valid range (0-255)
-    const r = Math.max(0, Math.min(255, red));
-    const g = Math.max(0, Math.min(255, green));
-    const b = Math.max(0, Math.min(255, blue));
-    const w = Math.max(0, Math.min(255, white));
-
-    // Send the command to the Arduino
-    sendProjectorLEDToSerial(ledIndex, r, g, b, w);
-    return true;
-  }
-);
-
-/**
- * Resets all LEDs on all strips back to 0 (off)
- * This will send commands to turn off LEDs on each strip
- */
-export function resetAllProjectorLEDs() {
-  console.log('[stateManager] Resetting all projector LEDs to 0');
-
-  // For strip ID 1 (projector strip), reset both LED 0 and LED 1
-  // LERP_LED: stripId, pixel, r, g, b, w, duration
-  sendMessage(
-    `LERP_LED ${STRIP_SUN_CENTER} 0 0 0 0 0 ${PROJECTOR_TRANSITION_TIME}`
-  );
-  sendMessage(
-    `LERP_LED ${STRIP_SUN_CENTER} 1 0 0 0 0 0 ${PROJECTOR_TRANSITION_TIME}`
-  );
-
-  // If there are other strips that need to be reset, add them here
-  // For example, for strip ID 0 (if it exists)
-  // sendMessage(`LERP_LED 0 0 0 0 0 0 ${PROJECTOR_TRANSITION_TIME}`);
-}
-
-// Handler for resetting all projector LEDs
-ipcMain.handle('reset-all-projector-leds', async () => {
-  resetAllProjectorLEDs();
-  return true;
-});
-
 // Handler for setting lamp colors (3 separate LEDs/pixels)
 ipcMain.handle(
   'set-lamp-colors',
@@ -275,7 +197,7 @@ ipcMain.handle(
     // Pixel 1: color0
     // Pixel 2: color1
     
-    sendLEDToSerial(1, 0, color2, color0, color1, 100);
+    sendLEDToSerial(STRIP_PROJECTOR, 0, color2, color0, color1, 100);
 
     return true;
   }

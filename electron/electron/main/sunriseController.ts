@@ -1,5 +1,5 @@
-import { ipcMain, dialog } from 'electron';
-import { SunriseStep, ColorFavorite } from '../../types/state';
+import { ipcMain } from 'electron';
+import { ColorFavorite } from '../../types/state';
 import { sendLEDToSerial, getState } from './stateManager';
 
 // Store for the sunrise playback state
@@ -10,8 +10,8 @@ let startTime = 0;
 let scheduledTimeouts: NodeJS.Timeout[] = [];
 
 // Map strip type for lamp and projector
-const STRIP_LAMP = 2;
-const STRIP_SUN_CENTER = 0;
+const STRIP_LAMP = 0;
+const STRIP_PROJECTOR = 1;
 
 /**
  * Get the preset favorites in order
@@ -34,13 +34,6 @@ function getSunrisePresets(): ColorFavorite[] {
 }
 
 /**
- * Lerp between two values
- */
-function lerp(start: number, end: number, t: number): number {
-  return start + (end - start) * t;
-}
-
-/**
  * Generate transitions between preset steps
  */
 function generateSunriseSequence(duration: number): Array<{
@@ -58,7 +51,6 @@ function generateSunriseSequence(duration: number): Array<{
   const sequence = [];
   const stepDuration = duration / presets.length; // Duration for each step in seconds
   const transitionDuration = stepDuration * 0.3333; // 33.33% for transitions
-  const holdDuration = stepDuration * 0.3334; // 33.34% for hold (slightly longer to account for rounding)
   
   console.log(`[sunriseController] Generating sequence: ${presets.length} presets, ${stepDuration}s per step, ${transitionDuration}s transitions`);
   
@@ -136,19 +128,10 @@ export function startSunrise(duration: number) {
           step.transitionDuration
         );
         
-        // Send projector colors (to both center LEDs for now)
+        // Send projector colors
         sendLEDToSerial(
-          STRIP_SUN_CENTER,
+          STRIP_PROJECTOR,
           0,
-          step.projector.color0,
-          step.projector.color1,
-          step.projector.color2,
-          step.transitionDuration
-        );
-        
-        sendLEDToSerial(
-          STRIP_SUN_CENTER,
-          1,
           step.projector.color0,
           step.projector.color1,
           step.projector.color2,
@@ -181,8 +164,8 @@ export function stopSunrise() {
   }
 
   // Reset all LEDs
-  sendLEDToSerial(STRIP_SUN_CENTER, 0, 0, 0, 0, 2000);
-  sendLEDToSerial(STRIP_SUN_CENTER, 1, 0, 0, 0, 2000);
+  sendLEDToSerial(STRIP_PROJECTOR, 0, 0, 0, 0, 2000);
+  sendLEDToSerial(STRIP_PROJECTOR, 1, 0, 0, 0, 2000);
   sendLEDToSerial(STRIP_LAMP, 0, 0, 0, 0, 2000);
 }
 
