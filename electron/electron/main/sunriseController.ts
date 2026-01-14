@@ -128,13 +128,13 @@ export function startSunrise(duration: number) {
           step.transitionDuration
         );
         
-        // Send projector colors
+        // Send projector colors (note: colors are reordered to match hardware mapping)
         sendLEDToSerial(
           STRIP_PROJECTOR,
           0,
+          step.projector.color2,
           step.projector.color0,
           step.projector.color1,
-          step.projector.color2,
           step.transitionDuration
         );
       }
@@ -148,24 +148,35 @@ export function startSunrise(duration: number) {
  * Stop the sunrise playback
  */
 export function stopSunrise() {
-  if (!isPlaying) return;
-
   console.log('[sunriseController] Stopping sunrise');
 
+  // Immediately reset LEDs before any other cleanup
+  sendLEDToSerial(STRIP_PROJECTOR, 0, 0, 0, 0, 0);
+  sendLEDToSerial(STRIP_LAMP, 0, 0, 0, 0, 0);
+
+  // Set flag to prevent any further playback
   isPlaying = false;
 
   // Clear all scheduled timeouts
-  scheduledTimeouts.forEach(timeout => clearTimeout(timeout));
+  scheduledTimeouts.forEach(timeout => {
+    try {
+      clearTimeout(timeout);
+    } catch (e) {
+      console.error('[sunriseController] Error clearing timeout:', e);
+    }
+  });
   scheduledTimeouts = [];
 
   if (playbackTimer) {
-    clearTimeout(playbackTimer);
+    try {
+      clearTimeout(playbackTimer);
+    } catch (e) {
+      console.error('[sunriseController] Error clearing playback timer:', e);
+    }
     playbackTimer = null;
   }
 
-  // Reset all LEDs
-  sendLEDToSerial(STRIP_PROJECTOR, 0, 0, 0, 0, 2000);
-  sendLEDToSerial(STRIP_LAMP, 0, 0, 0, 0, 2000);
+  console.log('[sunriseController] Sunrise stopped and LEDs reset');
 }
 
 /**

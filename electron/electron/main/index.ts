@@ -147,6 +147,10 @@ async function cleanupResources() {
   // Create lock file to signal to new instances that we're shutting down
   createLockFile();
 
+  // Stop any running sunrise sequence
+  const { stopSunrise } = await import('./sunriseController');
+  stopSunrise();
+
   // Close all serial ports
   await closeSerialPorts();
 
