@@ -119,6 +119,7 @@ export interface AppState {
   sunriseDuration: number;
   sunriseActive: boolean;
   sunriseBrightness: number; // Global brightness for sunrise (0-100)
+  alarmVolume: number; // Volume to use for alarm sound during sunrise (0-100)
   config: AppConfig; // Application configuration from main process
   currentPlaylist: any[]; // Current playlist of sounds
   currentPlaylistIndex: number; // Current index in the playlist

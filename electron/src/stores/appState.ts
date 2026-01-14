@@ -159,6 +159,7 @@ export const useAppStore = defineStore('appState', {
     sunriseDuration: 600, // Default: 10 minutes in seconds
     sunriseActive: false,
     sunriseBrightness: 100, // Default: 100% brightness
+    alarmVolume: 50, // Volume to use for alarm sound during sunrise (default 50%)
     config: defaultConfig,
     currentPlaylist: [], // Current playlist of sounds
     currentPlaylistIndex: -1, // Current index in the playlist

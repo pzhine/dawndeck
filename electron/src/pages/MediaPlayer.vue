@@ -326,6 +326,11 @@ const setVolume = (newVol: number) => {
   newVol = Math.max(0, Math.min(100, newVol));
   volume.value = newVol;
   
+  // Save alarm volume if we're playing the alarm sound
+  if (appStore.alarmSound && currentGlobalSound.value?.id === appStore.alarmSound.id) {
+    appStore.alarmVolume = newVol;
+  }
+  
   pendingVolume = newVol;
   
   // Only start if not already syncing or waiting

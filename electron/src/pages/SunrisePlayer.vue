@@ -33,7 +33,9 @@ const animationStartTime = ref(Date.now());
 const volumeUpdateInterval = ref<number | null>(null);
 const showTransparentReverse = ref(false);
 const sunriseOpacity = ref(1);
-const targetVolume = ref(appStore.volume / 100);
+
+// Use the saved alarm volume (last volume when alarm sound was playing)
+const targetVolume = ref(appStore.alarmVolume / 100);
 
 // Computed property to get the total sunrise duration in milliseconds
 const sunriseDuration = computed(() => appStore.sunriseDuration * 1000);
