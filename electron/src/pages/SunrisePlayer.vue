@@ -9,6 +9,7 @@
 
     <!-- Transparent clock overlay in the foreground -->
     <ClockComponent
+      class="clock-overlay"
       :transparent="true"
       :transparentReverse="showTransparentReverse"
     />
@@ -171,5 +172,10 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   z-index: 1;
+}
+
+.clock-overlay {
+  position: relative;
+  z-index: 2;
 }
 </style>

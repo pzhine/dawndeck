@@ -20,19 +20,22 @@ const router = useRouter();
 
 const clockIcon = feather.icons['clock'].toSvg();
 
-// Format the duration in minutes and seconds
+// Format the duration in mm:ss or hh:mm:ss format
 const formatDuration = (seconds: number): string => {
-  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
   const remainingSeconds = seconds % 60;
-  if (remainingSeconds === 0) {
-    return `${minutes}m`;
+  
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
   }
-  return `${minutes}m ${remainingSeconds}s`;
+  return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
 };
 
 /**
  * Non-linear step function for duration
- * 0-30 min: 1 minute increments (60 seconds)
+ * 0-5 min: 30 second increments (30 seconds)
+ * 5-30 min: 1 minute increments (60 seconds)
  * 30-60 min: 5 minute increments (300 seconds)
  * 60+ min: 10 minute increments (600 seconds)
  * 
@@ -52,7 +55,9 @@ const durationStepFunction = (currentValue: number, delta: number): number => {
     const currentMinutes = newValue / 60;
     
     let stepSize: number;
-    if (currentMinutes < 30) {
+    if (currentMinutes < 5) {
+      stepSize = 30; // 30 seconds
+    } else if (currentMinutes < 30) {
       stepSize = 60; // 1 minute
     } else if (currentMinutes < 60) {
       stepSize = 300; // 5 minutes
@@ -72,27 +77,31 @@ const handleDurationUpdate = (value: number) => {
 
 /**
  * Calculate progress based on steps, not linear value
- * 0-30 min: 30 steps (1 min each) = 1800 seconds
+ * 0-5 min: 10 steps (30 sec each) = 300 seconds
+ * 5-30 min: 25 steps (1 min each) = 1500 seconds
  * 30-60 min: 6 steps (5 min each) = 1800 seconds  
  * 60-120 min: 6 steps (10 min each) = 3600 seconds
- * Total: 42 steps
+ * Total: 47 steps
  */
 const durationProgressFunction = (value: number, min: number, max: number): number => {
   const minutes = value / 60;
   let currentStep = 0;
   
-  if (minutes <= 30) {
-    // 0-30 min: 1 minute per step
-    currentStep = minutes;
+  if (minutes <= 5) {
+    // 0-5 min: 30 seconds per step
+    currentStep = minutes * 2;
+  } else if (minutes <= 30) {
+    // 5-30 min: 1 minute per step
+    currentStep = 10 + (minutes - 5);
   } else if (minutes <= 60) {
     // 30-60 min: 5 minutes per step
-    currentStep = 30 + (minutes - 30) / 5;
+    currentStep = 10 + 25 + (minutes - 30) / 5;
   } else {
     // 60-120 min: 10 minutes per step
-    currentStep = 30 + 6 + (minutes - 60) / 10;
+    currentStep = 10 + 25 + 6 + (minutes - 60) / 10;
   }
   
-  const totalSteps = 42; // 30 + 6 + 6
+  const totalSteps = 47; // 10 + 25 + 6 + 6
   return Math.min(1, currentStep / totalSteps); // Ensure we don't exceed 1.0
 };
 
@@ -103,7 +112,7 @@ const menuItems = computed<ListItem[]>(() => [
     value: formatDuration(appStore.sunriseDuration),
     knob: {
       value: appStore.sunriseDuration,
-      min: 0,
+      min: 30,
       max: 7200,
       icon: clockIcon,
       color: '#fbbf24',

@@ -246,7 +246,7 @@ onMounted(() => {
         'number'
       );
       animateStyle(
-        200,
+        100,
         () => parseInt(clockStyles.marginTop.replace('px', '')),
         (val) => (clockStyles.marginTop = `${val}px`),
         5000,
