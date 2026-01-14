@@ -1,149 +1,164 @@
 import { ipcMain, dialog } from 'electron';
-import { SunriseStep } from '../../types/state';
+import { SunriseStep, ColorFavorite } from '../../types/state';
 import { sendLEDToSerial, getState } from './stateManager';
-import sunriseTimelines from '../../assets/sunriseTimelines.json';
 
 // Store for the sunrise playback state
 let isPlaying = false;
 let playbackTimer: NodeJS.Timeout | null = null;
-let currentTimeline: SunriseStep[] = [];
 let currentDuration = 600; // Default 10 minutes in seconds
 let startTime = 0;
+let scheduledTimeouts: NodeJS.Timeout[] = [];
+
+// Map strip type for lamp and projector
+const STRIP_LAMP = 2;
+const STRIP_SUN_CENTER = 0;
 
 /**
- * Map strip name to numeric ID for Arduino
- * @param stripName The name of the strip (e.g., "SUN_CENTER")
- * @returns The numeric ID for the strip
+ * Get the preset favorites in order
  */
-function mapStripNameToId(stripName: string): number {
-  switch (stripName.toUpperCase()) {
-    case 'SUN_CENTER':
-      return 0;
-    case 'SUN_RING':
-      return 1;
-    case 'LAMP':
-      return 2;
-    default:
-      console.warn(
-        `Unknown strip name: ${stripName}, defaulting to SUN_CENTER (0)`
-      );
-      return 0;
+function getSunrisePresets(): ColorFavorite[] {
+  const state = getState();
+  if (!state?.ambienceFavorites) return [];
+  
+  const presetOrder = ['night', 'first-light', 'dawn', 'sunrise', 'day'];
+  const presets: ColorFavorite[] = [];
+  
+  for (const id of presetOrder) {
+    const preset = state.ambienceFavorites.find(fav => fav.id === id && fav.isPreset);
+    if (preset) {
+      presets.push(preset);
+    }
   }
+  
+  return presets;
 }
 
 /**
- * Scale the timeline to fit the desired duration
- * @param timeline The original timeline
- * @param targetDuration The desired duration in seconds
- * @returns Scaled timeline
+ * Lerp between two values
  */
-function scaleTimeline(
-  timeline: SunriseStep[],
-  targetDuration: number
-): SunriseStep[] {
-  if (!timeline || timeline.length === 0) return [];
-
-  // Find the maximum startAt + duration value as the original total duration
-  const originalEndTime = Math.max(
-    ...timeline.map((step) => step.startAt + step.duration)
-  );
-
-  if (originalEndTime <= 0) return timeline; // Prevent division by zero
-
-  // Calculate scale factor
-  const scaleFactor = (targetDuration * 1000) / originalEndTime;
-
-  // Scale all time values
-  return timeline.map((step) => ({
-    ...step,
-    startAt: Math.round(step.startAt * scaleFactor),
-    duration: Math.round(step.duration * scaleFactor),
-  }));
+function lerp(start: number, end: number, t: number): number {
+  return start + (end - start) * t;
 }
 
 /**
- * Play a specific step in the timeline
- * @param step The step to play
+ * Generate transitions between preset steps
  */
-function playStep(step: SunriseStep) {
-  console.log(
-    `[sunriseController] Playing step: strip=${step.strip}, pixel=${step.pixel}, R=${step.red}, G=${step.green}, B=${step.blue}, W=${step.white}, duration=${step.duration}ms`
-  );
-
-  // Handle -1 values for color channels that should stay unchanged
-  // We need to send the message with the current values instead of -1
-  if (
-    step.red === -1 ||
-    step.green === -1 ||
-    step.blue === -1 ||
-    step.white === -1
-  ) {
-    // Just pass through the -1 values, the Arduino code will handle them
-    sendLEDToSerial(
-      mapStripNameToId(step.strip),
-      step.pixel,
-      step.red,
-      step.green,
-      step.blue,
-      step.white,
-      step.duration
-    );
-  } else {
-    // All values are provided, send them directly
-    sendLEDToSerial(
-      mapStripNameToId(step.strip),
-      step.pixel,
-      step.red,
-      step.green,
-      step.blue,
-      step.white,
-      step.duration
-    );
+function generateSunriseSequence(duration: number): Array<{
+  timestamp: number;
+  lamp: { warmWhite: number; pink: number; orange: number };
+  projector: { color0: number; color1: number; color2: number };
+  transitionDuration: number;
+}> {
+  const presets = getSunrisePresets();
+  if (presets.length === 0) {
+    console.error('[sunriseController] No preset favorites found');
+    return [];
   }
+  
+  const sequence = [];
+  const stepDuration = duration / presets.length; // Duration for each step in seconds
+  const transitionDuration = stepDuration * 0.3333; // 33.33% for transitions
+  const holdDuration = stepDuration * 0.3334; // 33.34% for hold (slightly longer to account for rounding)
+  
+  console.log(`[sunriseController] Generating sequence: ${presets.length} presets, ${stepDuration}s per step, ${transitionDuration}s transitions`);
+  
+  for (let i = 0; i < presets.length; i++) {
+    const currentPreset = presets[i];
+    const stepStartTime = i * stepDuration;
+    
+    // Apply brightness multiplier to colors
+    const lampMultiplier = currentPreset.lamp.brightness / 100;
+    const projectorMultiplier = currentPreset.projector.brightness / 100;
+    
+    const lampColors = {
+      warmWhite: Math.round(currentPreset.lamp.colors[0] * lampMultiplier),
+      pink: Math.round(currentPreset.lamp.colors[1] * lampMultiplier),
+      orange: Math.round(currentPreset.lamp.colors[2] * lampMultiplier),
+    };
+    
+    const projectorColors = {
+      color0: Math.round(currentPreset.projector.colors[0] * projectorMultiplier),
+      color1: Math.round(currentPreset.projector.colors[1] * projectorMultiplier),
+      color2: Math.round(currentPreset.projector.colors[2] * projectorMultiplier),
+    };
+    
+    // Transition into this step (from previous step)
+    // This happens at the start of the step
+    sequence.push({
+      timestamp: stepStartTime,
+      lamp: lampColors,
+      projector: projectorColors,
+      transitionDuration: transitionDuration * 1000, // Convert to ms
+    });
+    
+    console.log(`[sunriseController] Step ${i} (${currentPreset.name}) at ${stepStartTime.toFixed(2)}s, transition ${transitionDuration.toFixed(2)}s`);
+  }
+  
+  return sequence;
 }
 
 /**
- * Start playing back the sunrise timeline
- * @param timeline The timeline to play
+ * Start playing back the sunrise sequence
  * @param duration The total duration in seconds
  */
-export function startSunrise(timeline: SunriseStep[], duration: number) {
+export function startSunrise(duration: number) {
   if (isPlaying) {
     stopSunrise();
   }
 
-  if (!timeline || timeline.length === 0) {
-    console.error(
-      '[sunriseController] Cannot start sunrise: No timeline provided'
-    );
+  console.log(`[sunriseController] Starting sunrise, ${duration} seconds`);
+
+  const sequence = generateSunriseSequence(duration);
+  
+  if (sequence.length === 0) {
+    console.error('[sunriseController] Cannot start sunrise: No sequence generated');
     return;
   }
 
-  console.log(
-    `[sunriseController] Starting sunrise, ${timeline.length} steps over ${duration} seconds`
-  );
-
-  currentTimeline = scaleTimeline(timeline, duration);
   currentDuration = duration;
   isPlaying = true;
   startTime = Date.now();
+  scheduledTimeouts = [];
 
-  // Schedule each step according to its startAt time
-  currentTimeline.forEach((step) => {
-    setTimeout(() => {
+  // Schedule each step
+  sequence.forEach((step) => {
+    const timeout = setTimeout(() => {
       if (isPlaying) {
-        playStep(step);
+        console.log(`[sunriseController] Applying colors: Lamp(${step.lamp.warmWhite}, ${step.lamp.pink}, ${step.lamp.orange}), Projector(${step.projector.color0}, ${step.projector.color1}, ${step.projector.color2}), Duration: ${step.transitionDuration}ms`);
+        
+        // Send lamp colors
+        sendLEDToSerial(
+          STRIP_LAMP,
+          0,
+          step.lamp.orange,
+          step.lamp.warmWhite,
+          step.lamp.pink,
+          step.transitionDuration
+        );
+        
+        // Send projector colors (to both center LEDs for now)
+        sendLEDToSerial(
+          STRIP_SUN_CENTER,
+          0,
+          step.projector.color0,
+          step.projector.color1,
+          step.projector.color2,
+          step.transitionDuration
+        );
+        
+        sendLEDToSerial(
+          STRIP_SUN_CENTER,
+          1,
+          step.projector.color0,
+          step.projector.color1,
+          step.projector.color2,
+          step.transitionDuration
+        );
       }
-    }, step.startAt);
+    }, step.timestamp * 1000); // Convert to milliseconds
+    
+    scheduledTimeouts.push(timeout);
   });
-
-  // // Set a timer to stop the sunrise after the duration has elapsed
-  // playbackTimer = setTimeout(
-  //   () => {
-  //     stopSunrise();
-  //   },
-  //   duration * 1000 + 1000
-  // ); // Add a 1-second buffer
 }
 
 /**
@@ -156,35 +171,29 @@ export function stopSunrise() {
 
   isPlaying = false;
 
+  // Clear all scheduled timeouts
+  scheduledTimeouts.forEach(timeout => clearTimeout(timeout));
+  scheduledTimeouts = [];
+
   if (playbackTimer) {
     clearTimeout(playbackTimer);
     playbackTimer = null;
   }
 
   // Reset all LEDs
-  sendLEDToSerial(0, 0, 0, 0, 0, 0, 2000); // SUN_CENTER LED 0
-  sendLEDToSerial(0, 1, 0, 0, 0, 0, 2000); // SUN_CENTER LED 1
-  sendLEDToSerial(1, 0, 0, 0, 0, 0, 2000); // SUN_RING
-  sendLEDToSerial(2, 0, 0, 0, 0, 0, 2000); // LAMP
+  sendLEDToSerial(STRIP_SUN_CENTER, 0, 0, 0, 0, 2000);
+  sendLEDToSerial(STRIP_SUN_CENTER, 1, 0, 0, 0, 2000);
+  sendLEDToSerial(STRIP_LAMP, 0, 0, 0, 0, 2000);
 }
 
 /**
  * Initialize the sunrise controller
  */
 export function initSunriseController() {
-  ipcMain.handle(
-    'start-sunrise',
-    async (_, duration: number, timeline: string = 'default') => {
-      const timelineInfo = sunriseTimelines.find((t) => t.name === timeline);
-      if (!timelineInfo) {
-        console.warn('[sunriseController] timeline not found', timeline);
-        return false;
-      }
-      const timelineData = timelineInfo.timeline as SunriseStep[];
-      startSunrise(timelineData, duration);
-      return true;
-    }
-  );
+  ipcMain.handle('start-sunrise', async (_, duration: number) => {
+    startSunrise(duration);
+    return true;
+  });
 
   ipcMain.handle('stop-sunrise', async () => {
     stopSunrise();
