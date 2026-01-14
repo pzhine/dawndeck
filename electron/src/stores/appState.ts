@@ -93,11 +93,16 @@ const SUNRISE_PRESETS: ColorFavorite[] = [
 
 // Helper function to ensure sunrise presets exist in favorites
 function ensureSunrisePresets(favorites: ColorFavorite[]): ColorFavorite[] {
-  // Filter out any old presets that might have been modified
-  const nonPresets = favorites.filter(fav => !fav.isPreset);
+  // Check if any presets already exist
+  const hasPresets = favorites.some(fav => fav.isPreset);
   
-  // Return presets first, then user favorites
-  return [...SUNRISE_PRESETS, ...nonPresets];
+  // If presets exist, user may have edited them - keep them as-is
+  if (hasPresets) {
+    return favorites;
+  }
+  
+  // If no presets exist, add the defaults at the beginning
+  return [...SUNRISE_PRESETS, ...favorites];
 }
 
 // Pending hardware update queues (max length 1 - only latest values matter)

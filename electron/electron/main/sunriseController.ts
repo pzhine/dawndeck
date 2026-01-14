@@ -165,7 +165,6 @@ export function stopSunrise() {
 
   // Reset all LEDs
   sendLEDToSerial(STRIP_PROJECTOR, 0, 0, 0, 0, 2000);
-  sendLEDToSerial(STRIP_PROJECTOR, 1, 0, 0, 0, 2000);
   sendLEDToSerial(STRIP_LAMP, 0, 0, 0, 0, 2000);
 }
 
