@@ -19,24 +19,31 @@ const STRIP_PROJECTOR = 1;
 function getSunrisePresets(): ColorFavorite[] {
   const state = getState();
   if (!state?.ambienceFavorites) return [];
-  
+
   const presetOrder = ['night', 'first-light', 'dawn', 'sunrise', 'day'];
   const presets: ColorFavorite[] = [];
-  
+
   for (const id of presetOrder) {
-    const preset = state.ambienceFavorites.find(fav => fav.id === id && fav.isPreset);
+    const preset = state.ambienceFavorites.find(
+      (fav) => fav.id === id && fav.isPreset
+    );
     if (preset) {
       presets.push(preset);
     }
   }
-  
+
   return presets;
 }
 
 /**
  * Generate transitions between preset steps
+ * @param duration Total duration in seconds
+ * @param holdPercentage Percentage of each step to hold (0-100). 0% = continuous transitions, 100% = instant transitions
  */
-function generateSunriseSequence(duration: number): Array<{
+function generateSunriseSequence(
+  duration: number,
+  holdPercentage: number = 0
+): Array<{
   timestamp: number;
   lamp: { warmWhite: number; pink: number; orange: number };
   projector: { color0: number; color1: number; color2: number };
@@ -47,33 +54,42 @@ function generateSunriseSequence(duration: number): Array<{
     console.error('[sunriseController] No preset favorites found');
     return [];
   }
-  
+
   const sequence = [];
   const stepDuration = duration / presets.length; // Duration for each step in seconds
-  const transitionDuration = stepDuration * 0.3333; // 33.33% for transitions
-  
-  console.log(`[sunriseController] Generating sequence: ${presets.length} presets, ${stepDuration}s per step, ${transitionDuration}s transitions`);
-  
+  const transitionPercentage = 1 - holdPercentage / 100;
+  const transitionDuration = stepDuration * transitionPercentage; // Configurable transition time
+
+  console.log(
+    `[sunriseController] Generating sequence: ${presets.length} presets, ${stepDuration}s per step, ${transitionDuration}s transitions (${holdPercentage}% hold)`
+  );
+
   for (let i = 0; i < presets.length; i++) {
     const currentPreset = presets[i];
     const stepStartTime = i * stepDuration;
-    
+
     // Apply brightness multiplier to colors
     const lampMultiplier = currentPreset.lamp.brightness / 100;
     const projectorMultiplier = currentPreset.projector.brightness / 100;
-    
+
     const lampColors = {
       warmWhite: Math.round(currentPreset.lamp.colors[0] * lampMultiplier),
       pink: Math.round(currentPreset.lamp.colors[1] * lampMultiplier),
       orange: Math.round(currentPreset.lamp.colors[2] * lampMultiplier),
     };
-    
+
     const projectorColors = {
-      color0: Math.round(currentPreset.projector.colors[0] * projectorMultiplier),
-      color1: Math.round(currentPreset.projector.colors[1] * projectorMultiplier),
-      color2: Math.round(currentPreset.projector.colors[2] * projectorMultiplier),
+      color0: Math.round(
+        currentPreset.projector.colors[0] * projectorMultiplier
+      ),
+      color1: Math.round(
+        currentPreset.projector.colors[1] * projectorMultiplier
+      ),
+      color2: Math.round(
+        currentPreset.projector.colors[2] * projectorMultiplier
+      ),
     };
-    
+
     // Transition into this step (from previous step)
     // This happens at the start of the step
     sequence.push({
@@ -82,28 +98,35 @@ function generateSunriseSequence(duration: number): Array<{
       projector: projectorColors,
       transitionDuration: transitionDuration * 1000, // Convert to ms
     });
-    
-    console.log(`[sunriseController] Step ${i} (${currentPreset.name}) at ${stepStartTime.toFixed(2)}s, transition ${transitionDuration.toFixed(2)}s`);
+
+    console.log(
+      `[sunriseController] Step ${i} (${currentPreset.name}) at ${stepStartTime.toFixed(2)}s, transition ${transitionDuration.toFixed(2)}s`
+    );
   }
-  
+
   return sequence;
 }
 
 /**
  * Start playing back the sunrise sequence
  * @param duration The total duration in seconds
+ * @param holdPercentage Percentage of each step to hold (0-100). 0% = continuous transitions, 100% = instant transitions
  */
-export function startSunrise(duration: number) {
+export function startSunrise(duration: number, holdPercentage: number = 66.67) {
   if (isPlaying) {
     stopSunrise();
   }
 
-  console.log(`[sunriseController] Starting sunrise, ${duration} seconds`);
+  console.log(
+    `[sunriseController] Starting sunrise, ${duration} seconds, ${holdPercentage}% hold`
+  );
 
-  const sequence = generateSunriseSequence(duration);
-  
+  const sequence = generateSunriseSequence(duration, holdPercentage);
+
   if (sequence.length === 0) {
-    console.error('[sunriseController] Cannot start sunrise: No sequence generated');
+    console.error(
+      '[sunriseController] Cannot start sunrise: No sequence generated'
+    );
     return;
   }
 
@@ -116,8 +139,10 @@ export function startSunrise(duration: number) {
   sequence.forEach((step) => {
     const timeout = setTimeout(() => {
       if (isPlaying) {
-        console.log(`[sunriseController] Applying colors: Lamp(${step.lamp.warmWhite}, ${step.lamp.pink}, ${step.lamp.orange}), Projector(${step.projector.color0}, ${step.projector.color1}, ${step.projector.color2}), Duration: ${step.transitionDuration}ms`);
-        
+        console.log(
+          `[sunriseController] Applying colors: Lamp(${step.lamp.warmWhite}, ${step.lamp.pink}, ${step.lamp.orange}), Projector(${step.projector.color0}, ${step.projector.color1}, ${step.projector.color2}), Duration: ${step.transitionDuration}ms`
+        );
+
         // Send lamp colors
         sendLEDToSerial(
           STRIP_LAMP,
@@ -127,7 +152,7 @@ export function startSunrise(duration: number) {
           step.lamp.pink,
           step.transitionDuration
         );
-        
+
         // Send projector colors (note: colors are reordered to match hardware mapping)
         sendLEDToSerial(
           STRIP_PROJECTOR,
@@ -139,7 +164,7 @@ export function startSunrise(duration: number) {
         );
       }
     }, step.timestamp * 1000); // Convert to milliseconds
-    
+
     scheduledTimeouts.push(timeout);
   });
 }
@@ -151,14 +176,14 @@ export function stopSunrise() {
   console.log('[sunriseController] Stopping sunrise');
 
   // Immediately reset LEDs before any other cleanup
-  sendLEDToSerial(STRIP_PROJECTOR, 0, 0, 0, 0, 0);
-  sendLEDToSerial(STRIP_LAMP, 0, 0, 0, 0, 0);
+  sendLEDToSerial(STRIP_PROJECTOR, 0, 0, 0, 0, 2000);
+  sendLEDToSerial(STRIP_LAMP, 0, 0, 0, 0, 2000);
 
   // Set flag to prevent any further playback
   isPlaying = false;
 
   // Clear all scheduled timeouts
-  scheduledTimeouts.forEach(timeout => {
+  scheduledTimeouts.forEach((timeout) => {
     try {
       clearTimeout(timeout);
     } catch (e) {
@@ -183,10 +208,13 @@ export function stopSunrise() {
  * Initialize the sunrise controller
  */
 export function initSunriseController() {
-  ipcMain.handle('start-sunrise', async (_, duration: number) => {
-    startSunrise(duration);
-    return true;
-  });
+  ipcMain.handle(
+    'start-sunrise',
+    async (_, duration: number, holdPercentage?: number) => {
+      startSunrise(duration, holdPercentage);
+      return true;
+    }
+  );
 
   ipcMain.handle('stop-sunrise', async () => {
     stopSunrise();
