@@ -42,7 +42,7 @@ function getSunrisePresets(): ColorFavorite[] {
  */
 function generateSunriseSequence(
   duration: number,
-  holdPercentage: number = 0
+  holdPercentage: number
 ): Array<{
   timestamp: number;
   lamp: { warmWhite: number; pink: number; orange: number };
@@ -112,7 +112,7 @@ function generateSunriseSequence(
  * @param duration The total duration in seconds
  * @param holdPercentage Percentage of each step to hold (0-100). 0% = continuous transitions, 100% = instant transitions
  */
-export function startSunrise(duration: number, holdPercentage: number = 66.67) {
+export function startSunrise(duration: number, holdPercentage: number = 0) {
   if (isPlaying) {
     stopSunrise();
   }
