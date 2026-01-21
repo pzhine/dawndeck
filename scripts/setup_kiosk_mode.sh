@@ -159,6 +159,13 @@ configure_quiet_boot() {
     # Backup cmdline
     cp "$cmdline_file" "${cmdline_file}.backup-$(date +%Y%m%d_%H%M%S)"
     
+    # If cmdline.txt is empty, populate it with current kernel parameters
+    if [ ! -s "$cmdline_file" ]; then
+        log_info "cmdline.txt is empty, populating from current kernel parameters..."
+        cat /proc/cmdline > "$cmdline_file"
+        log_info "Populated cmdline.txt with current boot parameters"
+    fi
+    
     # Check if quiet boot is already configured
     if grep -q "quiet" "$cmdline_file"; then
         log_info "Quiet boot already configured"
@@ -167,11 +174,10 @@ configure_quiet_boot() {
     
     # Add quiet boot parameters
     # quiet - suppress most kernel messages
-    # splash - show splash screen
-    # loglevel=3 - only show errors
+    # loglevel=0 - only critical messages
     # logo.nologo - hide Raspberry Pi logos
     # vt.global_cursor_default=0 - hide cursor
-    sed -i '$ s/$/ quiet splash loglevel=3 logo.nologo vt.global_cursor_default=0/' "$cmdline_file"
+    sed -i '$ s/$/ quiet loglevel=0 logo.nologo vt.global_cursor_default=0/' "$cmdline_file"
     
     log_info "Quiet boot configured"
 }
@@ -378,9 +384,9 @@ configure_bash_profile() {
     cat > "$BASH_PROFILE" << 'EOF'
 # Start X session on tty1 login
 if [[ -z $DISPLAY ]] && [[ $(tty) = /dev/tty1 ]]; then
-    echo "Starting X session for Sunrise Alarm..."
-    # Start X with explicit framebuffer settings for proper resolution
-    exec startx "$HOME/.xinitrc" -- -dpi 96
+    # Redirect all output to log file for silent boot
+    exec > "$HOME/x-startup.log" 2>&1
+    exec startx "$HOME/.xinitrc" -- -dpi 96 -quiet
 fi
 EOF
     
