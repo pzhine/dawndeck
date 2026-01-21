@@ -12,8 +12,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import RoundScrollContainer from '../components/RoundScrollContainer.vue';
-import { ListItem } from '../components/InteractiveList.vue';
+import RoundScrollContainer, { ListItem } from '../components/RoundScrollContainer.vue';
 
 const router = useRouter();
 const wifiNetworks = ref<string[]>([]);

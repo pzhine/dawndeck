@@ -42,11 +42,6 @@ const routes = [
     component: () => import('./pages/BluetoothPairing.vue'),
   },
   {
-    path: '/sounds/countries/:searchPhrase/:categoryName',
-    name: 'SoundCountries',
-    component: () => import('./pages/SoundCountries.vue'),
-  },
-  {
     path: '/sounds/list/:searchPhrase/:categoryName',
     name: 'SoundsList',
     component: () => import('./pages/SoundsList.vue'),
@@ -55,11 +50,6 @@ const routes = [
     path: '/sounds/player/:id?/:name?/:previewUrl?/:duration?/:currentTime?/:category?/:country?',
     name: 'SoundPlayer',
     component: () => import('./pages/SoundPlayer.vue'),
-  },
-  {
-    path: '/sounds/player-menu/:id?/:name?/:previewUrl?/:duration?/:currentTime?/:totalTime?/:category?/:country?',
-    name: 'SoundPlayerMenu',
-    component: () => import('./pages/SoundPlayerMenu.vue'),
   },
   {
     path: '/alarm',
@@ -85,11 +75,6 @@ const routes = [
     path: '/sunriseSettings',
     name: 'SunriseSettings',
     component: () => import('./pages/SunriseSettings.vue'),
-  },
-  {
-    path: '/sunrise-sounds',
-    name: 'SunriseSounds',
-    component: () => import('./pages/SunriseSounds.vue'),
   },
   {
     path: '/sunrise-player',
