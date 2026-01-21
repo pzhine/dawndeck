@@ -251,10 +251,10 @@ async function createWindow() {
           fullscreen: shouldBeFullscreen,
         }
       : {
-          // Production settings
-          fullscreen: shouldBeFullscreen,
-          width: shouldBeFullscreen ? undefined : 1025,
-          height: shouldBeFullscreen ? undefined : 1025,
+          // Production settings - hardcoded for Waveshare 3.4" DSI (800x800)
+          width: 800,
+          height: 800,
+          fullscreen: true,
           title: 'Sunrise Alarm',
           autoHideMenuBar: true,
         }),
