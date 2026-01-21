@@ -145,6 +145,37 @@ install_packages() {
     log_info "Packages installed successfully"
 }
 
+# Function to configure quiet boot
+configure_quiet_boot() {
+    log_info "Configuring quiet boot..."
+    
+    local cmdline_file="/boot/firmware/cmdline.txt"
+    
+    if [ ! -f "$cmdline_file" ]; then
+        log_warn "Boot cmdline not found at $cmdline_file - skipping quiet boot"
+        return 0
+    fi
+    
+    # Backup cmdline
+    cp "$cmdline_file" "${cmdline_file}.backup-$(date +%Y%m%d_%H%M%S)"
+    
+    # Check if quiet boot is already configured
+    if grep -q "quiet" "$cmdline_file"; then
+        log_info "Quiet boot already configured"
+        return 0
+    fi
+    
+    # Add quiet boot parameters
+    # quiet - suppress most kernel messages
+    # splash - show splash screen
+    # loglevel=3 - only show errors
+    # logo.nologo - hide Raspberry Pi logos
+    # vt.global_cursor_default=0 - hide cursor
+    sed -i '$ s/$/ quiet splash loglevel=3 logo.nologo vt.global_cursor_default=0/' "$cmdline_file"
+    
+    log_info "Quiet boot configured"
+}
+
 # Function to configure auto-login
 configure_autologin() {
     log_info "Configuring auto-login for $TARGET_USER..."
@@ -198,32 +229,35 @@ create_xsession_script() {
 
 LOG_FILE="$HOME/sunrise-alarm-kiosk.log"
 
-# Function to log messages
+# Function to log messages (silently, only to file)
 log_message() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
 }
 
 log_message "=== Starting Sunrise Alarm Kiosk Mode ==="
 log_message "User: $(whoami)"
 log_message "Display: $DISPLAY"
 
+# Set black background immediately
+xsetroot -solid black 2>/dev/null
+
 # Disable screen blanking and power saving
 log_message "Disabling screen blanking..."
-xset s off
-xset s noblank
-xset -dpms
+xset s off 2>/dev/null
+xset s noblank 2>/dev/null
+xset -dpms 2>/dev/null
 
 # Hide mouse cursor after 2 seconds of inactivity
 log_message "Starting unclutter..."
-unclutter -idle 2 -root &
+unclutter -idle 2 -root >/dev/null 2>&1 &
 
 # Set X server to allow connections from localhost (for PulseAudio, etc.)
-xhost +local: 2>&1 | tee -a "$LOG_FILE"
+xhost +local: >> "$LOG_FILE" 2>&1
 
 # Start D-Bus session if not already running
 if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
     log_message "Starting D-Bus session..."
-    eval $(dbus-launch --sh-syntax)
+    eval $(dbus-launch --sh-syntax) 2>/dev/null
     export DBUS_SESSION_BUS_ADDRESS
 fi
 
@@ -234,7 +268,7 @@ if command -v xrandr &> /dev/null; then
     sleep 1
     
     log_message "Current xrandr output:"
-    xrandr 2>&1 | tee -a "$LOG_FILE"
+    xrandr >> "$LOG_FILE" 2>&1
     
     # Find DSI output
     DSI_OUTPUT=$(xrandr --query 2>/dev/null | grep -E "^DSI-[0-9]+ connected" | awk '{print $1}' | head -1)
@@ -243,19 +277,19 @@ if command -v xrandr &> /dev/null; then
         log_message "Found DSI output: $DSI_OUTPUT"
         
         # Get current mode
-        CURRENT_MODE=$(xrandr | grep "$DSI_OUTPUT" -A1 | grep -E "^\s+[0-9]+x[0-9]+" | grep "\*" | awk '{print $1}')
+        CURRENT_MODE=$(xrandr 2>/dev/null | grep "$DSI_OUTPUT" -A1 | grep -E "^\s+[0-9]+x[0-9]+" | grep "\*" | awk '{print $1}')
         log_message "Current mode: $CURRENT_MODE"
         
         # Check if 800x800 mode is available
-        if xrandr | grep -A20 "$DSI_OUTPUT" | grep -q " 800x800"; then
+        if xrandr 2>/dev/null | grep -A20 "$DSI_OUTPUT" | grep -q " 800x800"; then
             log_message "800x800 mode is available, setting it..."
-            xrandr --output "$DSI_OUTPUT" --mode 800x800 2>&1 | tee -a "$LOG_FILE"
+            xrandr --output "$DSI_OUTPUT" --mode 800x800 >> "$LOG_FILE" 2>&1
         else
             log_message "800x800 mode not found in available modes"
         fi
         
         log_message "Final xrandr output:"
-        xrandr 2>&1 | tee -a "$LOG_FILE"
+        xrandr >> "$LOG_FILE" 2>&1
     else
         log_message "⚠ No DSI output found, display may use default resolution"
     fi
@@ -264,21 +298,21 @@ else
 fi
 
 # Start PulseAudio if not already running
-if ! pgrep -x pulseaudio > /dev/null; then
+if ! pgrep -x pulseaudio > /dev/null 2>&1; then
     log_message "Starting PulseAudio..."
-    pulseaudio --start --log-target=syslog 2>&1 | tee -a "$LOG_FILE"
+    pulseaudio --start --log-target=syslog >> "$LOG_FILE" 2>&1
 fi
 
 # Ensure Bluetooth service is running
-if ! systemctl is-active --quiet bluetooth.service; then
+if ! systemctl is-active --quiet bluetooth.service 2>/dev/null; then
     log_message "Starting Bluetooth service..."
-    sudo systemctl start bluetooth.service 2>&1 | tee -a "$LOG_FILE" || log_message "Could not start Bluetooth (may not be configured)"
+    sudo systemctl start bluetooth.service >> "$LOG_FILE" 2>&1 || log_message "Could not start Bluetooth (may not be configured)"
 fi
 
 # Start EasyEffects for DSP processing (run as background service)
 if command -v easyeffects &> /dev/null; then
     log_message "Starting EasyEffects DSP..."
-    easyeffects --gapplication-service &
+    easyeffects --gapplication-service >> "$LOG_FILE" 2>&1 &
     sleep 2
 else
     log_message "EasyEffects not installed - no DSP processing"
@@ -309,7 +343,7 @@ export ELECTRON_DISABLE_SANDBOX=1
 # Run Electron app and restart it if it crashes
 while true; do
     log_message "Launching Electron app..."
-    "$ELECTRON_BINARY" 2>&1 | tee -a "$LOG_FILE"
+    "$ELECTRON_BINARY" >> "$LOG_FILE" 2>&1
     EXIT_CODE=$?
     log_message "Electron app exited with code: $EXIT_CODE"
     
@@ -505,6 +539,7 @@ main() {
     check_root
     validate_setup
     install_packages
+    configure_quiet_boot
     configure_autologin
     configure_easyeffects
     create_xsession_script
