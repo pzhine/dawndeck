@@ -167,17 +167,25 @@ configure_quiet_boot() {
     fi
     
     # Check if quiet boot is already configured
-    if grep -q "quiet" "$cmdline_file"; then
+    if grep -q "quiet" "$cmdline_file" && ! grep -q "console=tty1" "$cmdline_file"; then
         log_info "Quiet boot already configured"
         return 0
     fi
     
-    # Add quiet boot parameters
-    # quiet - suppress most kernel messages
-    # loglevel=0 - only critical messages
-    # logo.nologo - hide Raspberry Pi logos
-    # vt.global_cursor_default=0 - hide cursor
-    sed -i '$ s/$/ quiet loglevel=0 logo.nologo vt.global_cursor_default=0/' "$cmdline_file"
+    # Remove console=tty1 to prevent kernel messages on display
+    # Keep serial console for debugging via UART if needed
+    log_info "Removing console=tty1 to silence display output..."
+    sed -i 's/console=tty1 //g' "$cmdline_file"
+    sed -i 's/ console=tty1//g' "$cmdline_file"
+    
+    # Add quiet boot parameters if not already present
+    if ! grep -q "quiet" "$cmdline_file"; then
+        # quiet - suppress most kernel messages
+        # loglevel=0 - only critical messages
+        # logo.nologo - hide Raspberry Pi logos
+        # vt.global_cursor_default=0 - hide cursor
+        sed -i '$ s/$/ quiet loglevel=0 logo.nologo vt.global_cursor_default=0/' "$cmdline_file"
+    fi
     
     log_info "Quiet boot configured"
 }
