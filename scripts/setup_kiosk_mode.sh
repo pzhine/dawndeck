@@ -233,22 +233,29 @@ if command -v xrandr &> /dev/null; then
     # Wait for display to be ready
     sleep 1
     
+    log_message "Current xrandr output:"
+    xrandr 2>&1 | tee -a "$LOG_FILE"
+    
     # Find DSI output
-    DSI_OUTPUT=$(xrandr --query 2>/dev/null | grep -E "^DSI-[0-9]+" | awk '{print $1}' | head -1)
+    DSI_OUTPUT=$(xrandr --query 2>/dev/null | grep -E "^DSI-[0-9]+ connected" | awk '{print $1}' | head -1)
     
     if [ -n "$DSI_OUTPUT" ]; then
         log_message "Found DSI output: $DSI_OUTPUT"
         
-        # Try to set 800x800 resolution
-        if xrandr --output "$DSI_OUTPUT" --mode 800x800 2>&1 | tee -a "$LOG_FILE"; then
-            log_message "✓ Set display to 800x800"
+        # Get current mode
+        CURRENT_MODE=$(xrandr | grep "$DSI_OUTPUT" -A1 | grep -E "^\s+[0-9]+x[0-9]+" | grep "\*" | awk '{print $1}')
+        log_message "Current mode: $CURRENT_MODE"
+        
+        # Check if 800x800 mode is available
+        if xrandr | grep -A20 "$DSI_OUTPUT" | grep -q " 800x800"; then
+            log_message "800x800 mode is available, setting it..."
+            xrandr --output "$DSI_OUTPUT" --mode 800x800 2>&1 | tee -a "$LOG_FILE"
         else
-            log_message "⚠ Could not set 800x800, trying to add custom mode..."
-            # Add custom 800x800 mode if it doesn't exist
-            xrandr --newmode "800x800_60.00" 54.16 800 840 920 1040 800 801 804 823 -hsync +vsync 2>&1 | tee -a "$LOG_FILE" || true
-            xrandr --addmode "$DSI_OUTPUT" 800x800_60.00 2>&1 | tee -a "$LOG_FILE" || true
-            xrandr --output "$DSI_OUTPUT" --mode 800x800_60.00 2>&1 | tee -a "$LOG_FILE" || log_message "⚠ Could not configure custom mode"
+            log_message "800x800 mode not found in available modes"
         fi
+        
+        log_message "Final xrandr output:"
+        xrandr 2>&1 | tee -a "$LOG_FILE"
     else
         log_message "⚠ No DSI output found, display may use default resolution"
     fi
@@ -338,7 +345,8 @@ configure_bash_profile() {
 # Start X session on tty1 login
 if [[ -z $DISPLAY ]] && [[ $(tty) = /dev/tty1 ]]; then
     echo "Starting X session for Sunrise Alarm..."
-    exec startx "$HOME/.xinitrc" -- -nocursor
+    # Start X with explicit framebuffer settings for proper resolution
+    exec startx "$HOME/.xinitrc" -- -dpi 96
 fi
 EOF
     
