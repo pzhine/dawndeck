@@ -227,6 +227,35 @@ if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
     export DBUS_SESSION_BUS_ADDRESS
 fi
 
+# Configure display resolution for Waveshare 3.4" DSI (800x800)
+log_message "Configuring display resolution..."
+if command -v xrandr &> /dev/null; then
+    # Wait for display to be ready
+    sleep 1
+    
+    # Find DSI output
+    DSI_OUTPUT=$(xrandr --query 2>/dev/null | grep -E "^DSI-[0-9]+" | awk '{print $1}' | head -1)
+    
+    if [ -n "$DSI_OUTPUT" ]; then
+        log_message "Found DSI output: $DSI_OUTPUT"
+        
+        # Try to set 800x800 resolution
+        if xrandr --output "$DSI_OUTPUT" --mode 800x800 2>&1 | tee -a "$LOG_FILE"; then
+            log_message "✓ Set display to 800x800"
+        else
+            log_message "⚠ Could not set 800x800, trying to add custom mode..."
+            # Add custom 800x800 mode if it doesn't exist
+            xrandr --newmode "800x800_60.00" 54.16 800 840 920 1040 800 801 804 823 -hsync +vsync 2>&1 | tee -a "$LOG_FILE" || true
+            xrandr --addmode "$DSI_OUTPUT" 800x800_60.00 2>&1 | tee -a "$LOG_FILE" || true
+            xrandr --output "$DSI_OUTPUT" --mode 800x800_60.00 2>&1 | tee -a "$LOG_FILE" || log_message "⚠ Could not configure custom mode"
+        fi
+    else
+        log_message "⚠ No DSI output found, display may use default resolution"
+    fi
+else
+    log_message "⚠ xrandr not available"
+fi
+
 # Start PulseAudio if not already running
 if ! pgrep -x pulseaudio > /dev/null; then
     log_message "Starting PulseAudio..."
