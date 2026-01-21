@@ -1,4 +1,12 @@
-import { app, BrowserWindow, shell, ipcMain, dialog, Menu, screen } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  shell,
+  ipcMain,
+  dialog,
+  Menu,
+  screen,
+} from 'electron';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -221,14 +229,16 @@ const indexHtml = path.join(RENDERER_DIST, 'index.html');
 async function createWindow() {
   // Get primary display dimensions
   const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
-  
+  // Use bounds.width/height instead of workAreaSize to get full screen dimensions
+  // workAreaSize excludes taskbars/panels which may cause issues in kiosk mode
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+
   // Determine if we should use fullscreen based on screen width
   const shouldBeFullscreen = screenWidth <= 1024;
-  
+
   console.log(`Screen dimensions: ${screenWidth}x${screenHeight}`);
   console.log(`Fullscreen mode: ${shouldBeFullscreen}`);
-  
+
   win = new BrowserWindow({
     // Different window settings for dev and production
     ...(VITE_DEV_SERVER_URL
@@ -287,7 +297,7 @@ async function createWindow() {
     return { action: 'deny' };
   });
   // win.webContents.on('will-navigate', (event, url) => { }) #344
-  
+
   // Initialize Bluetooth services
   initializeBluetoothServices(win);
 }
@@ -354,11 +364,11 @@ async function initializeApp() {
   initVolumeControl();
   initAutoUpdater();
   initSunriseController();
-  
+
   // Initialize Bluetooth Media Service early to detect connections
   bluetoothMediaService = new BluetoothMediaService();
   setupBluetoothMediaEventListeners();
-  
+
   createApplicationMenu();
 }
 
@@ -442,12 +452,12 @@ ipcMain.handle('get-sounds-by-country', async (_, query) => {
 ipcMain.handle('get-country-sounds', async (_, { query, country }) => {
   try {
     const countrySounds = await groupSoundsByCountryWithCache(query);
-    
+
     // If country is 'all', return all sounds from all countries
     if (country === 'all') {
       return Object.values(countrySounds).flat();
     }
-    
+
     return countrySounds[country] || [];
   } catch (error) {
     console.error('Error in get-country-sounds IPC handler:', error);
@@ -462,44 +472,54 @@ let bluetoothPairingService: any = null;
 // Helper function to set up bluetooth media service event listeners
 function setupBluetoothMediaEventListeners() {
   if (!bluetoothMediaService) return;
-  
+
   // Forward metadata updates to renderer
   bluetoothMediaService.on('metadataUpdated', (metadata) => {
     if (win && !win.isDestroyed()) {
       win.webContents.send('bluetooth-media:metadata-update', metadata);
     }
   });
-  
+
   // Handle BT playback starting - stop global sound and navigate
   bluetoothMediaService.on('statusChanged', (status) => {
     console.log('[Main] BT status changed event received:', status);
     if (status === 'playing' && win && !win.isDestroyed()) {
-      console.log('[Main] Status is playing, sending bluetooth-media:playback-started to renderer');
+      console.log(
+        '[Main] Status is playing, sending bluetooth-media:playback-started to renderer'
+      );
       win.webContents.send('bluetooth-media:playback-started');
     }
   });
-  
+
   // Also handle track changes - if we get a real track (not "No device connected" or "Not Provided"), treat as playback starting
   bluetoothMediaService.on('trackChanged', (metadata) => {
     console.log('[Main] BT track changed event received:', metadata);
     // Check if this is a real track (not placeholder text) and status is playing
-    if (metadata.title && 
-        metadata.title !== 'No device connected' && 
-        win && !win.isDestroyed()) {
-      console.log('[Main] Real track detected with playing status, sending bluetooth-media:playback-started to renderer');
+    if (
+      metadata.title &&
+      metadata.title !== 'No device connected' &&
+      win &&
+      !win.isDestroyed()
+    ) {
+      console.log(
+        '[Main] Real track detected with playing status, sending bluetooth-media:playback-started to renderer'
+      );
       win.webContents.send('bluetooth-media:playback-started');
     }
   });
-  
+
   bluetoothMediaService.on('connected', () => {
     if (win && !win.isDestroyed()) {
       win.webContents.send('bluetooth-media:connection-changed', 'connected');
     }
   });
-  
+
   bluetoothMediaService.on('disconnected', () => {
     if (win && !win.isDestroyed()) {
-      win.webContents.send('bluetooth-media:connection-changed', 'disconnected');
+      win.webContents.send(
+        'bluetooth-media:connection-changed',
+        'disconnected'
+      );
     }
   });
 }
@@ -511,7 +531,7 @@ ipcMain.handle('bluetooth-media:send-command', async (_, command: string) => {
       bluetoothMediaService = new BluetoothMediaService();
       setupBluetoothMediaEventListeners();
     }
-    
+
     return await bluetoothMediaService.sendMediaCommand(command);
   } catch (error) {
     console.error('Error in bluetooth-media:send-command IPC handler:', error);
@@ -525,19 +545,19 @@ ipcMain.handle('bluetooth-media:get-metadata', async () => {
       bluetoothMediaService = new BluetoothMediaService();
       setupBluetoothMediaEventListeners();
     }
-    
+
     const metadata = await bluetoothMediaService.getMetadata();
-    return { 
-      success: true, 
+    return {
+      success: true,
       metadata,
-      connectionState: bluetoothMediaService.getConnectionState()
+      connectionState: bluetoothMediaService.getConnectionState(),
     };
   } catch (error) {
     console.error('Error in bluetooth-media:get-metadata IPC handler:', error);
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: error.message,
-      connectionState: 'disconnected' 
+      connectionState: 'disconnected',
     };
   }
 });
@@ -546,7 +566,7 @@ ipcMain.handle('bluetooth-media:get-metadata', async () => {
 function initializeBluetoothServices(mainWindow: BrowserWindow) {
   // Setup pairing handlers
   bluetoothPairingService = setupBluetoothPairingHandlers(mainWindow);
-  
+
   // Note: Sound notifications are now handled in the Vue frontend via BluetoothNotifications.vue
 }
 
@@ -565,17 +585,19 @@ ipcMain.handle('set-screen-brightness', async (_, brightness: number) => {
       console.log('Screen brightness control only supported on Linux');
       return { success: false, error: 'Platform not supported' };
     }
-    
+
     // Convert 0-100 range to 0-255
     const brightnessValue = Math.round((brightness / 100) * 255);
-    
+
     // Use the command from the docs: echo X | sudo tee /sys/class/backlight/*/brightness
     const execAsync = promisify(exec);
     const command = `echo ${brightnessValue} | sudo tee /sys/class/backlight/*/brightness`;
-    
+
     await execAsync(command);
-    console.log(`Screen brightness set to ${brightness}% (${brightnessValue}/255)`);
-    
+    console.log(
+      `Screen brightness set to ${brightness}% (${brightnessValue}/255)`
+    );
+
     return { success: true };
   } catch (error) {
     console.error('Failed to set screen brightness:', error);
@@ -609,14 +631,16 @@ function createApplicationMenu() {
       label: 'Advanced',
       submenu: [
         {
-          label: bluetoothMediaService?.isSimulationActive() ? 'Stop Mock Bluetooth Playback' : 'Start Mock Bluetooth Playback',
+          label: bluetoothMediaService?.isSimulationActive()
+            ? 'Stop Mock Bluetooth Playback'
+            : 'Start Mock Bluetooth Playback',
           accelerator: 'CmdOrCtrl+Shift+B',
           click: async () => {
             if (!bluetoothMediaService) {
               bluetoothMediaService = new BluetoothMediaService();
               setupBluetoothMediaEventListeners();
             }
-            
+
             if (bluetoothMediaService.isSimulationActive()) {
               bluetoothMediaService.stopSimulation();
               console.log('🛑 Mock Bluetooth playback stopped');
