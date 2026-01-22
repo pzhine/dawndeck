@@ -189,21 +189,23 @@ configure_quiet_boot() {
     # rd.udev.log_level=3 - hide udev messages
     
     # First remove any existing partial config to ensure clean slate
-    sed -i 's/ quiet//g' "$cmdline_file"
-    sed -i 's/ splash//g' "$cmdline_file"
-    sed -i 's/ logo.nologo//g' "$cmdline_file"
-    sed -i 's/ vt.global_cursor_default=0//g' "$cmdline_file"
-    sed -i 's/ loglevel=[0-9]*//g' "$cmdline_file"
-    sed -i 's/ plymouth.ignore-serial-consoles//g' "$cmdline_file"
-    sed -i 's/ systemd.show_status=false//g' "$cmdline_file"
-    sed -i 's/ rd.udev.log_level=3//g' "$cmdline_file"
+    # Use robust regex to handle spacing
+    sed -i 's/[[:space:]]*quiet//g' "$cmdline_file"
+    sed -i 's/[[:space:]]*splash//g' "$cmdline_file"
+    sed -i 's/[[:space:]]*logo.nologo//g' "$cmdline_file"
+    sed -i 's/[[:space:]]*vt.global_cursor_default=0//g' "$cmdline_file"
+    sed -i 's/[[:space:]]*loglevel=[0-9]*//g' "$cmdline_file"
+    sed -i 's/[[:space:]]*plymouth.ignore-serial-consoles//g' "$cmdline_file"
+    sed -i 's/[[:space:]]*systemd.show_status=false//g' "$cmdline_file"
+    sed -i 's/[[:space:]]*rd.udev.log_level=3//g' "$cmdline_file"
+    sed -i 's/[[:space:]]*plymouth.enable=0//g' "$cmdline_file"
 
     
     # Append full silent configuration
-    # Note: Removed 'splash' as it can sometimes cause the logo to appear via Plymouth
-    sed -i '$ s/$/ quiet logo.nologo vt.global_cursor_default=0 systemd.show_status=false rd.udev.log_level=3/' "$cmdline_file"
+    # Note: explicit plymouth.enable=0 to prevent any splash screen
+    sed -i '$ s/$/ quiet logo.nologo vt.global_cursor_default=0 systemd.show_status=false rd.udev.log_level=3 plymouth.enable=0/' "$cmdline_file"
     
-    log_info "Silent boot configured (console redirected to tty3)"
+    log_info "Silent boot configured (console redirected to tty3, plymouth disabled)"
 }
 
 # Function to configure config.txt

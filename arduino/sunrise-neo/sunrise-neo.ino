@@ -65,7 +65,31 @@ struct LedTransition {
 LedTransition ledTransitions[MAX_TRANSITIONS];
 unsigned long lastTransitionCheck = 0;
 
+// Startup pulse mode state
+bool startupMode = true;
+unsigned long nextPulseTime[CHANNEL_COUNT] = {0, 0, 0};
+int pulseTarget[CHANNEL_COUNT] = {0, 0, 0};
+unsigned long pulseDuration[CHANNEL_COUNT] = {0, 0, 0};
+
+// Configurable pulse timing ranges (in milliseconds)
+#define PULSE_FREQ_MIN 2000   // Min time between pulses
+#define PULSE_FREQ_MAX 5000   // Max time between pulses
+#define PULSE_DURATION_MIN 1500  // Min duration of a pulse
+#define PULSE_DURATION_MAX 3500  // Max duration of a pulse
+#define PULSE_BRIGHTNESS_MIN 20  // Min brightness for pulse
+#define PULSE_BRIGHTNESS_MAX 80  // Max brightness for pulse
+
 void handleSerialCommand() {
+  // Exit startup mode on first command
+  if (startupMode) {
+    startupMode = false;
+    // Clear all transitions and set lamp to off
+    for (int i = 0; i < MAX_TRANSITIONS; i++) {
+      ledTransitions[i].active = false;
+    }
+    lamp.clear();
+    lamp.show();
+  }
   if (strcmp(inputParams[0], "TEST") == 0) {
     digitalWrite(LED_BUILTIN, testIsHigh ? LOW : HIGH);
     testIsHigh = !testIsHigh;
@@ -111,6 +135,14 @@ void setup() {
   spot.setBrightness(DEFAULT_BRIGHTNESS);
   spot.clear();
   spot.show();
+  
+  // Initialize random seed using analog noise
+  randomSeed(analogRead(0));
+  
+  // Initialize first pulse times for startup mode
+  for (int channel = 0; channel < CHANNEL_COUNT; channel++) {
+    nextPulseTime[channel] = millis() + random(PULSE_FREQ_MIN, PULSE_FREQ_MAX);
+  }
 }
 
 void readSerialInput() {
@@ -353,9 +385,76 @@ void updateLedTransitions() {
   }
 }
 
+// Startup pulse animation - pulses each channel independently with random timing
+void updateStartupPulse() {
+  if (!startupMode) {
+    return;
+  }
+  
+  unsigned long currentTime = millis();
+  
+  // Check each channel for pulse timing
+  for (int channel = 0; channel < CHANNEL_COUNT; channel++) {
+    if (currentTime >= nextPulseTime[channel]) {
+      // Time to start a new pulse for this channel
+      
+      // Determine target brightness for this pulse
+      int targetBrightness = random(PULSE_BRIGHTNESS_MIN, PULSE_BRIGHTNESS_MAX + 1);
+      
+      // Determine duration for this pulse
+      unsigned long duration = random(PULSE_DURATION_MIN, PULSE_DURATION_MAX + 1);
+      
+      // Start the pulse (fade up)
+      int r = -1, g = -1, b = -1;
+      if (channel == CHANNEL_R) r = targetBrightness;
+      if (channel == CHANNEL_G) g = targetBrightness;
+      if (channel == CHANNEL_B) b = targetBrightness;
+      
+      lerpLedTo(STRIP_LAMP, 0, r, g, b, duration / 2);
+      
+      // Store values for the fade down
+      pulseTarget[channel] = targetBrightness;
+      pulseDuration[channel] = duration;
+      
+      // Schedule next pulse for this channel
+      nextPulseTime[channel] = currentTime + duration + random(PULSE_FREQ_MIN, PULSE_FREQ_MAX + 1);
+    }
+    
+    // Check if we need to fade down (halfway through pulse duration)
+    // We check by looking at the transition state
+    bool channelTransitionActive = false;
+    for (int i = 0; i < MAX_TRANSITIONS; i++) {
+      if (ledTransitions[i].active && 
+          ledTransitions[i].stripId == STRIP_LAMP &&
+          ledTransitions[i].pixel == 0 &&
+          ledTransitions[i].channelId == channel) {
+        channelTransitionActive = true;
+        break;
+      }
+    }
+    
+    // If no active transition and we have a stored target, start fade down
+    if (!channelTransitionActive && pulseTarget[channel] > 0 && 
+        currentTime >= (nextPulseTime[channel] - random(PULSE_FREQ_MIN, PULSE_FREQ_MAX + 1) - pulseDuration[channel] / 2)) {
+      int r = -1, g = -1, b = -1;
+      if (channel == CHANNEL_R) r = 0;
+      if (channel == CHANNEL_G) g = 0;
+      if (channel == CHANNEL_B) b = 0;
+      
+      lerpLedTo(STRIP_LAMP, 0, r, g, b, pulseDuration[channel] / 2);
+      pulseTarget[channel] = 0; // Clear the target
+    }
+  }
+}
+
 // Main loop
 void loop() {
   readAndHandleSerialCommands();
+  
+  // Update startup pulse animation if in startup mode
+  if (startupMode) {
+    updateStartupPulse();
+  }
   
   // Update LED transitions at most every 16ms (approx. 60fps)
   unsigned long currentTime = millis();
