@@ -2,7 +2,7 @@
 
 # Script to configure Raspberry Pi OS Bookworm to boot into X session
 # running only the Sunrise Alarm Electron app (kiosk mode)
-# Usage: sudo ./setup_kiosk_mode.sh [username]
+# Usage: sudo ./setup_kiosk_mode.sh [username] [--nologo]
 
 set -e
 
@@ -11,8 +11,28 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ELECTRON_PROD_DIR="$PROJECT_ROOT/electron/release/linux-arm64-unpacked"
 
-# Get the user to configure (either passed as argument or the user who ran sudo)
-TARGET_USER="${1:-${SUDO_USER:-$(whoami)}}"
+# Parse arguments
+TARGET_USER=""
+NO_LOGO=false
+
+for arg in "$@"; do
+    case $arg in
+        --nologo)
+            NO_LOGO=true
+            shift
+            ;;
+        *)
+            if [ -z "$TARGET_USER" ]; then
+                TARGET_USER="$arg"
+            fi
+            ;;
+    esac
+done
+
+if [ -z "$TARGET_USER" ]; then
+    TARGET_USER="${SUDO_USER:-$(whoami)}"
+fi
+
 USER_HOME=$(eval echo ~$TARGET_USER)
 
 # Configuration files
@@ -202,10 +222,20 @@ configure_quiet_boot() {
 
     
     # Append full silent configuration
-    # Note: explicit plymouth.enable=0 to prevent any splash screen
-    sed -i '$ s/$/ quiet logo.nologo vt.global_cursor_default=0 systemd.show_status=false rd.udev.log_level=3 plymouth.enable=0/' "$cmdline_file"
+    # Note: plymouth.enable=0 completely disables splash screen
+    local boot_params="quiet vt.global_cursor_default=0 systemd.show_status=false rd.udev.log_level=3"
     
-    log_info "Silent boot configured (console redirected to tty3, plymouth disabled)"
+    if [ "$NO_LOGO" = true ]; then
+        log_info "Disabling logo (--nologo flag used)..."
+        boot_params="$boot_params logo.nologo plymouth.enable=0"
+    else
+        log_info "Keeping logo/splash enabled (use --nologo to disable)..."
+        boot_params="$boot_params splash plymouth.ignore-serial-consoles"
+    fi
+    
+    sed -i "$ s/$/ $boot_params/" "$cmdline_file"
+    
+    log_info "Silent boot configured (console redirected to tty3)"
 }
 
 # Function to configure config.txt
@@ -229,9 +259,15 @@ configure_boot_config() {
     cp "$config_file" "${config_file}.backup-$(date +%Y%m%d_%H%M%S)"
     
     # Disable rainbow splash screen
-    if ! grep -q "disable_splash=1" "$config_file"; then
-        echo "disable_splash=1" >> "$config_file"
-        log_info "Added disable_splash=1"
+    if [ "$NO_LOGO" = true ]; then
+        if ! grep -q "disable_splash=1" "$config_file"; then
+            echo "disable_splash=1" >> "$config_file"
+            log_info "Added disable_splash=1"
+        fi
+    else
+        # Remove disable_splash if present to allow custom splash
+        sed -i '/disable_splash=1/d' "$config_file"
+        log_info "Ensured disable_splash=1 is removed (allowing splash)"
     fi
     
     # Disable warning overlays (lightning bolt, etc)
