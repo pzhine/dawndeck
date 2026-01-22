@@ -43,8 +43,9 @@ if [ ! -f "$SKETCH_PATH" ]; then
 fi
 
 # Extract Arduino configuration from config.json
-ARDUINO_PORT=$(jq -r '.arduino.port // empty' "$CONFIG_FILE")
-BOARD_TYPE=$(jq -r '.arduino.boardType // "arduino:avr:uno"' "$CONFIG_FILE")
+# Use Python to parse JSON since jq may not be installed
+ARDUINO_PORT=$(python3 -c "import json; f=open('$CONFIG_FILE'); c=json.load(f); print(c.get('arduino', {}).get('port', ''))" 2>/dev/null)
+BOARD_TYPE=$(python3 -c "import json; f=open('$CONFIG_FILE'); c=json.load(f); print(c.get('arduino', {}).get('boardType', 'arduino:avr:uno'))" 2>/dev/null)
 
 if [ -z "$ARDUINO_PORT" ]; then
     log_error "Arduino port not configured in $CONFIG_FILE"
