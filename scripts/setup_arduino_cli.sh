@@ -105,19 +105,19 @@ log_info "Index updated"
 
 # Install SparkFun AVR core
 log_step "Installing SparkFun AVR boards..."
-if arduino-cli core list | grep -q "sparkfun:avr"; then
-    INSTALLED_VERSION=$(arduino-cli core list | grep "sparkfun:avr" | awk '{print $2}')
+if arduino-cli core list | grep -qi "SparkFun:avr"; then
+    INSTALLED_VERSION=$(arduino-cli core list | grep -i "SparkFun:avr" | awk '{print $2}')
     log_info "SparkFun AVR core already installed (version: $INSTALLED_VERSION)"
     
     # Check for updates
     log_step "Checking for updates..."
-    if arduino-cli core upgrade sparkfun:avr 2>&1 | grep -q "already at the latest version"; then
+    if arduino-cli core upgrade SparkFun:avr 2>&1 | grep -q "already at the latest version"; then
         log_info "Core is up to date"
     else
         log_info "Core upgraded"
     fi
 else
-    arduino-cli core install sparkfun:avr
+    arduino-cli core install SparkFun:avr
     log_info "SparkFun AVR core installed"
 fi
 
@@ -178,11 +178,11 @@ echo "  Config file: $HOME/.arduino15/arduino-cli.yaml"
 echo "  Libraries: $HOME/Arduino/libraries/"
 echo ""
 echo "Board FQBN for SparkFun Pro Micro 16MHz:"
-echo "  sparkfun:avr:promicro:cpu=16MHzatmega32U4"
+echo "  SparkFun:avr:promicro:cpu=16MHzatmega32U4"
 echo ""
 echo "Add this to your ~/.config/sunrise-alarm/config.json:"
 echo '  "arduino": {'
-echo '    "boardType": "sparkfun:avr:promicro:cpu=16MHzatmega32U4",'
+echo '    "boardType": "SparkFun:avr:promicro:cpu=16MHzatmega32U4",'
 echo '    "port": "/dev/ttyACM0"'
 echo '  }'
 echo ""

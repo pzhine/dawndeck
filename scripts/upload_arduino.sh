@@ -71,9 +71,9 @@ log_info "Port: $ARDUINO_PORT"
 
 # Verify the board platform is installed
 log_info "Verifying board platform..."
-PLATFORM=$(echo "$BOARD_TYPE" | cut -d: -f1,2)  # Extract "sparkfun:avr" from FQBN
+PLATFORM=$(echo "$BOARD_TYPE" | cut -d: -f1,2)  # Extract "SparkFun:avr" from FQBN
 
-if ! arduino-cli core list | grep -q "$PLATFORM"; then
+if ! arduino-cli core list | grep -qi "$PLATFORM"; then
     log_error "Board platform '$PLATFORM' is not installed"
     echo ""
     echo "Installed platforms:"
@@ -85,7 +85,7 @@ if ! arduino-cli core list | grep -q "$PLATFORM"; then
     echo "Or manually:"
     echo "  arduino-cli config add board_manager.additional_urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/master/IDE_Board_Manager/package_sparkfun_index.json"
     echo "  arduino-cli core update-index"
-    echo "  arduino-cli core install sparkfun:avr"
+    echo "  arduino-cli core install SparkFun:avr"
     exit 1
 fi
 
