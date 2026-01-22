@@ -166,28 +166,38 @@ configure_quiet_boot() {
         log_info "Populated cmdline.txt with current boot parameters"
     fi
     
-    # Check if quiet boot is already configured
-    if grep -q "quiet" "$cmdline_file" && ! grep -q "console=tty1" "$cmdline_file"; then
-        log_info "Quiet boot already configured"
+    # Redirect console to tty3 instead of tty1 to hide kernel messages
+    if grep -q "console=tty1" "$cmdline_file"; then
+        log_info "Redirecting console from tty1 to tty3..."
+        sed -i 's/console=tty1/console=tty3/g' "$cmdline_file"
+    fi
+    
+    # Check if quiet boot parameters are already present
+    if grep -q "systemd.show_status=false" "$cmdline_file"; then
+        log_info "Silent boot parameters already configured"
         return 0
     fi
     
-    # Remove console=tty1 to prevent kernel messages on display
-    # Keep serial console for debugging via UART if needed
-    log_info "Removing console=tty1 to silence display output..."
-    sed -i 's/console=tty1 //g' "$cmdline_file"
-    sed -i 's/ console=tty1//g' "$cmdline_file"
+    # Add silent boot parameters
+    # quiet - suppress most kernel messages
+    # splash - clean splash screen
+    # logo.nologo - hide Raspberry Pi logos
+    # vt.global_cursor_default=0 - hide cursor
+    # systemd.show_status=false - hide systemd starting messages
+    # rd.udev.log_level=3 - hide udev messages
+    # plymouth.ignore-serial-consoles - ensure splash shows
     
-    # Add quiet boot parameters if not already present
-    if ! grep -q "quiet" "$cmdline_file"; then
-        # quiet - suppress most kernel messages
-        # loglevel=0 - only critical messages
-        # logo.nologo - hide Raspberry Pi logos
-        # vt.global_cursor_default=0 - hide cursor
-        sed -i '$ s/$/ quiet loglevel=0 logo.nologo vt.global_cursor_default=0/' "$cmdline_file"
-    fi
+    # First remove any existing partial config to ensure clean slate
+    sed -i 's/ quiet//g' "$cmdline_file"
+    sed -i 's/ splash//g' "$cmdline_file"
+    sed -i 's/ logo.nologo//g' "$cmdline_file"
+    sed -i 's/ vt.global_cursor_default=0//g' "$cmdline_file"
+    sed -i 's/ loglevel=[0-9]*//g' "$cmdline_file"
     
-    log_info "Quiet boot configured"
+    # Append full silent configuration
+    sed -i '$ s/$/ quiet splash logo.nologo vt.global_cursor_default=0 systemd.show_status=false rd.udev.log_level=3 plymouth.ignore-serial-consoles/' "$cmdline_file"
+    
+    log_info "Silent boot configured (console redirected to tty3)"
 }
 
 # Function to configure auto-login
@@ -198,14 +208,20 @@ configure_autologin() {
     local override_dir="/etc/systemd/system/getty@tty1.service.d"
     mkdir -p "$override_dir"
     
-    # Create autologin configuration
+    # Create .hushlogin to suppress last login message
+    sudo -u "$TARGET_USER" touch "$USER_HOME/.hushlogin"
+    
+    # Create autologin configuration with quiet login options
+    # --skip-login: do not prompt for login name
+    # --nonewline: do not print a newline before issue
+    # --noissue: do not print /etc/issue
     cat > "$override_dir/autologin.conf" << EOF
 [Service]
 ExecStart=
-ExecStart=-/sbin/agetty --autologin $TARGET_USER --noclear %I \$TERM
+ExecStart=-/sbin/agetty --skip-login --nonewline --noissue --autologin $TARGET_USER --noclear %I \$TERM
 EOF
     
-    log_info "Auto-login configured for tty1"
+    log_info "Silent auto-login configured for tty1"
 }
 
 # Function to configure EasyEffects
