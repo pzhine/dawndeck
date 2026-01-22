@@ -206,6 +206,47 @@ configure_quiet_boot() {
     log_info "Silent boot configured (console redirected to tty3)"
 }
 
+# Function to configure config.txt
+configure_boot_config() {
+    log_info "Configuring boot config (config.txt)..."
+    
+    # Try /boot/firmware/config.txt first, then /boot/config.txt
+    local config_file=""
+    if [ -f "/boot/firmware/config.txt" ]; then
+        config_file="/boot/firmware/config.txt"
+    elif [ -f "/boot/config.txt" ]; then
+        config_file="/boot/config.txt"
+    else
+        log_warn "Boot config.txt not found - skipping config.txt updates"
+        return 0
+    fi
+    
+    log_info "Found config file at $config_file"
+    
+    # Backup config
+    cp "$config_file" "${config_file}.backup-$(date +%Y%m%d_%H%M%S)"
+    
+    # Disable rainbow splash screen
+    if ! grep -q "disable_splash=1" "$config_file"; then
+        echo "disable_splash=1" >> "$config_file"
+        log_info "Added disable_splash=1"
+    fi
+    
+    # Disable warning overlays (lightning bolt, etc)
+    if ! grep -q "avoid_warnings=1" "$config_file"; then
+        echo "avoid_warnings=1" >> "$config_file"
+        log_info "Added avoid_warnings=1"
+    fi
+
+    # Disable camera LED (optional, good for sleeping)
+    if ! grep -q "disable_camera_led=1" "$config_file"; then
+        echo "disable_camera_led=1" >> "$config_file"
+        log_info "Added disable_camera_led=1"
+    fi
+    
+    log_info "Boot config updated"
+}
+
 # Function to configure auto-login
 configure_autologin() {
     log_info "Configuring auto-login for $TARGET_USER..."
@@ -576,6 +617,7 @@ main() {
     validate_setup
     install_packages
     configure_quiet_boot
+    configure_boot_config
     configure_autologin
     configure_easyeffects
     create_xsession_script
