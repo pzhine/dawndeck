@@ -74,10 +74,10 @@ unsigned long pulseDuration[CHANNEL_COUNT] = {0, 0, 0};
 // Configurable pulse timing ranges (in milliseconds)
 #define PULSE_FREQ_MIN 0   // Min time between pulses
 #define PULSE_FREQ_MAX 50   // Max time between pulses
-#define PULSE_DURATION_MIN 1500  // Min duration of a pulse
-#define PULSE_DURATION_MAX 3500  // Max duration of a pulse
-#define PULSE_BRIGHTNESS_MIN 20  // Min brightness for pulse
-#define PULSE_BRIGHTNESS_MAX 80  // Max brightness for pulse
+#define PULSE_DURATION_MIN 3000  // Min duration of a pulse
+#define PULSE_DURATION_MAX 6000  // Max duration of a pulse
+#define PULSE_BRIGHTNESS_MIN 50  // Min brightness for pulse
+#define PULSE_BRIGHTNESS_MAX 120  // Max brightness for pulse
 
 void handleSerialCommand() {
   // Exit startup mode on first command
