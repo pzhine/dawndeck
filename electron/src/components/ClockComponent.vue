@@ -155,6 +155,27 @@ const hoursPart = ref('');
 const minutesPart = ref('');
 const amPmPart = ref('');
 
+// Watch for colonBlink setting changes
+watch(
+  () => appStore.colonBlink,
+  (newValue) => {
+    // Clear existing interval
+    if (colonBlinkIntervalId) {
+      clearInterval(colonBlinkIntervalId);
+    }
+    
+    if (newValue) {
+      // Enable blinking
+      colonBlinkIntervalId = window.setInterval(() => {
+        showColon.value = !showColon.value;
+      }, 1000);
+    } else {
+      // Disable blinking - keep colon always visible
+      showColon.value = true;
+    }
+  }
+);
+
 // Format time based on timeFormat preference
 const updateFormattedTime = () => {
   const hours = time.value.getHours();
@@ -198,10 +219,15 @@ onMounted(() => {
     updateFormattedTime();
   }, 500);
 
-  // Blink colon every second
-  colonBlinkIntervalId = window.setInterval(() => {
-    showColon.value = !showColon.value;
-  }, 1000);
+  // Blink colon every second if enabled
+  if (appStore.colonBlink) {
+    colonBlinkIntervalId = window.setInterval(() => {
+      showColon.value = !showColon.value;
+    }, 1000);
+  } else {
+    // Keep colon always visible if blinking is disabled
+    showColon.value = true;
+  }
 
   // Set focus to make the enter key work
   clockContainer.value?.focus();
@@ -213,11 +239,15 @@ onMounted(() => {
     ).color;
     initialColor.value = rawComputedColor; // Store the raw color string
     console.log('Initial color:', initialColor.value);
-    clockStyles.color = initialColor.value; // Set the reactive style
+    if (props.transparent) {
+      clockStyles.color = initialColor.value; // Set the reactive style only if animating
+    }
   } else {
     // Fallback if clockContainer is not yet available
     initialColor.value = 'rgb(0,0,0)'; // Fallback to a known parsable format
-    clockStyles.color = initialColor.value;
+    if (props.transparent) {
+      clockStyles.color = initialColor.value;
+    }
   }
 
   // Initialize styles

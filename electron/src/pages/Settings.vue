@@ -1,4 +1,5 @@
 <template>
+  <BackToHome />
   <div class="w-full h-full">
     <RoundScrollContainer
       :items="menuItems"
@@ -15,6 +16,7 @@ import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import RoundScrollContainer, { ListItem } from '../components/RoundScrollContainer.vue';
 import { useAppStore } from '../stores/appState';
+import BackToHome from '../components/BackToHome.vue';
 
 const router = useRouter();
 const appStore = useAppStore();
@@ -33,11 +35,28 @@ const menuItems = computed(() => {
       },
     },
     {
+      label: 'UI Color',
+      value: '',
+      onSelect: () => router.push('/color-settings'),
+    },
+    {
       label: 'Time Format',
       value: appStore.timeFormat,
       onSelect: () => {
         // Toggle between 12h and 24h format
         appStore.setTimeFormat(appStore.timeFormat === '12h' ? '24h' : '12h');
+      },
+    },
+    {
+      label: 'Timezone',
+      value: appStore.timezone?.split('/').pop()?.replace(/_/g, ' ') || 'Not Set',
+      onSelect: () => router.push('/timezone-settings'),
+    },
+    {
+      label: 'Colon Blink',
+      value: appStore.colonBlink ? 'On' : 'Off',
+      onSelect: () => {
+        appStore.setColonBlink(!appStore.colonBlink);
       },
     },
     {

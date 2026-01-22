@@ -79,8 +79,8 @@
                 @touchmove.prevent="(e) => handleSliderInteraction(e, item, index)"
               >
                 <div 
-                  class="absolute top-0 left-0 h-full bg-gradient-to-r from-yellow-400 to-yellow-500 transition-all duration-75"
-                  :style="{ width: getSliderPercentage(item) + '%' }"
+                  class="absolute top-0 left-0 h-full transition-all duration-75"
+                  :style="{ width: getSliderPercentage(item) + '%', backgroundColor: 'rgb(var(--ui-color))' }"
                 ></div>
               </div>
               <!-- <span class="value-text opacity-80 min-w-[3rem] text-right">

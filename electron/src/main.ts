@@ -30,6 +30,16 @@ const routes = [
     component: WifiConnect,
   },
   { path: '/settings', name: 'Settings', component: Settings },
+  {
+    path: '/timezone-settings',
+    name: 'TimezoneSettings',
+    component: () => import('./pages/TimezoneSettings.vue'),
+  },
+  {
+    path: '/color-settings',
+    name: 'ColorSettings',
+    component: () => import('./pages/ColorSettings.vue'),
+  },
   { path: '/sounds', name: 'SoundCategories', component: SoundCategories },
   {
     path: '/media-player/:soundId?',
@@ -45,11 +55,6 @@ const routes = [
     path: '/sounds/list/:searchPhrase/:categoryName',
     name: 'SoundsList',
     component: () => import('./pages/SoundsList.vue'),
-  },
-  {
-    path: '/sounds/player/:id?/:name?/:previewUrl?/:duration?/:currentTime?/:category?/:country?',
-    name: 'SoundPlayer',
-    component: () => import('./pages/SoundPlayer.vue'),
   },
   {
     path: '/alarm',
@@ -97,11 +102,6 @@ const app = createApp(App);
 app.use(router);
 app.use(pinia); // Add Pinia to the Vue application
 
-// Mount the app
-document.fonts.ready.then(() => {
-  app.mount('#app');
-});
-
 // Initialize the app state from saved data
 const initializeAppState = async () => {
   const appStore = useAppStore();
@@ -114,6 +114,23 @@ const initializeAppState = async () => {
     appStore.saveState();
   });
 };
+
+// Load state and mount app
+document.fonts.ready.then(async () => {
+  // Load state BEFORE mounting to prevent race condition
+  await initializeAppState();
+
+  // Mount the app after state is loaded
+  app.mount('#app');
+
+  // Perform post-mount initialization
+  nextTick(async () => {
+    postMessage({ payload: 'removeLoading' }, '*');
+
+    // Check internet connectivity
+    await checkInternetAndRoute(true);
+  });
+});
 
 // Check internet connectivity and route accordingly with retries
 const checkInternetAndRoute = async (initialStartup = false) => {
@@ -299,16 +316,5 @@ const checkAlarmCondition = () => {
   }
 };
 
-// Set up alarm check every 10
+// Set up alarm check every 10 seconds
 setInterval(checkAlarmCondition, 10000);
-
-// Perform initialization and checks after the app is mounted
-nextTick(async () => {
-  postMessage({ payload: 'removeLoading' }, '*');
-
-  // Load saved app state
-  await initializeAppState();
-
-  // Check internet connectivity
-  await checkInternetAndRoute(true);
-});

@@ -202,23 +202,21 @@ let SEGMENT_COLOR = 0x111111;
 let SEGMENT_OPACITY = 0.5;
 let HOVER_COLOR = 0x333333;
 let ICON_COLOR = '#cccccc';
-let ACTIVE_ICON_COLOR = '#facc15'; // Yellow-400
+let ACTIVE_ICON_COLOR = '#facc15'; // Default fallback
 
 const updateColors = () => {
   if (!canvasContainer.value) return;
 
-  // Resolve Tailwind colors from CSS variables
-  // We use Canvas getImageData to force the browser to convert any color format (like oklch) to RGB
+  // Helper to resolve CSS variables and convert to RGB using canvas
   const resolveColor = (varName: string) => {
     if (!canvasContainer.value) return null;
     
-    // 1. Get the computed color string
     const originalColor = canvasContainer.value.style.color;
     canvasContainer.value.style.color = `var(${varName})`;
     const computedColor = getComputedStyle(canvasContainer.value).color;
     canvasContainer.value.style.color = originalColor;
 
-    // 2. Draw to canvas and read back RGB values
+    // Draw to canvas and read back RGB values
     const canvas = document.createElement('canvas');
     canvas.width = 1;
     canvas.height = 1;
@@ -232,10 +230,17 @@ const updateColors = () => {
     return `rgb(${r}, ${g}, ${b})`;
   };
 
+  // For RGB color from CSS variable, parse the r, g, b values
+  const resolveRgbColor = () => {
+    const rgbValue = getComputedStyle(document.documentElement).getPropertyValue('--ui-color').trim();
+    const [r, g, b] = rgbValue.split(',').map(v => parseInt(v.trim()));
+    return `rgb(${r}, ${g}, ${b})`;
+  };
+
   const segmentColor = resolveColor('--color-gray-900');
   const hoverColor = resolveColor('--color-gray-800');
   const iconColor = resolveColor('--color-gray-400');
-  const activeIconColor = resolveColor('--color-yellow-400');
+  const activeIconColor = resolveRgbColor();
 
   if (segmentColor) SEGMENT_COLOR = new THREE.Color(segmentColor).getHex();
   if (hoverColor) HOVER_COLOR = new THREE.Color(hoverColor).getHex();
@@ -252,13 +257,14 @@ const preloadIcons = async () => {
   ];
 
   const promises = allItems.map(item => {
-    const cacheKey = item.icon + (item.active ? '_active' : '');
+    // Include color in cache key to handle theme changes
+    const targetColor = item.active ? ACTIVE_ICON_COLOR : ICON_COLOR;
+    const cacheKey = item.icon + (item.active ? '_active_' + targetColor : '_inactive_' + targetColor);
+    
     if (iconCache.has(cacheKey)) return Promise.resolve();
     
     return new Promise<void>((resolve) => {
       const img = new Image();
-      
-      const targetColor = item.active ? ACTIVE_ICON_COLOR : ICON_COLOR;
       
       // Safer SVG processing:
       // 1. Replace currentColor with white
@@ -575,7 +581,7 @@ const drawIconAndLabel = (canvas: HTMLCanvasElement, texture: THREE.CanvasTextur
   texture.needsUpdate = true;
 
   // Check cache first
-  const cacheKey = item.icon + (item.active ? '_active' : '');
+  const cacheKey = item.icon + (item.active ? '_active_' + targetColor : '_inactive_' + targetColor);
   if (iconCache.has(cacheKey)) {
     const img = iconCache.get(cacheKey)!;
     const x = (canvas.width - iconSize) / 2;
@@ -645,6 +651,7 @@ const createIconAndLabel = (item: MenuItem, angle: number) => {
   canvas.height = 512;
   
   const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
   
   drawIconAndLabel(canvas, texture, item);
 

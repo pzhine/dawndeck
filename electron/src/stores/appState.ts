@@ -3,7 +3,10 @@ import { debounce, throttle } from 'lodash-es';
 import { AlarmSound } from '../../types/sound';
 import { AppState, ColorFavorite } from '../../types/state';
 import { setGlobalVolume } from '../services/audioService';
-import { generateColorFavoriteName, generateColorSlug } from '../services/colorNaming';
+import {
+  generateColorFavoriteName,
+  generateColorSlug,
+} from '../services/colorNaming';
 import { mixColorsRgb } from '../services/colorUtils';
 import defaultConfig from '../../config.example.json';
 
@@ -94,20 +97,26 @@ const SUNRISE_PRESETS: ColorFavorite[] = [
 // Helper function to ensure sunrise presets exist in favorites
 function ensureSunrisePresets(favorites: ColorFavorite[]): ColorFavorite[] {
   // Check if any presets already exist
-  const hasPresets = favorites.some(fav => fav.isPreset);
-  
+  const hasPresets = favorites.some((fav) => fav.isPreset);
+
   // If presets exist, user may have edited them - keep them as-is
   if (hasPresets) {
     return favorites;
   }
-  
+
   // If no presets exist, add the defaults at the beginning
   return [...SUNRISE_PRESETS, ...favorites];
 }
 
 // Pending hardware update queues (max length 1 - only latest values matter)
-let pendingLampUpdate: { colors: { warmWhite: number; pink: number; orange: number }; brightness: number } | null = null;
-let pendingProjectorUpdate: { colors: { color0: number; color1: number; color2: number }; brightness: number } | null = null;
+let pendingLampUpdate: {
+  colors: { warmWhite: number; pink: number; orange: number };
+  brightness: number;
+} | null = null;
+let pendingProjectorUpdate: {
+  colors: { color0: number; color1: number; color2: number };
+  brightness: number;
+} | null = null;
 let lampUpdateInterval: NodeJS.Timeout | null = null;
 let projectorUpdateInterval: NodeJS.Timeout | null = null;
 
@@ -145,6 +154,9 @@ export const useAppStore = defineStore('appState', {
     projectorPosition: undefined, // SVG coordinates for projector color picker
     ambienceFavorites: [], // Array to store ambience color favorites (lamp + projector)
     timeFormat: '24h', // Default time format
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Default to system timezone
+    colonBlink: true, // Default to blinking colon
+    uiColor: { r: 251, g: 191, b: 36 }, // Default to amber-400
     listPositions: {}, // Empty object to store list positions by route
     alarmSound: null, // Default to no alarm sound selected
     favoriteSounds: [], // Array to store favorite sounds
@@ -201,9 +213,9 @@ export const useAppStore = defineStore('appState', {
       // Update or create pending update with latest values
       pendingLampUpdate = {
         colors: { ...this.lampColors },
-        brightness: this.lampBrightness
+        brightness: this.lampBrightness,
       };
-      
+
       // Start interval if not already running
       if (!lampUpdateInterval) {
         lampUpdateInterval = setInterval(() => {
@@ -211,34 +223,34 @@ export const useAppStore = defineStore('appState', {
         }, 300);
       }
     },
-    
+
     // Flush pending lamp update to hardware
     async flushLampHardwareUpdate(): Promise<void> {
       if (!pendingLampUpdate || !this.lampActive) return;
-      
+
       const update = pendingLampUpdate;
       pendingLampUpdate = null;
-      
+
       const multiplier = update.brightness / 100;
       await window.ipcRenderer.invoke('set-lamp-colors', {
         warmWhite: Math.round(update.colors.warmWhite * multiplier),
         pink: Math.round(update.colors.pink * multiplier),
         orange: Math.round(update.colors.orange * multiplier),
       });
-      
+
       // Clear interval if no pending update
       if (!pendingLampUpdate && lampUpdateInterval) {
         clearInterval(lampUpdateInterval);
         lampUpdateInterval = null;
       }
     },
-    
+
     // Toggle lamp active state
     async toggleLampActive() {
       const newState = !this.lampActive;
       this.lampActive = newState;
       this.saveState();
-      
+
       if (newState) {
         // Lamp activated - restore colors with current brightness
         const multiplier = this.lampBrightness / 100;
@@ -247,7 +259,10 @@ export const useAppStore = defineStore('appState', {
           pink: Math.round(this.lampColors.pink * multiplier),
           orange: Math.round(this.lampColors.orange * multiplier),
         });
-        console.log('Lamp activated - colors restored with brightness', this.lampBrightness);
+        console.log(
+          'Lamp activated - colors restored with brightness',
+          this.lampBrightness
+        );
       } else {
         // Lamp deactivated - zero out all colors
         await window.ipcRenderer.invoke('set-lamp-colors', {
@@ -282,13 +297,25 @@ export const useAppStore = defineStore('appState', {
 
         // Sync with system volume after loading state
         await this.syncWithSystemVolume();
-        
+
         // Restore screen brightness
         if (this.screenBrightness !== undefined) {
-          await window.ipcRenderer.invoke('set-screen-brightness', this.screenBrightness);
+          await window.ipcRenderer.invoke(
+            'set-screen-brightness',
+            this.screenBrightness
+          );
           console.log('Screen brightness restored:', this.screenBrightness);
         }
-        
+
+        // Initialize UI color CSS variable
+        if (this.uiColor) {
+          document.documentElement.style.setProperty(
+            '--ui-color',
+            `${this.uiColor.r}, ${this.uiColor.g}, ${this.uiColor.b}`
+          );
+          console.log('UI color restored:', this.uiColor);
+        }
+
         // Restore lamp state if active
         if (this.lampActive) {
           const multiplier = this.lampBrightness / 100;
@@ -297,9 +324,12 @@ export const useAppStore = defineStore('appState', {
             pink: Math.round(this.lampColors.pink * multiplier),
             orange: Math.round(this.lampColors.orange * multiplier),
           });
-          console.log('Lamp state restored:', { brightness: this.lampBrightness, colors: this.lampColors });
+          console.log('Lamp state restored:', {
+            brightness: this.lampBrightness,
+            colors: this.lampColors,
+          });
         }
-        
+
         // Restore projector state if active
         if (this.projectorActive) {
           const multiplier = this.projectorBrightness / 100;
@@ -308,7 +338,10 @@ export const useAppStore = defineStore('appState', {
             color1: Math.round(this.projectorColors.color1 * multiplier),
             color2: Math.round(this.projectorColors.color2 * multiplier),
           });
-          console.log('Projector state restored:', { brightness: this.projectorBrightness, colors: this.projectorColors });
+          console.log('Projector state restored:', {
+            brightness: this.projectorBrightness,
+            colors: this.projectorColors,
+          });
         }
       } catch (error) {
         console.error('Failed to load saved state:', error);
@@ -368,7 +401,7 @@ export const useAppStore = defineStore('appState', {
     setScreenBrightness(level: number): void {
       this.screenBrightness = Math.max(0, Math.min(100, level)); // Clamp between 0-100
       this.saveState();
-      
+
       // Apply brightness to hardware on Linux (throttled)
       throttledSetScreenBrightness(this.screenBrightness);
     },
@@ -400,7 +433,10 @@ export const useAppStore = defineStore('appState', {
     },
 
     // Set individual lamp colors (RGB values 0-255)
-    setLampColors(colors: { warmWhite: number; pink: number; orange: number }, position?: { x: number; y: number }): void {
+    setLampColors(
+      colors: { warmWhite: number; pink: number; orange: number },
+      position?: { x: number; y: number }
+    ): void {
       this.lampColors = {
         warmWhite: Math.max(0, Math.min(255, colors.warmWhite)),
         pink: Math.max(0, Math.min(255, colors.pink)),
@@ -419,9 +455,9 @@ export const useAppStore = defineStore('appState', {
       // Update or create pending update with latest values
       pendingProjectorUpdate = {
         colors: { ...this.projectorColors },
-        brightness: this.projectorBrightness
+        brightness: this.projectorBrightness,
       };
-      
+
       // Start interval if not already running
       if (!projectorUpdateInterval) {
         projectorUpdateInterval = setInterval(() => {
@@ -429,34 +465,34 @@ export const useAppStore = defineStore('appState', {
         }, 300);
       }
     },
-    
+
     // Flush pending projector update to hardware
     async flushProjectorHardwareUpdate(): Promise<void> {
       if (!pendingProjectorUpdate || !this.projectorActive) return;
-      
+
       const update = pendingProjectorUpdate;
       pendingProjectorUpdate = null;
-      
+
       const multiplier = update.brightness / 100;
       await window.ipcRenderer.invoke('set-projector-colors', {
         color0: Math.round(update.colors.color0 * multiplier),
         color1: Math.round(update.colors.color1 * multiplier),
         color2: Math.round(update.colors.color2 * multiplier),
       });
-      
+
       // Clear interval if no pending update
       if (!pendingProjectorUpdate && projectorUpdateInterval) {
         clearInterval(projectorUpdateInterval);
         projectorUpdateInterval = null;
       }
     },
-    
+
     // Toggle projector active state
     async toggleProjectorActive() {
       const newState = !this.projectorActive;
       this.projectorActive = newState;
       this.saveState();
-      
+
       if (newState) {
         // Projector activated - restore colors with current brightness
         const multiplier = this.projectorBrightness / 100;
@@ -465,7 +501,10 @@ export const useAppStore = defineStore('appState', {
           color1: Math.round(this.projectorColors.color1 * multiplier),
           color2: Math.round(this.projectorColors.color2 * multiplier),
         });
-        console.log('Projector activated - colors restored with brightness', this.projectorBrightness);
+        console.log(
+          'Projector activated - colors restored with brightness',
+          this.projectorBrightness
+        );
       } else {
         // Projector deactivated - zero out all colors
         await window.ipcRenderer.invoke('set-projector-colors', {
@@ -478,7 +517,10 @@ export const useAppStore = defineStore('appState', {
     },
 
     // Set individual projector colors (RGB values 0-255)
-    setProjectorColors(colors: { color0: number; color1: number; color2: number }, position?: { x: number; y: number }): void {
+    setProjectorColors(
+      colors: { color0: number; color1: number; color2: number },
+      position?: { x: number; y: number }
+    ): void {
       this.projectorColors = {
         color0: Math.max(0, Math.min(255, colors.color0)),
         color1: Math.max(0, Math.min(255, colors.color1)),
@@ -494,6 +536,26 @@ export const useAppStore = defineStore('appState', {
     // Set the time format
     setTimeFormat(format: '12h' | '24h'): void {
       this.timeFormat = format;
+    },
+
+    // Set timezone
+    setTimezone(timezone: string): void {
+      this.timezone = timezone;
+    },
+
+    // Set colon blink
+    setColonBlink(enabled: boolean): void {
+      this.colonBlink = enabled;
+    },
+
+    // Set UI color
+    setUiColor(color: { r: number; g: number; b: number }): void {
+      this.uiColor = color;
+      // Update CSS variable with RGB format
+      document.documentElement.style.setProperty(
+        '--ui-color',
+        `${color.r}, ${color.g}, ${color.b}`
+      );
     },
 
     // Set the alarm sound
@@ -625,10 +687,14 @@ export const useAppStore = defineStore('appState', {
     },
 
     // Set the current playlist with context info
-    setCurrentPlaylist(sounds: any[], currentIndex: number, context?: { category?: string; country?: string }): void {
-      this.currentPlaylist = sounds.map(sound => ({
+    setCurrentPlaylist(
+      sounds: any[],
+      currentIndex: number,
+      context?: { category?: string; country?: string }
+    ): void {
+      this.currentPlaylist = sounds.map((sound) => ({
         ...sound,
-        _context: context || {}
+        _context: context || {},
       }));
       this.currentPlaylistIndex = currentIndex;
     },
@@ -641,72 +707,94 @@ export const useAppStore = defineStore('appState', {
 
     // Get current sound in playlist
     getCurrentPlaylistSound(): any | null {
-      if (this.currentPlaylist.length === 0 || this.currentPlaylistIndex < 0) return null;
+      if (this.currentPlaylist.length === 0 || this.currentPlaylistIndex < 0)
+        return null;
       return this.currentPlaylist[this.currentPlaylistIndex];
     },
 
     // Move to next sound in playlist and return it
     moveToNextSound(): any | null {
       if (this.currentPlaylist.length === 0) return null;
-      this.currentPlaylistIndex = (this.currentPlaylistIndex + 1) % this.currentPlaylist.length;
+      this.currentPlaylistIndex =
+        (this.currentPlaylistIndex + 1) % this.currentPlaylist.length;
       return this.currentPlaylist[this.currentPlaylistIndex];
     },
 
     // Move to previous sound in playlist and return it
     moveToPreviousSound(): any | null {
       if (this.currentPlaylist.length === 0) return null;
-      this.currentPlaylistIndex = (this.currentPlaylistIndex - 1 + this.currentPlaylist.length) % this.currentPlaylist.length;
+      this.currentPlaylistIndex =
+        (this.currentPlaylistIndex - 1 + this.currentPlaylist.length) %
+        this.currentPlaylist.length;
       return this.currentPlaylist[this.currentPlaylistIndex];
     },
 
     // Remove ambience (lamp + projector) from favorites by id
     removeAmbienceFromFavorites(id: string): void {
       // Don't allow deletion of sunrise presets
-      const favorite = this.ambienceFavorites.find(fav => fav.id === id);
+      const favorite = this.ambienceFavorites.find((fav) => fav.id === id);
       if (favorite?.isPreset) {
         console.warn('Cannot delete sunrise preset:', id);
         return;
       }
-      this.ambienceFavorites = this.ambienceFavorites.filter(fav => fav.id !== id);
+      this.ambienceFavorites = this.ambienceFavorites.filter(
+        (fav) => fav.id !== id
+      );
       this.saveState();
     },
 
     // Add current ambience (lamp + projector) to favorites
     addAmbienceToFavorites(): void {
       // Define circle colors for lamp and projector
-      const lampCircleColors: [string, string, string] = ['#ffb86d', '#FF2A70', '#ff4b09'];
-      const projectorCircleColors: [string, string, string] = ['#9d09ff', '#ff8409', '#0058f0'];
-      
+      const lampCircleColors: [string, string, string] = [
+        '#ffb86d',
+        '#FF2A70',
+        '#ff4b09',
+      ];
+      const projectorCircleColors: [string, string, string] = [
+        '#9d09ff',
+        '#ff8409',
+        '#0058f0',
+      ];
+
       // Mix lamp LED values with lamp circle colors
       const lampRgb = mixColorsRgb(lampCircleColors, [
         this.lampColors.warmWhite,
         this.lampColors.pink,
-        this.lampColors.orange
+        this.lampColors.orange,
       ]);
-      
+
       // Mix projector LED values with projector circle colors
       const projectorRgb = mixColorsRgb(projectorCircleColors, [
         this.projectorColors.color0,
         this.projectorColors.color1,
-        this.projectorColors.color2
+        this.projectorColors.color2,
       ]);
-      
+
       // Pass both colors separately to generate a combined name (e.g. "Strawberry-Teal")
       const name = generateColorFavoriteName(projectorRgb, lampRgb);
-      
+
       // Convert name to kebab-case for slug-friendly ID
       const slug = generateColorSlug(name);
-      
+
       const favorite: ColorFavorite = {
         id: slug,
         name,
         lamp: {
-          colors: [this.lampColors.warmWhite, this.lampColors.pink, this.lampColors.orange],
+          colors: [
+            this.lampColors.warmWhite,
+            this.lampColors.pink,
+            this.lampColors.orange,
+          ],
           position: this.lampPosition || { x: 0, y: 0 },
           brightness: this.lampBrightness,
         },
         projector: {
-          colors: [this.projectorColors.color0, this.projectorColors.color1, this.projectorColors.color2],
+          colors: [
+            this.projectorColors.color0,
+            this.projectorColors.color1,
+            this.projectorColors.color2,
+          ],
           position: this.projectorPosition || { x: 0, y: 0 },
           brightness: this.projectorBrightness,
         },
@@ -719,18 +807,22 @@ export const useAppStore = defineStore('appState', {
     // Remove ambience favorite by id
     removeAmbienceFavorite(id: string): void {
       // Don't allow deletion of sunrise presets
-      const favorite = this.ambienceFavorites.find(fav => fav.id === id);
+      const favorite = this.ambienceFavorites.find((fav) => fav.id === id);
       if (favorite?.isPreset) {
         console.warn('Cannot delete sunrise preset:', id);
         return;
       }
-      this.ambienceFavorites = this.ambienceFavorites.filter(fav => fav.id !== id);
+      this.ambienceFavorites = this.ambienceFavorites.filter(
+        (fav) => fav.id !== id
+      );
       this.saveState();
     },
 
     // Update an existing ambience favorite with current color and brightness values
     updateAmbienceFavorite(id: string): void {
-      const existingIndex = this.ambienceFavorites.findIndex(fav => fav.id === id);
+      const existingIndex = this.ambienceFavorites.findIndex(
+        (fav) => fav.id === id
+      );
       if (existingIndex === -1) return;
 
       // Keep the existing favorite but update colors, positions, and brightness
@@ -738,12 +830,20 @@ export const useAppStore = defineStore('appState', {
       this.ambienceFavorites[existingIndex] = {
         ...existing,
         lamp: {
-          colors: [this.lampColors.warmWhite, this.lampColors.pink, this.lampColors.orange],
+          colors: [
+            this.lampColors.warmWhite,
+            this.lampColors.pink,
+            this.lampColors.orange,
+          ],
           position: this.lampPosition || { x: 0, y: 0 },
           brightness: this.lampBrightness,
         },
         projector: {
-          colors: [this.projectorColors.color0, this.projectorColors.color1, this.projectorColors.color2],
+          colors: [
+            this.projectorColors.color0,
+            this.projectorColors.color1,
+            this.projectorColors.color2,
+          ],
           position: this.projectorPosition || { x: 0, y: 0 },
           brightness: this.projectorBrightness,
         },
@@ -754,22 +854,28 @@ export const useAppStore = defineStore('appState', {
 
     // Load ambience favorite (apply both lamp and projector colors/positions)
     loadAmbienceFavorite(id: string): void {
-      const favorite = this.ambienceFavorites.find(fav => fav.id === id);
+      const favorite = this.ambienceFavorites.find((fav) => fav.id === id);
       if (favorite) {
         // Load lamp settings
-        this.setLampColors({
-          warmWhite: favorite.lamp.colors[0],
-          pink: favorite.lamp.colors[1],
-          orange: favorite.lamp.colors[2],
-        }, favorite.lamp.position);
+        this.setLampColors(
+          {
+            warmWhite: favorite.lamp.colors[0],
+            pink: favorite.lamp.colors[1],
+            orange: favorite.lamp.colors[2],
+          },
+          favorite.lamp.position
+        );
         this.setLampBrightness(favorite.lamp.brightness);
-        
+
         // Load projector settings
-        this.setProjectorColors({
-          color0: favorite.projector.colors[0],
-          color1: favorite.projector.colors[1],
-          color2: favorite.projector.colors[2],
-        }, favorite.projector.position);
+        this.setProjectorColors(
+          {
+            color0: favorite.projector.colors[0],
+            color1: favorite.projector.colors[1],
+            color2: favorite.projector.colors[2],
+          },
+          favorite.projector.position
+        );
         this.setProjectorBrightness(favorite.projector.brightness);
       }
     },

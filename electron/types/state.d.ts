@@ -98,6 +98,9 @@ export interface AppState {
   projectorPosition?: { x: number; y: number }; // SVG coordinates for projector color picker
   ambienceFavorites: ColorFavorite[]; // Array of ambience color favorites (lamp + projector)
   timeFormat: '12h' | '24h'; // Add time format preference
+  timezone: string; // IANA timezone identifier (e.g., 'America/New_York')
+  colonBlink: boolean; // Whether the colon between hours and minutes should blink
+  uiColor: { r: number; g: number; b: number }; // RGB color for UI theme (0-255 each)
   listPositions: ListPositions; // Store InteractiveList positions by route
   alarmSound: AlarmSound | null;
   favoriteSounds: AlarmSound[]; // Array to store favorite sounds
