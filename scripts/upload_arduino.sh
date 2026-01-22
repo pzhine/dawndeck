@@ -60,21 +60,36 @@ fi
 if ! command -v arduino-cli &> /dev/null; then
     log_error "arduino-cli is not installed"
     echo ""
-    echo "To install on Raspberry Pi:"
-    echo "  curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh"
-    echo "  sudo mv bin/arduino-cli /usr/local/bin/"
-    echo "  arduino-cli config init"
-    echo "  arduino-cli core update-index"
-    echo "  arduino-cli core install arduino:avr"
-    echo ""
-    echo "Then install required libraries:"
-    echo "  arduino-cli lib install \"Adafruit NeoPixel\""
+    echo "Run the setup script first:"
+    echo "  ./scripts/setup_arduino_cli.sh"
     exit 1
 fi
 
 log_info "Found Arduino sketch at $SKETCH_PATH"
 log_info "Board type: $BOARD_TYPE"
 log_info "Port: $ARDUINO_PORT"
+
+# Verify the board platform is installed
+log_info "Verifying board platform..."
+PLATFORM=$(echo "$BOARD_TYPE" | cut -d: -f1,2)  # Extract "sparkfun:avr" from FQBN
+
+if ! arduino-cli core list | grep -q "$PLATFORM"; then
+    log_error "Board platform '$PLATFORM' is not installed"
+    echo ""
+    echo "Installed platforms:"
+    arduino-cli core list
+    echo ""
+    echo "To install SparkFun boards, run:"
+    echo "  ./scripts/setup_arduino_cli.sh"
+    echo ""
+    echo "Or manually:"
+    echo "  arduino-cli config add board_manager.additional_urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/master/IDE_Board_Manager/package_sparkfun_index.json"
+    echo "  arduino-cli core update-index"
+    echo "  arduino-cli core install sparkfun:avr"
+    exit 1
+fi
+
+log_info "Board platform '$PLATFORM' is installed"
 
 # Check if port exists
 if [ ! -e "$ARDUINO_PORT" ]; then
