@@ -178,21 +178,35 @@ watch(
 
 // Format time based on timeFormat preference
 const updateFormattedTime = () => {
-  const hours = time.value.getHours();
-  const minutes = time.value.getMinutes().toString().padStart(2, '0');
-  // const seconds = time.value.getSeconds().toString().padStart(2, '0');
+  // Get time in the selected timezone
+  const timeZone = appStore.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  
+  // Create formatter for getting timezone-aware time
+  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: appStore.timeFormat === '12h'
+  });
+  
+  const parts = timeFormatter.formatToParts(time.value);
+  const hourPart = parts.find(p => p.type === 'hour');
+  const minutePart = parts.find(p => p.type === 'minute');
+  const dayPeriodPart = parts.find(p => p.type === 'dayPeriod');
+  
+  const hours = hourPart ? hourPart.value : '0';
+  const minutes = minutePart ? minutePart.value : '00';
 
   if (appStore.timeFormat === '12h') {
-    const isPM = hours >= 12;
-    const hours12 = hours % 12 || 12; // Convert 0 to 12 for 12 AM
-    formattedTime.value = `${hours12}:${minutes} ${isPM ? 'PM' : 'AM'}`;
-    hoursPart.value = hours12.toString();
+    const period = dayPeriodPart ? dayPeriodPart.value : '';
+    formattedTime.value = `${hours}:${minutes} ${period}`;
+    hoursPart.value = hours;
     minutesPart.value = minutes;
-    amPmPart.value = ` ${isPM ? 'PM' : 'AM'}`;
+    amPmPart.value = ` ${period}`;
   } else {
     // 24h format
-    formattedTime.value = `${hours.toString().padStart(2, '0')}:${minutes}`;
-    hoursPart.value = hours.toString().padStart(2, '0');
+    formattedTime.value = `${hours.padStart(2, '0')}:${minutes}`;
+    hoursPart.value = hours.padStart(2, '0');
     minutesPart.value = minutes;
     amPmPart.value = '';
   }
@@ -204,6 +218,7 @@ const updateFormattedTime = () => {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
+      timeZone,
     };
     formattedDate.value = time.value.toLocaleDateString(undefined, options);
   }
