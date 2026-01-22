@@ -173,19 +173,20 @@ configure_quiet_boot() {
     fi
     
     # Check if quiet boot parameters are already present
-    if grep -q "systemd.show_status=false" "$cmdline_file"; then
-        log_info "Silent boot parameters already configured"
+    # We check for multiple key parameters to ensure full configuration
+    if grep -q "systemd.show_status=false" "$cmdline_file" && \
+       grep -q "logo.nologo" "$cmdline_file" && \
+       grep -q "vt.global_cursor_default=0" "$cmdline_file"; then
+        log_info "Silent boot parameters already fully configured"
         return 0
     fi
     
-    # Add silent boot parameters
+    log_info "Applying silent boot parameters..."
     # quiet - suppress most kernel messages
-    # splash - clean splash screen
     # logo.nologo - hide Raspberry Pi logos
     # vt.global_cursor_default=0 - hide cursor
     # systemd.show_status=false - hide systemd starting messages
     # rd.udev.log_level=3 - hide udev messages
-    # plymouth.ignore-serial-consoles - ensure splash shows
     
     # First remove any existing partial config to ensure clean slate
     sed -i 's/ quiet//g' "$cmdline_file"
@@ -193,9 +194,14 @@ configure_quiet_boot() {
     sed -i 's/ logo.nologo//g' "$cmdline_file"
     sed -i 's/ vt.global_cursor_default=0//g' "$cmdline_file"
     sed -i 's/ loglevel=[0-9]*//g' "$cmdline_file"
+    sed -i 's/ plymouth.ignore-serial-consoles//g' "$cmdline_file"
+    sed -i 's/ systemd.show_status=false//g' "$cmdline_file"
+    sed -i 's/ rd.udev.log_level=3//g' "$cmdline_file"
+
     
     # Append full silent configuration
-    sed -i '$ s/$/ quiet splash logo.nologo vt.global_cursor_default=0 systemd.show_status=false rd.udev.log_level=3 plymouth.ignore-serial-consoles/' "$cmdline_file"
+    # Note: Removed 'splash' as it can sometimes cause the logo to appear via Plymouth
+    sed -i '$ s/$/ quiet logo.nologo vt.global_cursor_default=0 systemd.show_status=false rd.udev.log_level=3/' "$cmdline_file"
     
     log_info "Silent boot configured (console redirected to tty3)"
 }
