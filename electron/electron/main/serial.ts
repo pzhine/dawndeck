@@ -67,7 +67,7 @@ export function startSerialComms() {
     );
     return;
   }
-  
+
   // Don't try to open if already open
   if (port) {
     console.log('[serial] Port already open');
@@ -91,6 +91,14 @@ export function startSerialComms() {
 
     port.on('open', () => {
       console.log('[serial] Serial port open');
+      // Send initial command to turn off lights and exit Arduino startup mode
+      // Wait a moment for Arduino to be ready to receive
+      setTimeout(() => {
+        console.log(
+          '[serial] Sending initial command to exit Arduino startup mode'
+        );
+        sendMessage('LERP_LED 0 0 0 0 0 0');
+      }, 1000);
     });
 
     port.on('error', (err) => {

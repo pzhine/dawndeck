@@ -72,8 +72,8 @@ int pulseTarget[CHANNEL_COUNT] = {0, 0, 0};
 unsigned long pulseDuration[CHANNEL_COUNT] = {0, 0, 0};
 
 // Configurable pulse timing ranges (in milliseconds)
-#define PULSE_FREQ_MIN 2000   // Min time between pulses
-#define PULSE_FREQ_MAX 5000   // Max time between pulses
+#define PULSE_FREQ_MIN 0   // Min time between pulses
+#define PULSE_FREQ_MAX 50   // Max time between pulses
 #define PULSE_DURATION_MIN 1500  // Min duration of a pulse
 #define PULSE_DURATION_MAX 3500  // Max duration of a pulse
 #define PULSE_BRIGHTNESS_MIN 20  // Min brightness for pulse
