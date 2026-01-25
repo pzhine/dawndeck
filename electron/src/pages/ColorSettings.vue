@@ -36,6 +36,7 @@ let resizeObserver: ResizeObserver | null = null;
 let animationFrameId: number | null = null;
 
 // Geometry
+const WHEEL_GAP_DEGREES = 60; // Degrees to leave open on the left
 let centerX = 0;
 let centerY = 0;
 // We want the ring to be around the perimeter.
@@ -64,22 +65,35 @@ const drawWheel = () => {
   ctx.save();
   ctx.translate(centerX, centerY);
 
+  // Calculate angles for the gap (centered at PI/Left)
+  const gapRadians = WHEEL_GAP_DEGREES * (Math.PI / 180);
+  const startAngle = Math.PI + (gapRadians / 2);
+  const endAngle = Math.PI - (gapRadians / 2); // Goes clockwise to this
+  
+  // To distribute full spectrum across the visible arc, we normalize.
+  // Visible span in radians
+  const visibleRadians = (2 * Math.PI) - gapRadians;
+  const k = visibleRadians / (2 * Math.PI);
+
   // Conic Gradient for Hue
-  // Start angle -PI/2 to put Red at Top (if desired) or 0 for East.
-  // Standard clocks usually start at top, but color wheels start at East (0).
-  // Let's stick effectively to standard math angle 0 = East.
-  const hueGradient = ctx.createConicGradient(0, 0, 0);
+  // Rotated so that gradient start aligns with our startAngle.
+  const hueGradient = ctx.createConicGradient(startAngle, 0, 0);
+  
+  // We want colors to go from 0 to 1 over the span of "visibleRadians"
+  // But define stops in terms of 0..1 representing 0..360 deg
   hueGradient.addColorStop(0, 'red');
-  hueGradient.addColorStop(0.166, 'yellow');
-  hueGradient.addColorStop(0.333, '#00ff00'); // lime
-  hueGradient.addColorStop(0.5, 'cyan');
-  hueGradient.addColorStop(0.666, 'blue');
-  hueGradient.addColorStop(0.833, 'magenta');
-  hueGradient.addColorStop(1, 'red');
+  hueGradient.addColorStop(0.166 * k, 'yellow');
+  hueGradient.addColorStop(0.333 * k, '#00ff00'); // lime
+  hueGradient.addColorStop(0.5 * k, 'cyan');
+  hueGradient.addColorStop(0.666 * k, 'blue');
+  hueGradient.addColorStop(0.833 * k, 'magenta');
+  hueGradient.addColorStop(1.0 * k, 'red');
+  // Gradient from k to 1 is not used
 
   // Draw Ring
   ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  // Draw arc skipping the gap on the left
+  ctx.arc(0, 0, radius, startAngle, endAngle);
   ctx.strokeStyle = hueGradient;
   ctx.lineWidth = RING_THICKNESS;
   ctx.stroke();
@@ -90,8 +104,11 @@ const drawWheel = () => {
   const hsl = { h: 0, s: 0, l: 0 };
   color.getHSL(hsl);
   
-  // Angle for indicator
-  const angle = hsl.h * Math.PI * 2;
+  // Map hue back to visual angle
+  // hue 0 -> startAngle
+  // hue 1 -> startAngle + visibleRadians
+  const relativeAngle = hsl.h * visibleRadians;
+  const angle = startAngle + relativeAngle;
   
   const indicatorX = Math.cos(angle) * radius;
   const indicatorY = Math.sin(angle) * radius;
@@ -125,7 +142,37 @@ const updateColorFromInput = (clientIDX: number, clientIDY: number) => {
   let angle = Math.atan2(y, x);
   if (angle < 0) angle += Math.PI * 2;
   
-  const hue = angle / (Math.PI * 2);
+  // Handle Gap (centered at PI)
+  const gapRadians = WHEEL_GAP_DEGREES * (Math.PI / 180);
+  const gapHalf = gapRadians / 2;
+  const gapStart = Math.PI - gapHalf;
+  const gapEnd = Math.PI + gapHalf;
+
+  // We need to define where the arc starts/ends for hue calculation.
+  // Visual Start: startAngle = PI + gapHalf (210 deg)
+  const startAngle = gapEnd; 
+
+  const visibleRadians = (2 * Math.PI) - gapRadians;
+
+  // Shift angle so that startAngle is at 0
+  let relativeAngle = angle - startAngle;
+  if (relativeAngle < 0) relativeAngle += (2 * Math.PI);
+  
+  // If user clicks in the "invisible" gap, clamp to nearest end
+  // In relative terms, the valid range is [0, visibleRadians]
+  // The gap is (visibleRadians, 2PI)
+  if (relativeAngle > visibleRadians) {
+      // Closer to visibleRadians (end of spectrum) or 0 (start of spectrum)?
+      const distToEnd = Math.abs(relativeAngle - visibleRadians);
+      const distToStart = Math.abs(relativeAngle - 2 * Math.PI); // which is 0 effectively
+      if (distToEnd < distToStart) {
+          relativeAngle = visibleRadians;
+      } else {
+          relativeAngle = 0;
+      }
+  }
+
+  const hue = relativeAngle / visibleRadians;
 
   // Set new color
   // Saturation fixed at 1, Lightness fixed at 0.5
