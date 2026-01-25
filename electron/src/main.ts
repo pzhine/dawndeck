@@ -292,6 +292,9 @@ const checkInternetAndRoute = async (initialStartup = false) => {
 // Set up hourly checks (60 * 60 * 1000 = 3600000 milliseconds = 1 hour)
 setInterval(checkInternetAndRoute, 3600000);
 
+// Track the last alarm trigger to prevent multiple triggers
+let lastAlarmTrigger: string | null = null;
+
 // Check if the alarm should be triggered
 const checkAlarmCondition = () => {
   const appStore = useAppStore();
@@ -307,14 +310,27 @@ const checkAlarmCondition = () => {
 
   // Check if it's time to trigger the alarm
   if (currentHour === alarmHour && currentMinute === alarmMinute) {
-    console.log('Alarm time reached! Redirecting to SunrisePlayer...');
+    // Create a unique key for this alarm time to prevent duplicate triggers
+    const alarmKey = `${alarmHour}:${alarmMinute}`;
 
-    // Only redirect if we're not already on the SunrisePlayer page
-    if (router.currentRoute.value.name !== 'SunrisePlayer') {
-      router.push({ name: 'SunrisePlayer' });
+    // Only trigger if we haven't already triggered for this time
+    if (lastAlarmTrigger !== alarmKey) {
+      console.log('Alarm time reached! Redirecting to SunrisePlayer...');
+      lastAlarmTrigger = alarmKey;
+
+      // Only redirect if we're not already on the SunrisePlayer page
+      if (router.currentRoute.value.name !== 'SunrisePlayer') {
+        router.push({ name: 'SunrisePlayer' });
+      }
+    }
+  } else {
+    // Reset the trigger when we're no longer in the alarm minute
+    // This allows the alarm to fire again the next day
+    if (lastAlarmTrigger !== null) {
+      lastAlarmTrigger = null;
     }
   }
 };
 
-// Set up alarm check every 10 seconds
-setInterval(checkAlarmCondition, 10000);
+// Check alarm every 5 seconds for better accuracy
+setInterval(checkAlarmCondition, 5000);
