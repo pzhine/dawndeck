@@ -36,7 +36,7 @@ let resizeObserver: ResizeObserver | null = null;
 let animationFrameId: number | null = null;
 
 // Geometry
-const WHEEL_GAP_DEGREES = 60; // Degrees to leave open on the left
+const WHEEL_GAP_DEGREES = 40; // Degrees to leave open on the left
 let centerX = 0;
 let centerY = 0;
 // We want the ring to be around the perimeter.

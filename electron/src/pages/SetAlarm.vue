@@ -9,6 +9,21 @@
     <div class="flex-1 flex flex-col items-center justify-center relative touch-none">
       <div class="flex flex-row items-center justify-center gap-4">
         
+        <!-- AM/PM Indicator (Only 12h) -->
+        <div 
+          v-if="is12h"
+          class="flex flex-col justify-center select-none"
+          :style="{ 
+             'font-family': '\'DS-Digital\', sans-serif', 
+             'font-size': '32px',
+             'line-height': '1',
+             'margin-bottom': '8px'
+          }"
+        >
+          <div :style="{ opacity: isAm ? 1 : 0.15 }">AM</div>
+          <div :style="{ opacity: !isAm ? 1 : 0.15 }">PM</div>
+        </div>
+
         <!-- Hours -->
         <div class="w-16">
           <ScrollSelector 
@@ -25,15 +40,6 @@
           <ScrollSelector 
             :items="minutesItems" 
             v-model="selectedMinute"
-          />
-        </div>
-
-        <!-- AM/PM (Only 12h) -->
-        <div v-if="is12h" class="w-24 ml-2 border-l border-white/10 pl-2">
-          <ScrollSelector 
-            :items="['AM', 'PM']" 
-            v-model="selectedAmPm"
-            :format-label="formatAmPm"
           />
         </div>
       
@@ -108,6 +114,9 @@ const hours12Items = [12, ...Array.from({ length: 11 }, (_, i) => i + 1)];
 const is12h = computed(() => appStore.timeFormat === '12h');
 const hoursItems = computed(() => is12h.value ? hours12Items : hours24Items);
 
+// Track AM/PM state for display
+const isAm = computed(() => appStore.alarmTime[0] < 12);
+
 // Bindings
 const selectedMinute = computed({
   get: () => appStore.alarmTime[1],
@@ -133,38 +142,30 @@ const selectedHour = computed({
       return;
     }
 
-    // 12h Logic
+    // 12h Logic - Toggle AM/PM only on 11<->12 transition
     const currentH = appStore.alarmTime[0];
-    const isPM = currentH >= 12; // 12 PM is 12. 12 AM is 0.
+    const currentIsPM = currentH >= 12;
+    const currentDisplay = selectedHour.value; // Current displayed hour (1-12)
+    const newDisplay = valNum; // New displayed hour (1-12)
     
-    // Convert visual hour to 24h
-    // 12 -> 0 (if AM) / 12 (if PM)
-    // 1 -> 1 (if AM) / 13 (if PM)
+    // User Requirement:
+    // Forward (11 -> 12): Toggle AM/PM
+    // Backward (12 -> 11): Toggle AM/PM
+    // All other transitions (including 12 <-> 1) maintain AM/PM state
+    const shouldToggle = 
+      (currentDisplay === 11 && newDisplay === 12) ||
+      (currentDisplay === 12 && newDisplay === 11);
     
-    let newH = valNum;
-    if (newH === 12) newH = 0;
+    const newIsPM = shouldToggle ? !currentIsPM : currentIsPM;
     
-    if (isPM) newH += 12;
-    
-    appStore.setAlarmTime(newH, appStore.alarmTime[1]);
-  }
-});
-
-const selectedAmPm = computed({
-  get: () => appStore.alarmTime[0] >= 12 ? 'PM' : 'AM',
-  set: (val) => {
-    const currentH = appStore.alarmTime[0];
-    const isPM = currentH >= 12;
-    const isNewPM = val === 'PM';
-    
-    if (isPM === isNewPM) return;
-    
-    let newH = currentH;
-    if (isNewPM) {
-      newH += 12;
+    // Convert to 24h
+    let newH = newDisplay;
+    if (newH === 12) {
+      newH = newIsPM ? 12 : 0;
     } else {
-      newH -= 12;
+      newH = newIsPM ? newH + 12 : newH;
     }
+    
     appStore.setAlarmTime(newH, appStore.alarmTime[1]);
   }
 });
@@ -172,7 +173,5 @@ const selectedAmPm = computed({
 const formatHourLabel = (val: string | number) => {
   return String(val).padStart(2, '0');
 };
-
-const formatAmPm = (val: string | number) => String(val);
 
 </script>

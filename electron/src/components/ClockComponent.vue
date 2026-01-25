@@ -5,18 +5,35 @@
     tabindex="0"
     ref="clockContainer"
   >
-    <div
-      class="flex items-center justify-center"
-      :style="{
-        'font-size': '200px',
-        'line-height': '220px',
-        'font-weight': 'normal',
-        'font-family': '\'DS-Digital\', sans-serif',
-      }"
-    >
-      {{ hoursPart
-      }}<span :style="{ visibility: showColon ? 'visible' : 'hidden' }">:</span
-      >{{ minutesPart }}{{ amPmPart }}
+    <div class="flex items-center justify-center flex-row">
+      <!-- AM/PM Indicator -->
+      <div 
+        v-if="amPmPart"
+        class="flex flex-col justify-center mr-4 select-none"
+        :style="{ 
+           'font-family': '\'DS-Digital\', sans-serif', 
+           'font-size': '40px',
+           'line-height': '1',
+           'margin-top': '15px' 
+        }"
+      >
+        <div :style="{ opacity: isAm ? 1 : 0.15 }">AM</div>
+        <div :style="{ opacity: !isAm ? 1 : 0.15 }">PM</div>
+      </div>
+
+      <div
+        class="flex items-center justify-center"
+        :style="{
+          'font-size': '200px',
+          'line-height': '220px',
+          'font-weight': 'normal',
+          'font-family': '\'DS-Digital\', sans-serif',
+        }"
+      >
+        {{ hoursPart
+        }}<span :style="{ visibility: showColon ? 'visible' : 'hidden' }">:</span
+        >{{ minutesPart }}
+      </div>
     </div>
     <div
       v-if="showDate"
@@ -32,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed, watch, reactive } from 'vue';
+import { onMounted, onUnmounted, ref, watch, reactive } from 'vue';
 import { useAppStore } from '../stores/appState';
 import { animateStyle, easeInOutBezier } from '../animations/animationUtils'; // Import helpers
 
@@ -61,6 +78,16 @@ const props = defineProps({
   transparentReverse: {
     type: Boolean,
     default: false,
+  },
+  hours: {
+    type: Number,
+    default: null,
+    validator: (value: number) => value >= 0 && value <= 23
+  },
+  minutes: {
+    type: Number,
+    default: null,
+    validator: (value: number) => value >= 0 && value <= 59
   },
 });
 
@@ -154,6 +181,7 @@ const showColon = ref(true);
 const hoursPart = ref('');
 const minutesPart = ref('');
 const amPmPart = ref('');
+const isAm = ref(false); // Track AM/PM state
 
 // Watch for colonBlink setting changes
 watch(
@@ -176,8 +204,42 @@ watch(
   }
 );
 
+// Watch for changes locally or in props
+watch(
+  () => [appStore.timeFormat, props.hours, props.minutes],
+  () => {
+    updateFormattedTime();
+  }
+);
+
 // Format time based on timeFormat preference
 const updateFormattedTime = () => {
+    // If props are provided, use them instead of current time
+  if (props.hours !== null && props.minutes !== null) {
+      const h = props.hours;
+      const m = props.minutes;
+      
+      const minutesStr = m.toString().padStart(2, '0');
+      
+      if (appStore.timeFormat === '12h') {
+          const period = h >= 12 ? 'PM' : 'AM';
+          const displayH = h % 12 || 12;
+          
+          formattedTime.value = `${displayH}:${minutesStr} ${period}`;
+          hoursPart.value = displayH.toString();
+          minutesPart.value = minutesStr;
+          amPmPart.value = ` ${period}`;
+          isAm.value = period === 'AM';
+      } else {
+          const hoursStr = h.toString().padStart(2, '0');
+          formattedTime.value = `${hoursStr}:${minutesStr}`;
+          hoursPart.value = hoursStr;
+          minutesPart.value = minutesStr;
+          amPmPart.value = '';
+      }
+      return;
+  }
+
   // Get time in the selected timezone
   const timeZone = appStore.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   
@@ -203,6 +265,7 @@ const updateFormattedTime = () => {
     hoursPart.value = hours;
     minutesPart.value = minutes;
     amPmPart.value = ` ${period}`;
+    isAm.value = period.toLowerCase() === 'am';
   } else {
     // 24h format
     formattedTime.value = `${hours.padStart(2, '0')}:${minutes}`;

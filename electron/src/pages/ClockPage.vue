@@ -3,11 +3,21 @@
     :upper-items="upperMenuItems" 
     :lower-items="lowerMenuItems"
     :on-show="onMenuShow"
+    ref="radialMenu"
   >
-    <div tabindex="0" ref="clockContainer" class="page-container">
+    <div tabindex="0" ref="clockContainer">
       <div :class="['clock-wrapper', { dimmed: isDimmed }]">
         <ClockComponent ref="clockComponent" />
       </div>
+    </div>
+    <div 
+      v-if="appStore.alarmActive && !isMenuVisible" 
+      class="fixed bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1 text-xl font-medium opacity-80"
+    >
+      <div v-html="alarmIcon" class="flex items-center opacity-90" />
+      <span :style="{ 'font-family': '\'DS-Digital\', sans-serif' }">
+        {{ appStore.formattedAlarmTime }}
+      </span>
     </div>
   </RadialMenu>
 </template>
@@ -27,6 +37,8 @@ const inactivityTimer = ref<number | null>(null);
 const isDimmed = ref(false);
 const isBTPlaying = ref(false);
 const isSoundPlaying = ref(false);
+const radialMenu = ref<InstanceType<typeof RadialMenu> | null>(null);
+const isMenuVisible = ref(false);
 
 const lampIcon = feather.icons['sun'].toSvg();
 const musicIcon = feather.icons['volume-2'].toSvg();
@@ -102,16 +114,61 @@ const goToMenu = (event: MouseEvent) => {
 };
 
 const onMenuShow = async () => {
+  isMenuVisible.value = true;
   isBTPlaying.value = await getBluetoothStatus();
   isSoundPlaying.value = isGlobalSoundPlaying();
 };
 
 onMounted(() => {
   window.addEventListener('mousedown', goToMenu);
+  
+  // Track menu visibility by monitoring clicks
+  const handleClick = () => {
+    // If the menu was visible, check if we're clicking away from it
+    setTimeout(() => {
+      // After a short delay, check if we're still on the clock page without the menu
+      if (!radialMenu.value) return;
+      
+      // We'll assume the menu is hidden after interaction completes
+      // This is a simple heuristic - the menu shows on touch/click, then hides when done
+      const checkMenuHidden = () => {
+        const canvasContainer = radialMenu.value?.$el?.querySelector('.canvas-container');
+        if (canvasContainer && !canvasContainer.classList.contains('active')) {
+          isMenuVisible.value = false;
+        }
+      };
+      
+      // Check multiple times to catch the transition
+      setTimeout(checkMenuHidden, 100);
+      setTimeout(checkMenuHidden, 500);
+      setTimeout(checkMenuHidden, 1000);
+    }, 100);
+  };
+  
+  window.addEventListener('click', handleClick);
+  window.addEventListener('touchend', handleClick);
 });
 
 onUnmounted(() => {
   window.removeEventListener('mousedown', goToMenu);
+  
+  const handleClick = () => {
+    setTimeout(() => {
+      if (!radialMenu.value) return;
+      const checkMenuHidden = () => {
+        const canvasContainer = radialMenu.value?.$el?.querySelector('.canvas-container');
+        if (canvasContainer && !canvasContainer.classList.contains('active')) {
+          isMenuVisible.value = false;
+        }
+      };
+      setTimeout(checkMenuHidden, 100);
+      setTimeout(checkMenuHidden, 500);
+      setTimeout(checkMenuHidden, 1000);
+    }, 100);
+  };
+  
+  window.removeEventListener('click', handleClick);
+  window.removeEventListener('touchend', handleClick);
 
   // Clean up the timer if it exists
   if (inactivityTimer.value !== null) {

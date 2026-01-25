@@ -235,19 +235,20 @@ const animationLoop = (timestamp: number) => {
       // Smooth snap
       const snapDiff = targetScroll - scrollTop.value;
       scrollTop.value += snapDiff * 0.1; // Ease to target
-      
-      // Update Selection
-      if (Math.abs(snapDiff) < 0.1) {
-          // Find selected item
-          const totalItems = props.items.length;
-          const wrappedIndex = ((nearestItemIndex % totalItems) + totalItems) % totalItems;
-          const newVal = props.items[wrappedIndex];
-          
-          if (newVal !== props.modelValue) {
-            emit('update:modelValue', newVal);
-          }
-      }
     }
+  }
+
+  // Check for value change continuously (while dragging or animating)
+  const nearestItemIndex = Math.round(scrollTop.value / ITEM_HEIGHT);
+  const totalItems = props.items.length;
+  // Handle wrapping for negative or large positive indices
+  const wrappedIndex = ((nearestItemIndex % totalItems) + totalItems) % totalItems;
+  const newVal = props.items[wrappedIndex];
+  
+  // Emit if changed (debouncing handled by Vue usually, but we emit every frame if different)
+  // Since we are rounding, this will be stable for a range of scrollTop.
+  if (newVal !== props.modelValue) {
+    emit('update:modelValue', newVal);
   }
   
   animationFrameId = requestAnimationFrame(animationLoop);
