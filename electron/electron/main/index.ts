@@ -359,6 +359,8 @@ async function initializeApp() {
     }
   });
 
+  console.log('[Main] IPC handler for renderer-log registered');
+
   createWindow();
   initStateManagement();
   initVolumeControl();
@@ -420,6 +422,55 @@ ipcMain.handle('open-win', (_, arg) => {
     childWindow.loadFile(indexHtml, { hash: arg });
   }
 });
+
+// Track the last alarm trigger to prevent multiple triggers
+let lastAlarmTrigger: string | null = null;
+
+// Check if the alarm should be triggered
+const checkAlarmCondition = () => {
+  const state = getState();
+
+  // Only proceed if the alarm is active
+  if (!state || !state.alarmActive) return;
+
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+
+  const [alarmHour, alarmMinute] = state.alarmTime;
+
+  console.log(
+    '[Alarm] Checking alarm:',
+    `Current: ${currentHour}:${currentMinute}`,
+    `Alarm: ${alarmHour}:${alarmMinute}`
+  );
+
+  // Check if it's time to trigger the alarm
+  if (currentHour === alarmHour && currentMinute === alarmMinute) {
+    // Create a unique key for this alarm time to prevent duplicate triggers
+    const alarmKey = `${alarmHour}:${alarmMinute}`;
+
+    // Only trigger if we haven't already triggered for this time
+    if (lastAlarmTrigger !== alarmKey) {
+      console.log('[Alarm] Alarm time reached! Notifying renderer...');
+      lastAlarmTrigger = alarmKey;
+
+      // Send message to renderer to navigate to SunrisePlayer
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('trigger-alarm');
+      }
+    }
+  } else {
+    // Reset the trigger when we're no longer in the alarm minute
+    // This allows the alarm to fire again the next day
+    if (lastAlarmTrigger !== null) {
+      lastAlarmTrigger = null;
+    }
+  }
+};
+
+// Check alarm every 5 seconds for better accuracy
+setInterval(checkAlarmCondition, 5000);
 
 // Register IPC handlers for Freesound API
 ipcMain.handle('search-sounds', async (_, query) => {
