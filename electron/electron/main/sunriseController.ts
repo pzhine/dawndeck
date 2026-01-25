@@ -9,6 +9,15 @@ let currentDuration = 600; // Default 10 minutes in seconds
 let startTime = 0;
 let scheduledTimeouts: NodeJS.Timeout[] = [];
 
+// Store LED state before sunrise to restore later
+let savedLampState: { warmWhite: number; pink: number; orange: number } | null =
+  null;
+let savedProjectorState: {
+  color0: number;
+  color1: number;
+  color2: number;
+} | null = null;
+
 // Map strip type for lamp and projector
 const STRIP_LAMP = 0;
 const STRIP_PROJECTOR = 1;
@@ -121,6 +130,29 @@ export function startSunrise(duration: number, holdPercentage: number = 0) {
     `[sunriseController] Starting sunrise, ${duration} seconds, ${holdPercentage}% hold`
   );
 
+  // Save current LED state before starting
+  const state = getState();
+  if (state) {
+    savedLampState = {
+      warmWhite: state.lampColors.warmWhite,
+      pink: state.lampColors.pink,
+      orange: state.lampColors.orange,
+    };
+    savedProjectorState = {
+      color0: state.projectorColors.color0,
+      color1: state.projectorColors.color1,
+      color2: state.projectorColors.color2,
+    };
+    console.log(
+      `[sunriseController] Saved state - Lamp(${savedLampState.warmWhite}, ${savedLampState.pink}, ${savedLampState.orange}), Projector(${savedProjectorState.color0}, ${savedProjectorState.color1}, ${savedProjectorState.color2})`
+    );
+  }
+
+  // Turn off all lights immediately (no transition from current state)
+  sendLEDToSerial(STRIP_LAMP, 0, 0, 0, 0, 0);
+  sendLEDToSerial(STRIP_PROJECTOR, 0, 0, 0, 0, 0);
+  console.log('[sunriseController] Lights turned off');
+
   const sequence = generateSunriseSequence(duration, holdPercentage);
 
   if (sequence.length === 0) {
@@ -167,6 +199,41 @@ export function startSunrise(duration: number, holdPercentage: number = 0) {
 
     scheduledTimeouts.push(timeout);
   });
+
+  // Schedule restoration of lights at the end of the sequence
+  const endTimeout = setTimeout(() => {
+    if (isPlaying && savedLampState && savedProjectorState) {
+      console.log(
+        `[sunriseController] Sunrise ended, restoring lights - Lamp(${savedLampState.warmWhite}, ${savedLampState.pink}, ${savedLampState.orange}), Projector(${savedProjectorState.color0}, ${savedProjectorState.color1}, ${savedProjectorState.color2})`
+      );
+
+      // Restore lamp colors
+      sendLEDToSerial(
+        STRIP_LAMP,
+        0,
+        savedLampState.orange,
+        savedLampState.warmWhite,
+        savedLampState.pink,
+        2000 // 2 second transition to restored state
+      );
+
+      // Restore projector colors
+      sendLEDToSerial(
+        STRIP_PROJECTOR,
+        0,
+        savedProjectorState.color2,
+        savedProjectorState.color0,
+        savedProjectorState.color1,
+        2000 // 2 second transition to restored state
+      );
+
+      isPlaying = false;
+      savedLampState = null;
+      savedProjectorState = null;
+    }
+  }, duration * 1000); // Convert to milliseconds
+
+  scheduledTimeouts.push(endTimeout);
 }
 
 /**
@@ -175,12 +242,37 @@ export function startSunrise(duration: number, holdPercentage: number = 0) {
 export function stopSunrise() {
   console.log('[sunriseController] Stopping sunrise');
 
-  // Immediately reset LEDs before any other cleanup
-  sendLEDToSerial(STRIP_PROJECTOR, 0, 0, 0, 0, 2000);
-  sendLEDToSerial(STRIP_LAMP, 0, 0, 0, 0, 2000);
+  // Restore saved state if available, otherwise turn off
+  if (savedLampState && savedProjectorState) {
+    console.log(
+      `[sunriseController] Restoring lights - Lamp(${savedLampState.warmWhite}, ${savedLampState.pink}, ${savedLampState.orange}), Projector(${savedProjectorState.color0}, ${savedProjectorState.color1}, ${savedProjectorState.color2})`
+    );
+    sendLEDToSerial(
+      STRIP_LAMP,
+      0,
+      savedLampState.orange,
+      savedLampState.warmWhite,
+      savedLampState.pink,
+      2000
+    );
+    sendLEDToSerial(
+      STRIP_PROJECTOR,
+      0,
+      savedProjectorState.color2,
+      savedProjectorState.color0,
+      savedProjectorState.color1,
+      2000
+    );
+  } else {
+    // No saved state, just turn off
+    sendLEDToSerial(STRIP_PROJECTOR, 0, 0, 0, 0, 2000);
+    sendLEDToSerial(STRIP_LAMP, 0, 0, 0, 0, 2000);
+  }
 
   // Set flag to prevent any further playback
   isPlaying = false;
+  savedLampState = null;
+  savedProjectorState = null;
 
   // Clear all scheduled timeouts
   scheduledTimeouts.forEach((timeout) => {
