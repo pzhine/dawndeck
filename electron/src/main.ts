@@ -308,6 +308,14 @@ const checkAlarmCondition = () => {
 
   const [alarmHour, alarmMinute] = appStore.alarmTime;
 
+  console.log(
+    'checkAlarmCondition',
+    currentHour,
+    currentMinute,
+    alarmHour,
+    alarmMinute
+  );
+
   // Check if it's time to trigger the alarm
   if (currentHour === alarmHour && currentMinute === alarmMinute) {
     // Create a unique key for this alarm time to prevent duplicate triggers
