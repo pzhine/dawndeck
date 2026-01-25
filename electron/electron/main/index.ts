@@ -447,12 +447,6 @@ const checkAlarmCondition = () => {
 
   const [alarmHour, alarmMinute] = state.alarmTime;
 
-  console.log(
-    '[Alarm] Checking alarm:',
-    `Current: ${currentHour}:${currentMinute} (${timezone})`,
-    `Alarm: ${alarmHour}:${alarmMinute}`
-  );
-
   // Check if it's time to trigger the alarm
   if (currentHour === alarmHour && currentMinute === alarmMinute) {
     // Create a unique key for this alarm time to prevent duplicate triggers
