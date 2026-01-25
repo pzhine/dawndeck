@@ -10,12 +10,17 @@ let startTime = 0;
 let scheduledTimeouts: NodeJS.Timeout[] = [];
 
 // Store LED state before sunrise to restore later
-let savedLampState: { warmWhite: number; pink: number; orange: number } | null =
-  null;
+let savedLampState: {
+  warmWhite: number;
+  pink: number;
+  orange: number;
+  brightness: number;
+} | null = null;
 let savedProjectorState: {
   color0: number;
   color1: number;
   color2: number;
+  brightness: number;
 } | null = null;
 
 // Map strip type for lamp and projector
@@ -137,14 +142,19 @@ export function startSunrise(duration: number, holdPercentage: number = 0) {
       warmWhite: state.lampColors.warmWhite,
       pink: state.lampColors.pink,
       orange: state.lampColors.orange,
+      brightness: state.lampBrightness,
     };
     savedProjectorState = {
       color0: state.projectorColors.color0,
       color1: state.projectorColors.color1,
       color2: state.projectorColors.color2,
+      brightness: state.projectorBrightness,
     };
+    // Calculate actual hardware values for logging
+    const lampMultiplier = state.lampBrightness / 100;
+    const projectorMultiplier = state.projectorBrightness / 100;
     console.log(
-      `[sunriseController] Saved state - Lamp(${savedLampState.warmWhite}, ${savedLampState.pink}, ${savedLampState.orange}), Projector(${savedProjectorState.color0}, ${savedProjectorState.color1}, ${savedProjectorState.color2})`
+      `[sunriseController] Saved state - Lamp(${Math.round(savedLampState.warmWhite * lampMultiplier)}, ${Math.round(savedLampState.pink * lampMultiplier)}, ${Math.round(savedLampState.orange * lampMultiplier)} @ ${state.lampBrightness}%), Projector(${Math.round(savedProjectorState.color0 * projectorMultiplier)}, ${Math.round(savedProjectorState.color1 * projectorMultiplier)}, ${Math.round(savedProjectorState.color2 * projectorMultiplier)} @ ${state.projectorBrightness}%)`
     );
   }
 
@@ -203,27 +213,47 @@ export function startSunrise(duration: number, holdPercentage: number = 0) {
   // Schedule restoration of lights at the end of the sequence
   const endTimeout = setTimeout(() => {
     if (isPlaying && savedLampState && savedProjectorState) {
-      console.log(
-        `[sunriseController] Sunrise ended, restoring lights - Lamp(${savedLampState.warmWhite}, ${savedLampState.pink}, ${savedLampState.orange}), Projector(${savedProjectorState.color0}, ${savedProjectorState.color1}, ${savedProjectorState.color2})`
+      // Apply brightness multiplier to get actual hardware values
+      const lampMultiplier = savedLampState.brightness / 100;
+      const projectorMultiplier = savedProjectorState.brightness / 100;
+
+      const lampOrange = Math.round(savedLampState.orange * lampMultiplier);
+      const lampWarmWhite = Math.round(
+        savedLampState.warmWhite * lampMultiplier
+      );
+      const lampPink = Math.round(savedLampState.pink * lampMultiplier);
+
+      const projColor0 = Math.round(
+        savedProjectorState.color0 * projectorMultiplier
+      );
+      const projColor1 = Math.round(
+        savedProjectorState.color1 * projectorMultiplier
+      );
+      const projColor2 = Math.round(
+        savedProjectorState.color2 * projectorMultiplier
       );
 
-      // Restore lamp colors
+      console.log(
+        `[sunriseController] Sunrise ended, restoring lights - Lamp(${lampWarmWhite}, ${lampPink}, ${lampOrange} @ ${savedLampState.brightness}%), Projector(${projColor0}, ${projColor1}, ${projColor2} @ ${savedProjectorState.brightness}%)`
+      );
+
+      // Restore lamp colors with brightness applied
       sendLEDToSerial(
         STRIP_LAMP,
         0,
-        savedLampState.orange,
-        savedLampState.warmWhite,
-        savedLampState.pink,
+        lampOrange,
+        lampWarmWhite,
+        lampPink,
         2000 // 2 second transition to restored state
       );
 
-      // Restore projector colors
+      // Restore projector colors with brightness applied
       sendLEDToSerial(
         STRIP_PROJECTOR,
         0,
-        savedProjectorState.color2,
-        savedProjectorState.color0,
-        savedProjectorState.color1,
+        projColor2,
+        projColor0,
+        projColor1,
         2000 // 2 second transition to restored state
       );
 
@@ -244,23 +274,34 @@ export function stopSunrise() {
 
   // Restore saved state if available, otherwise turn off
   if (savedLampState && savedProjectorState) {
+    // Apply brightness multiplier to get actual hardware values
+    const lampMultiplier = savedLampState.brightness / 100;
+    const projectorMultiplier = savedProjectorState.brightness / 100;
+
+    const lampOrange = Math.round(savedLampState.orange * lampMultiplier);
+    const lampWarmWhite = Math.round(savedLampState.warmWhite * lampMultiplier);
+    const lampPink = Math.round(savedLampState.pink * lampMultiplier);
+
+    const projColor0 = Math.round(
+      savedProjectorState.color0 * projectorMultiplier
+    );
+    const projColor1 = Math.round(
+      savedProjectorState.color1 * projectorMultiplier
+    );
+    const projColor2 = Math.round(
+      savedProjectorState.color2 * projectorMultiplier
+    );
+
     console.log(
-      `[sunriseController] Restoring lights - Lamp(${savedLampState.warmWhite}, ${savedLampState.pink}, ${savedLampState.orange}), Projector(${savedProjectorState.color0}, ${savedProjectorState.color1}, ${savedProjectorState.color2})`
+      `[sunriseController] Restoring lights - Lamp(${lampWarmWhite}, ${lampPink}, ${lampOrange} @ ${savedLampState.brightness}%), Projector(${projColor0}, ${projColor1}, ${projColor2} @ ${savedProjectorState.brightness}%)`
     );
-    sendLEDToSerial(
-      STRIP_LAMP,
-      0,
-      savedLampState.orange,
-      savedLampState.warmWhite,
-      savedLampState.pink,
-      2000
-    );
+    sendLEDToSerial(STRIP_LAMP, 0, lampOrange, lampWarmWhite, lampPink, 2000);
     sendLEDToSerial(
       STRIP_PROJECTOR,
       0,
-      savedProjectorState.color2,
-      savedProjectorState.color0,
-      savedProjectorState.color1,
+      projColor2,
+      projColor0,
+      projColor1,
       2000
     );
   } else {
