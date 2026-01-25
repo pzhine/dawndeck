@@ -433,15 +433,23 @@ const checkAlarmCondition = () => {
   // Only proceed if the alarm is active
   if (!state || !state.alarmActive) return;
 
+  // Get current time in the user's configured timezone
+  const timezone = state.timezone || 'UTC';
   const now = new Date();
-  const currentHour = now.getHours();
-  const currentMinute = now.getMinutes();
+
+  // Convert to user's timezone
+  const timeInTimezone = new Date(
+    now.toLocaleString('en-US', { timeZone: timezone })
+  );
+
+  const currentHour = timeInTimezone.getHours();
+  const currentMinute = timeInTimezone.getMinutes();
 
   const [alarmHour, alarmMinute] = state.alarmTime;
 
   console.log(
     '[Alarm] Checking alarm:',
-    `Current: ${currentHour}:${currentMinute}`,
+    `Current: ${currentHour}:${currentMinute} (${timezone})`,
     `Alarm: ${alarmHour}:${alarmMinute}`
   );
 
