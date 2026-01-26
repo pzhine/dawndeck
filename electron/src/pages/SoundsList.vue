@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full">
+  <div class="w-full h-full">
     <div v-if="isLoading" class="flex justify-center items-center h-64">
       <div class="text-xl">Loading sounds...</div>
     </div>
@@ -14,11 +14,12 @@
         {{
           isFavorites
             ? 'No favorite sounds yet.'
-            : 'No sounds found for this country.'
+            : 'No sounds found for this category.'
         }}
       </div>
     </div>
-    <InteractiveList
+    <RoundScrollContainer
+      v-else
       :items="soundsList"
       :showBackButton="true"
       :title="listTitle"
@@ -32,8 +33,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import InteractiveList from '../components/InteractiveList.vue';
-import { playPreview, stopPreview } from '../services/audioService';
+import RoundScrollContainer from '../components/RoundScrollContainer.vue';
+import { stopPreview, playGlobalSound } from '../services/audioService';
 import { useAppStore } from '../stores/appState';
 
 const route = useRoute();
@@ -75,9 +76,10 @@ const removeAudioExtensions = (name: string): string => {
   return name.replace(pattern, '');
 };
 
-// Get the country name from the route params
+// Get the country name from the query params (optional)
 const countryName = computed(() => {
-  return decodeURIComponent(route.params.country as string);
+  const country = route.query.country as string | undefined;
+  return country ? decodeURIComponent(country) : 'all';
 });
 
 // Get the search phrase from the route params
@@ -93,16 +95,15 @@ const listTitle = computed(() => {
   if (isFavorites.value) {
     return 'Favorite Sounds';
   }
+  if (countryName.value === 'all') {
+    return categoryName.value
+  }
   return `"${categoryName.value}" from ${countryName.value}`;
 });
 
 // Create a formatted list of sounds for the InteractiveList component
 const soundsList = computed(() => {
   return sounds.value
-    .sort((a, b) => {
-      // Sort by duration in descending order
-      return b.duration - a.duration;
-    })
     .map((sound) => {
       // Format duration in minutes:seconds
       const minutes = Math.floor(sound.duration / 60);
@@ -180,7 +181,7 @@ onMounted(() => {
   appStore.setLastSoundListRoute('SoundsList', {
     categoryName: route.params.categoryName as string,
     searchPhrase: route.params.searchPhrase as string,
-    country: route.params.country as string,
+    country: (route.query.country as string) || 'all',
   });
 });
 
@@ -188,21 +189,45 @@ const selectSound = (sound: any) => {
   // Get the selected sound data
   const selectedSound = sound.data;
   if (selectedSound) {
-    // Navigate to the sound player page
-    const p = {
-      name: 'SoundPlayer',
-      params: isFavorites.value
-        ? selectedSound
-        : {
-            id: selectedSound.id.toString(),
-            name: removeAudioExtensions(selectedSound.name),
-            previewUrl: selectedSound.previews['preview-hq-mp3'],
-            duration: selectedSound.duration.toString(),
-            category: categoryName.value,
-            country: countryName.value,
-          },
-    };
-    router.push(p);
+    // Find the index of this sound in the sounds array
+    const soundIndex = sounds.value.findIndex(s => s.id === selectedSound.id);
+    
+    console.log('Setting playlist:', {
+      totalSounds: sounds.value.length,
+      currentIndex: soundIndex,
+      selectedSound: selectedSound.name,
+      category: categoryName.value,
+      country: countryName.value,
+    });
+    
+    // Store the playlist and current index in the app store with context
+    appStore.setCurrentPlaylist(sounds.value, soundIndex, {
+      category: categoryName.value,
+      country: countryName.value,
+    });
+    
+    // Determine preview URL based on sound object structure (Search Result vs Favorite)
+    const previewUrl = selectedSound.previews 
+      ? selectedSound.previews['preview-hq-mp3'] 
+      : selectedSound.previewUrl;
+
+    // Play the sound globally using audioService
+    playGlobalSound(
+      {
+        id: selectedSound.id.toString(),
+        name: selectedSound.name,
+        previewUrl: previewUrl,
+        duration: selectedSound.duration,
+        currentTime: 0,
+        category: categoryName.value,
+        country: countryName.value,
+        soundId: selectedSound.id,
+      },
+      false // don't loop
+    );
+    
+    // Navigate to MediaPlayer page to show the player
+    router.push({ name: 'MediaPlayer' });
   }
 };
 

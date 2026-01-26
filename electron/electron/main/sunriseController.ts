@@ -1,171 +1,340 @@
-import { ipcMain, dialog } from 'electron';
-import { SunriseStep } from '../../types/state';
+import { ipcMain } from 'electron';
+import { ColorFavorite } from '../../types/state';
 import { sendLEDToSerial, getState } from './stateManager';
-import sunriseTimelines from '../../assets/sunriseTimelines.json';
 
 // Store for the sunrise playback state
 let isPlaying = false;
 let playbackTimer: NodeJS.Timeout | null = null;
-let currentTimeline: SunriseStep[] = [];
 let currentDuration = 600; // Default 10 minutes in seconds
 let startTime = 0;
+let scheduledTimeouts: NodeJS.Timeout[] = [];
+
+// Store LED state before sunrise to restore later
+let savedLampState: {
+  warmWhite: number;
+  pink: number;
+  orange: number;
+  brightness: number;
+} | null = null;
+let savedProjectorState: {
+  color0: number;
+  color1: number;
+  color2: number;
+  brightness: number;
+} | null = null;
+
+// Map strip type for lamp and projector
+const STRIP_LAMP = 0;
+const STRIP_PROJECTOR = 1;
 
 /**
- * Map strip name to numeric ID for Arduino
- * @param stripName The name of the strip (e.g., "SUN_CENTER")
- * @returns The numeric ID for the strip
+ * Get the preset favorites in order
  */
-function mapStripNameToId(stripName: string): number {
-  switch (stripName.toUpperCase()) {
-    case 'SUN_CENTER':
-      return 0;
-    case 'SUN_RING':
-      return 1;
-    case 'LAMP':
-      return 2;
-    default:
-      console.warn(
-        `Unknown strip name: ${stripName}, defaulting to SUN_CENTER (0)`
-      );
-      return 0;
+function getSunrisePresets(): ColorFavorite[] {
+  const state = getState();
+  if (!state?.ambienceFavorites) return [];
+
+  const presetOrder = ['night', 'first-light', 'dawn', 'sunrise', 'day'];
+  const presets: ColorFavorite[] = [];
+
+  for (const id of presetOrder) {
+    const preset = state.ambienceFavorites.find(
+      (fav) => fav.id === id && fav.isPreset
+    );
+    if (preset) {
+      presets.push(preset);
+    }
   }
+
+  return presets;
 }
 
 /**
- * Scale the timeline to fit the desired duration
- * @param timeline The original timeline
- * @param targetDuration The desired duration in seconds
- * @returns Scaled timeline
+ * Generate transitions between preset steps
+ * @param duration Total duration in seconds
+ * @param holdPercentage Percentage of each step to hold (0-100). 0% = continuous transitions, 100% = instant transitions
  */
-function scaleTimeline(
-  timeline: SunriseStep[],
-  targetDuration: number
-): SunriseStep[] {
-  if (!timeline || timeline.length === 0) return [];
+function generateSunriseSequence(
+  duration: number,
+  holdPercentage: number
+): Array<{
+  timestamp: number;
+  lamp: { warmWhite: number; pink: number; orange: number };
+  projector: { color0: number; color1: number; color2: number };
+  transitionDuration: number;
+}> {
+  const presets = getSunrisePresets();
+  if (presets.length === 0) {
+    console.error('[sunriseController] No preset favorites found');
+    return [];
+  }
 
-  // Find the maximum startAt + duration value as the original total duration
-  const originalEndTime = Math.max(
-    ...timeline.map((step) => step.startAt + step.duration)
-  );
+  const sequence = [];
+  const stepDuration = duration / presets.length; // Duration for each step in seconds
+  const transitionPercentage = 1 - holdPercentage / 100;
+  const transitionDuration = stepDuration * transitionPercentage; // Configurable transition time
 
-  if (originalEndTime <= 0) return timeline; // Prevent division by zero
-
-  // Calculate scale factor
-  const scaleFactor = (targetDuration * 1000) / originalEndTime;
-
-  // Scale all time values
-  return timeline.map((step) => ({
-    ...step,
-    startAt: Math.round(step.startAt * scaleFactor),
-    duration: Math.round(step.duration * scaleFactor),
-  }));
-}
-
-/**
- * Play a specific step in the timeline
- * @param step The step to play
- */
-function playStep(step: SunriseStep) {
   console.log(
-    `[sunriseController] Playing step: strip=${step.strip}, pixel=${step.pixel}, R=${step.red}, G=${step.green}, B=${step.blue}, W=${step.white}, duration=${step.duration}ms`
+    `[sunriseController] Generating sequence: ${presets.length} presets, ${stepDuration}s per step, ${transitionDuration}s transitions (${holdPercentage}% hold)`
   );
 
-  // Handle -1 values for color channels that should stay unchanged
-  // We need to send the message with the current values instead of -1
-  if (
-    step.red === -1 ||
-    step.green === -1 ||
-    step.blue === -1 ||
-    step.white === -1
-  ) {
-    // Just pass through the -1 values, the Arduino code will handle them
-    sendLEDToSerial(
-      mapStripNameToId(step.strip),
-      step.pixel,
-      step.red,
-      step.green,
-      step.blue,
-      step.white,
-      step.duration
-    );
-  } else {
-    // All values are provided, send them directly
-    sendLEDToSerial(
-      mapStripNameToId(step.strip),
-      step.pixel,
-      step.red,
-      step.green,
-      step.blue,
-      step.white,
-      step.duration
+  for (let i = 0; i < presets.length; i++) {
+    const currentPreset = presets[i];
+    const stepStartTime = i * stepDuration;
+
+    // Apply brightness multiplier to colors
+    const lampMultiplier = currentPreset.lamp.brightness / 100;
+    const projectorMultiplier = currentPreset.projector.brightness / 100;
+
+    const lampColors = {
+      warmWhite: Math.round(currentPreset.lamp.colors[0] * lampMultiplier),
+      pink: Math.round(currentPreset.lamp.colors[1] * lampMultiplier),
+      orange: Math.round(currentPreset.lamp.colors[2] * lampMultiplier),
+    };
+
+    const projectorColors = {
+      color0: Math.round(
+        currentPreset.projector.colors[0] * projectorMultiplier
+      ),
+      color1: Math.round(
+        currentPreset.projector.colors[1] * projectorMultiplier
+      ),
+      color2: Math.round(
+        currentPreset.projector.colors[2] * projectorMultiplier
+      ),
+    };
+
+    // Transition into this step (from previous step)
+    // This happens at the start of the step
+    sequence.push({
+      timestamp: stepStartTime,
+      lamp: lampColors,
+      projector: projectorColors,
+      transitionDuration: transitionDuration * 1000, // Convert to ms
+    });
+
+    console.log(
+      `[sunriseController] Step ${i} (${currentPreset.name}) at ${stepStartTime.toFixed(2)}s, transition ${transitionDuration.toFixed(2)}s`
     );
   }
+
+  return sequence;
 }
 
 /**
- * Start playing back the sunrise timeline
- * @param timeline The timeline to play
+ * Start playing back the sunrise sequence
  * @param duration The total duration in seconds
+ * @param holdPercentage Percentage of each step to hold (0-100). 0% = continuous transitions, 100% = instant transitions
  */
-export function startSunrise(timeline: SunriseStep[], duration: number) {
+export function startSunrise(duration: number, holdPercentage: number = 0) {
   if (isPlaying) {
     stopSunrise();
   }
 
-  if (!timeline || timeline.length === 0) {
+  console.log(
+    `[sunriseController] Starting sunrise, ${duration} seconds, ${holdPercentage}% hold`
+  );
+
+  // Save current LED state before starting
+  const state = getState();
+  if (state) {
+    savedLampState = {
+      warmWhite: state.lampColors.warmWhite,
+      pink: state.lampColors.pink,
+      orange: state.lampColors.orange,
+      brightness: state.lampBrightness,
+    };
+    savedProjectorState = {
+      color0: state.projectorColors.color0,
+      color1: state.projectorColors.color1,
+      color2: state.projectorColors.color2,
+      brightness: state.projectorBrightness,
+    };
+    // Calculate actual hardware values for logging
+    const lampMultiplier = state.lampBrightness / 100;
+    const projectorMultiplier = state.projectorBrightness / 100;
+    console.log(
+      `[sunriseController] Saved state - Lamp(${Math.round(savedLampState.warmWhite * lampMultiplier)}, ${Math.round(savedLampState.pink * lampMultiplier)}, ${Math.round(savedLampState.orange * lampMultiplier)} @ ${state.lampBrightness}%), Projector(${Math.round(savedProjectorState.color0 * projectorMultiplier)}, ${Math.round(savedProjectorState.color1 * projectorMultiplier)}, ${Math.round(savedProjectorState.color2 * projectorMultiplier)} @ ${state.projectorBrightness}%)`
+    );
+  }
+
+  // Turn off all lights immediately (no transition from current state)
+  sendLEDToSerial(STRIP_LAMP, 0, 0, 0, 0, 0);
+  sendLEDToSerial(STRIP_PROJECTOR, 0, 0, 0, 0, 0);
+  console.log('[sunriseController] Lights turned off');
+
+  const sequence = generateSunriseSequence(duration, holdPercentage);
+
+  if (sequence.length === 0) {
     console.error(
-      '[sunriseController] Cannot start sunrise: No timeline provided'
+      '[sunriseController] Cannot start sunrise: No sequence generated'
     );
     return;
   }
 
-  console.log(
-    `[sunriseController] Starting sunrise, ${timeline.length} steps over ${duration} seconds`
-  );
-
-  currentTimeline = scaleTimeline(timeline, duration);
   currentDuration = duration;
   isPlaying = true;
   startTime = Date.now();
+  scheduledTimeouts = [];
 
-  // Schedule each step according to its startAt time
-  currentTimeline.forEach((step) => {
-    setTimeout(() => {
+  // Schedule each step
+  sequence.forEach((step) => {
+    const timeout = setTimeout(() => {
       if (isPlaying) {
-        playStep(step);
+        console.log(
+          `[sunriseController] Applying colors: Lamp(${step.lamp.warmWhite}, ${step.lamp.pink}, ${step.lamp.orange}), Projector(${step.projector.color0}, ${step.projector.color1}, ${step.projector.color2}), Duration: ${step.transitionDuration}ms`
+        );
+
+        // Send lamp colors
+        sendLEDToSerial(
+          STRIP_LAMP,
+          0,
+          step.lamp.orange,
+          step.lamp.warmWhite,
+          step.lamp.pink,
+          step.transitionDuration
+        );
+
+        // Send projector colors (note: colors are reordered to match hardware mapping)
+        sendLEDToSerial(
+          STRIP_PROJECTOR,
+          0,
+          step.projector.color2,
+          step.projector.color0,
+          step.projector.color1,
+          step.transitionDuration
+        );
       }
-    }, step.startAt);
+    }, step.timestamp * 1000); // Convert to milliseconds
+
+    scheduledTimeouts.push(timeout);
   });
 
-  // // Set a timer to stop the sunrise after the duration has elapsed
-  // playbackTimer = setTimeout(
-  //   () => {
-  //     stopSunrise();
-  //   },
-  //   duration * 1000 + 1000
-  // ); // Add a 1-second buffer
+  // Schedule restoration of lights at the end of the sequence
+  const endTimeout = setTimeout(() => {
+    if (isPlaying && savedLampState && savedProjectorState) {
+      // Apply brightness multiplier to get actual hardware values
+      const lampMultiplier = savedLampState.brightness / 100;
+      const projectorMultiplier = savedProjectorState.brightness / 100;
+
+      const lampOrange = Math.round(savedLampState.orange * lampMultiplier);
+      const lampWarmWhite = Math.round(
+        savedLampState.warmWhite * lampMultiplier
+      );
+      const lampPink = Math.round(savedLampState.pink * lampMultiplier);
+
+      const projColor0 = Math.round(
+        savedProjectorState.color0 * projectorMultiplier
+      );
+      const projColor1 = Math.round(
+        savedProjectorState.color1 * projectorMultiplier
+      );
+      const projColor2 = Math.round(
+        savedProjectorState.color2 * projectorMultiplier
+      );
+
+      console.log(
+        `[sunriseController] Sunrise ended, restoring lights - Lamp(${lampWarmWhite}, ${lampPink}, ${lampOrange} @ ${savedLampState.brightness}%), Projector(${projColor0}, ${projColor1}, ${projColor2} @ ${savedProjectorState.brightness}%)`
+      );
+
+      // Restore lamp colors with brightness applied
+      sendLEDToSerial(
+        STRIP_LAMP,
+        0,
+        lampOrange,
+        lampWarmWhite,
+        lampPink,
+        2000 // 2 second transition to restored state
+      );
+
+      // Restore projector colors with brightness applied
+      sendLEDToSerial(
+        STRIP_PROJECTOR,
+        0,
+        projColor2,
+        projColor0,
+        projColor1,
+        2000 // 2 second transition to restored state
+      );
+
+      isPlaying = false;
+      savedLampState = null;
+      savedProjectorState = null;
+    }
+  }, duration * 1000); // Convert to milliseconds
+
+  scheduledTimeouts.push(endTimeout);
 }
 
 /**
  * Stop the sunrise playback
  */
 export function stopSunrise() {
-  if (!isPlaying) return;
-
   console.log('[sunriseController] Stopping sunrise');
 
+  // Restore saved state if available, otherwise turn off
+  if (savedLampState && savedProjectorState) {
+    // Apply brightness multiplier to get actual hardware values
+    const lampMultiplier = savedLampState.brightness / 100;
+    const projectorMultiplier = savedProjectorState.brightness / 100;
+
+    const lampOrange = Math.round(savedLampState.orange * lampMultiplier);
+    const lampWarmWhite = Math.round(savedLampState.warmWhite * lampMultiplier);
+    const lampPink = Math.round(savedLampState.pink * lampMultiplier);
+
+    const projColor0 = Math.round(
+      savedProjectorState.color0 * projectorMultiplier
+    );
+    const projColor1 = Math.round(
+      savedProjectorState.color1 * projectorMultiplier
+    );
+    const projColor2 = Math.round(
+      savedProjectorState.color2 * projectorMultiplier
+    );
+
+    console.log(
+      `[sunriseController] Restoring lights - Lamp(${lampWarmWhite}, ${lampPink}, ${lampOrange} @ ${savedLampState.brightness}%), Projector(${projColor0}, ${projColor1}, ${projColor2} @ ${savedProjectorState.brightness}%)`
+    );
+    sendLEDToSerial(STRIP_LAMP, 0, lampOrange, lampWarmWhite, lampPink, 2000);
+    sendLEDToSerial(
+      STRIP_PROJECTOR,
+      0,
+      projColor2,
+      projColor0,
+      projColor1,
+      2000
+    );
+  } else {
+    // No saved state, just turn off
+    sendLEDToSerial(STRIP_PROJECTOR, 0, 0, 0, 0, 2000);
+    sendLEDToSerial(STRIP_LAMP, 0, 0, 0, 0, 2000);
+  }
+
+  // Set flag to prevent any further playback
   isPlaying = false;
+  savedLampState = null;
+  savedProjectorState = null;
+
+  // Clear all scheduled timeouts
+  scheduledTimeouts.forEach((timeout) => {
+    try {
+      clearTimeout(timeout);
+    } catch (e) {
+      console.error('[sunriseController] Error clearing timeout:', e);
+    }
+  });
+  scheduledTimeouts = [];
 
   if (playbackTimer) {
-    clearTimeout(playbackTimer);
+    try {
+      clearTimeout(playbackTimer);
+    } catch (e) {
+      console.error('[sunriseController] Error clearing playback timer:', e);
+    }
     playbackTimer = null;
   }
 
-  // Reset all LEDs
-  sendLEDToSerial(0, 0, 0, 0, 0, 0, 2000); // SUN_CENTER LED 0
-  sendLEDToSerial(0, 1, 0, 0, 0, 0, 2000); // SUN_CENTER LED 1
-  sendLEDToSerial(1, 0, 0, 0, 0, 0, 2000); // SUN_RING
-  sendLEDToSerial(2, 0, 0, 0, 0, 0, 2000); // LAMP
+  console.log('[sunriseController] Sunrise stopped and LEDs reset');
 }
 
 /**
@@ -174,14 +343,8 @@ export function stopSunrise() {
 export function initSunriseController() {
   ipcMain.handle(
     'start-sunrise',
-    async (_, duration: number, timeline: string = 'default') => {
-      const timelineInfo = sunriseTimelines.find((t) => t.name === timeline);
-      if (!timelineInfo) {
-        console.warn('[sunriseController] timeline not found', timeline);
-        return false;
-      }
-      const timelineData = timelineInfo.timeline as SunriseStep[];
-      startSunrise(timelineData, duration);
+    async (_, duration: number, holdPercentage?: number) => {
+      startSunrise(duration, holdPercentage);
       return true;
     }
   );

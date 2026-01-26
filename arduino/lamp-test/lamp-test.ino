@@ -20,6 +20,11 @@ Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_RGB + NEO_KHZ800);
 // Argument 2 = Arduino pin number (most are valid)
 // Argument 3 = Pixel type flags
 
+// Base color for lamp (orange/white/pink)
+int baseR = 200;
+int baseG = 255;
+int baseB = 150;
+
 void setup() {
   // These lines are specifically to support the Adafruit Trinket 5V 16 MHz.
   // Any other board, you can remove this part (but no harm leaving it):
@@ -30,33 +35,34 @@ void setup() {
 
   strip.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
   strip.show();            // Turn OFF all pixels ASAP
-  strip.setBrightness(0); // Set BRIGHTNESS to about 1/5 (max = 255)
+  strip.setBrightness(100); // Set BRIGHTNESS to max (max = 255)
 
-                    //    orng  wht  pnk
-  strip.setPixelColor(0,  200,  255, 150);
+  strip.setPixelColor(0, baseR, baseG, baseB);
   strip.show();
 }
 void loop() {
-
-  //rainbow(10);             // Flowing rainbow cycle along the whole strip
+//  breathe(10);
 }
 
-// Rainbow cycle along whole strip. Pass delay time (in ms) between frames.
-void rainbow(int wait) {
-  // Hue of first pixel runs 5 complete loops through the color wheel.
-  // Color wheel has a range of 65536 but it's OK if we roll over, so
-  // just count from 0 to 5*65536. Adding 256 to firstPixelHue each time
-  // means we'll make 5*65536/256 = 1280 passes through this loop:
-  for(long firstPixelHue = 0; firstPixelHue < 5*65536; firstPixelHue += 256) {
-    // strip.rainbow() can take a single argument (first pixel hue) or
-    // optionally a few extras: number of rainbow repetitions (default 1),
-    // saturation and value (brightness) (both 0-255, similar to the
-    // ColorHSV() function, default 255), and a true/false flag for whether
-    // to apply gamma correction to provide 'truer' colors (default true).
-    strip.rainbow(firstPixelHue);
-    // Above line is equivalent to:
-    // strip.rainbow(firstPixelHue, 1, 255, 255, true);
-    strip.show(); // Update strip with new contents
-    delay(wait);  // Pause for a moment
+// Breathe brightness from 0 to 255 and back
+void breathe(int wait) {
+  // Fade up from 0 to 255
+  for (int brightness = 0; brightness < 256; brightness++) {
+    int r = (baseR * brightness) / 255;
+    int g = (baseG * brightness) / 255;
+    int b = (baseB * brightness) / 255;
+    strip.setPixelColor(0, r, g, b);
+    strip.show();
+    delay(wait);
+  }
+  
+  // Fade down from 255 to 0
+  for (int brightness = 255; brightness >= 0; brightness--) {
+    int r = (baseR * brightness) / 255;
+    int g = (baseG * brightness) / 255;
+    int b = (baseB * brightness) / 255;
+    strip.setPixelColor(0, r, g, b);
+    strip.show();
+    delay(wait);
   }
 }

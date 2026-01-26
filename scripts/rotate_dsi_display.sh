@@ -1,10 +1,56 @@
 #!/bin/bash
 
-# Script to rotate DSI display 90 degrees and fix touch tracking
+# Script to rotate DSI display and fix touch tracking
 # This script configures both the display rotation in /boot/firmware/config.txt
 # and the touch input coordination. It is idempotent and can be run multiple times.
+#
+# Usage: sudo ./rotate_dsi_display.sh [DEGREES]
+# DEGREES: 0, 90, 180, or 270 (default: 90)
 
-echo "Configuring DSI display rotation and touch input..."
+# Parse rotation parameter
+ROTATION_DEGREES=${1:-90}
+
+# Validate rotation parameter
+if [[ ! "$ROTATION_DEGREES" =~ ^(0|90|180|270)$ ]]; then
+    echo "Error: Invalid rotation angle '$ROTATION_DEGREES'"
+    echo "Usage: $0 [DEGREES]"
+    echo "  DEGREES must be one of: 0, 90, 180, 270"
+    echo "  Default: 90"
+    exit 1
+fi
+
+# Map rotation degrees to display_rotate value, transformation matrix, and xrandr rotation
+case $ROTATION_DEGREES in
+    0)
+        DISPLAY_ROTATE=0
+        TRANSFORM_MATRIX="1 0 0 0 1 0 0 0 1"
+        XRANDR_ROTATION="normal"
+        ROTATION_DESC="0 degrees (no rotation)"
+        ;;
+    90)
+        DISPLAY_ROTATE=1
+        TRANSFORM_MATRIX="0 1 0 -1 0 1 0 0 1"
+        XRANDR_ROTATION="right"
+        ROTATION_DESC="90 degrees clockwise"
+        ;;
+    180)
+        DISPLAY_ROTATE=2
+        TRANSFORM_MATRIX="-1 0 1 0 -1 1 0 0 1"
+        XRANDR_ROTATION="inverted"
+        ROTATION_DESC="180 degrees"
+        ;;
+    270)
+        DISPLAY_ROTATE=3
+        TRANSFORM_MATRIX="0 -1 1 1 0 0 0 0 1"
+        XRANDR_ROTATION="left"
+        ROTATION_DESC="270 degrees clockwise (90 degrees counter-clockwise)"
+        ;;
+esac
+
+echo "Configuring DSI display rotation to $ROTATION_DESC..."
+echo "Display rotate value: $DISPLAY_ROTATE"
+echo "Transform matrix: $TRANSFORM_MATRIX"
+echo ""
 
 # Function to create autostart script for persistent touch rotation
 create_autostart_script() {
@@ -26,8 +72,28 @@ log_message() {
     echo "\$(date '+%Y-%m-%d %H:%M:%S') - \$1" >> "\$LOG_FILE"
 }
 
-log_message "LXDE autostart: Touch rotation script started"
+log_message "LXDE autostart: Display and touch rotation script started"
 log_message "Target device ID: $device_id"
+log_message "Target rotation: $ROTATION_DESC"
+log_message "DISPLAY environment: \$DISPLAY"
+log_message "USER environment: \$USER"
+
+# Apply display rotation via xrandr (for KMS displays)
+if command -v xrandr >/dev/null 2>&1; then
+    DSI_OUTPUT=\$(xrandr --query 2>/dev/null | grep -E "^DSI-[0-9]+" | awk '{print \$1}' | head -1)
+    if [ -n "\$DSI_OUTPUT" ]; then
+        log_message "Applying xrandr rotation to \$DSI_OUTPUT: $XRANDR_ROTATION"
+        if xrandr --output "\$DSI_OUTPUT" --rotate "$XRANDR_ROTATION" 2>>"\$LOG_FILE"; then
+            log_message "SUCCESS: Display rotation applied via xrandr"
+        else
+            log_message "ERROR: Failed to apply xrandr rotation"
+        fi
+    else
+        log_message "WARNING: No DSI output found for xrandr rotation"
+    fi
+fi
+
+log_message "Target touch device ID: $device_id"
 log_message "DISPLAY environment: \$DISPLAY"
 log_message "USER environment: \$USER"
 
@@ -50,8 +116,8 @@ fi
 log_message "Device $device_id found, applying rotation..."
 
 # Apply touch rotation
-if xinput set-prop $device_id "Coordinate Transformation Matrix" 0 1 0 -1 0 1 0 0 1 2>>"\$LOG_FILE"; then
-    log_message "SUCCESS: Touch rotation applied successfully for device $device_id"
+if xinput set-prop $device_id "Coordinate Transformation Matrix" $TRANSFORM_MATRIX 2>>"\$LOG_FILE"; then
+    log_message "SUCCESS: Touch rotation ($ROTATION_DESC) applied successfully for device $device_id"
     
     # Verify the transformation was applied
     log_message "Verifying transformation matrix:"
@@ -109,29 +175,29 @@ if [ -f "$CONFIG_FILE" ]; then
     CURRENT_ROTATE=$(grep "^display_rotate=" "$CONFIG_FILE" 2>/dev/null | cut -d'=' -f2)
     COMMENTED_ROTATE=$(grep "^#.*display_rotate=" "$CONFIG_FILE" 2>/dev/null)
 
-    if [ "$CURRENT_ROTATE" = "1" ]; then
-        echo "✓ Display rotation already set to 90 degrees (display_rotate=1)"
+    if [ "$CURRENT_ROTATE" = "$DISPLAY_ROTATE" ]; then
+        echo "✓ Display rotation already set to $ROTATION_DESC (display_rotate=$DISPLAY_ROTATE)"
     else
         NEED_CONFIG_CHANGE=true
         if [ "$EUID" -ne 0 ]; then
             echo "⚠ Config.txt needs modification but script not running as root"
             echo "  Run with sudo to automatically update config.txt, or manually add:"
-            echo "  display_rotate=1"
+            echo "  display_rotate=$DISPLAY_ROTATE"
             echo "  to $CONFIG_FILE"
         else
             echo "Updating display rotation in $CONFIG_FILE..."
             if [ -n "$COMMENTED_ROTATE" ]; then
                 echo "Found commented display_rotate line, updating it..."
-                sed -i 's/^#.*display_rotate=.*/display_rotate=1/' "$CONFIG_FILE"
-                echo "✓ Updated existing commented display_rotate to display_rotate=1"
+                sed -i "s/^#.*display_rotate=.*/display_rotate=$DISPLAY_ROTATE/" "$CONFIG_FILE"
+                echo "✓ Updated existing commented display_rotate to display_rotate=$DISPLAY_ROTATE"
             elif [ -n "$CURRENT_ROTATE" ]; then
-                echo "Current display_rotate=$CURRENT_ROTATE, updating to 90 degrees..."
-                sed -i 's/^display_rotate=.*/display_rotate=1/' "$CONFIG_FILE"
-                echo "✓ Updated display_rotate to 1 (90 degrees clockwise)"
+                echo "Current display_rotate=$CURRENT_ROTATE, updating to $ROTATION_DESC..."
+                sed -i "s/^display_rotate=.*/display_rotate=$DISPLAY_ROTATE/" "$CONFIG_FILE"
+                echo "✓ Updated display_rotate to $DISPLAY_ROTATE ($ROTATION_DESC)"
             else
                 echo "No display_rotate setting found, adding it..."
-                echo "display_rotate=1" >> "$CONFIG_FILE"
-                echo "✓ Added display_rotate=1 to config.txt"
+                echo "display_rotate=$DISPLAY_ROTATE" >> "$CONFIG_FILE"
+                echo "✓ Added display_rotate=$DISPLAY_ROTATE to config.txt"
             fi
         fi
     fi
@@ -145,6 +211,39 @@ DSI_DISPLAY_CHECK=$(ls /sys/class/drm/card*-DSI-* 2>/dev/null)
 if [ -z "$DSI_DISPLAY_CHECK" ]; then
     echo "Warning: No DSI display detected in /sys/class/drm/"
     echo "Proceeding anyway - display might be configured differently"
+fi
+
+# Apply xrandr rotation for KMS-enabled displays
+echo ""
+echo "Applying display rotation via xrandr (for KMS/DRM displays)..."
+if command -v xrandr >/dev/null 2>&1; then
+    # Find DSI display output
+    DSI_OUTPUT=$(xrandr --query | grep -E "^DSI-[0-9]+" | awk '{print $1}' | head -1)
+    
+    if [ -n "$DSI_OUTPUT" ]; then
+        echo "Found display output: $DSI_OUTPUT"
+        
+        # Check current rotation
+        CURRENT_XRANDR_ROTATION=$(xrandr --query | grep "^$DSI_OUTPUT" | grep -oE "(normal|left|right|inverted)" | head -1)
+        echo "Current xrandr rotation: $CURRENT_XRANDR_ROTATION"
+        echo "Target xrandr rotation: $XRANDR_ROTATION"
+        
+        if [ "$CURRENT_XRANDR_ROTATION" = "$XRANDR_ROTATION" ]; then
+            echo "✓ Display already rotated to $ROTATION_DESC via xrandr"
+        else
+            echo "Applying xrandr rotation: xrandr --output $DSI_OUTPUT --rotate $XRANDR_ROTATION"
+            if xrandr --output "$DSI_OUTPUT" --rotate "$XRANDR_ROTATION" 2>/dev/null; then
+                echo "✓ Display rotation applied via xrandr"
+                NEED_CONFIG_CHANGE=true  # Mark that we need persistence
+            else
+                echo "⚠ Failed to apply xrandr rotation (exit code: $?)"
+            fi
+        fi
+    else
+        echo "⚠ No DSI output found in xrandr"
+    fi
+else
+    echo "⚠ xrandr not available"
 fi
 
 # Handle touch input configuration
@@ -174,7 +273,7 @@ else
         echo "⚠ No touch input device detected automatically."
         echo ""
         echo "Manual touch rotation command (replace [ID] with your device ID from above):"
-        echo "xinput set-prop [ID] \"Coordinate Transformation Matrix\" 0 1 0 -1 0 1 0 0 1"
+        echo "xinput set-prop [ID] \"Coordinate Transformation Matrix\" $TRANSFORM_MATRIX"
         echo ""
         echo "You can also run this script with a specific device ID:"
         echo "TOUCH_DEVICE_ID=[ID] $0"
@@ -234,12 +333,12 @@ if [ "$NEED_TOUCH_CHANGE" = true ]; then
         echo "Current transformation matrix:"
         xinput list-props "$XINPUT_DEVICE_ID" | grep "Coordinate Transformation Matrix"
         
-        # Apply the rotation that we know works
+        # Apply the rotation
         echo ""
-        echo "Applying 90-degree clockwise rotation to touch input..."
-        echo "Command: xinput set-prop $XINPUT_DEVICE_ID \"Coordinate Transformation Matrix\" 0 1 0 -1 0 1 0 0 1"
+        echo "Applying $ROTATION_DESC to touch input..."
+        echo "Command: xinput set-prop $XINPUT_DEVICE_ID \"Coordinate Transformation Matrix\" $TRANSFORM_MATRIX"
         
-        xinput set-prop "$XINPUT_DEVICE_ID" "Coordinate Transformation Matrix" 0 1 0 -1 0 1 0 0 1
+        xinput set-prop "$XINPUT_DEVICE_ID" "Coordinate Transformation Matrix" $TRANSFORM_MATRIX
         TOUCH_ROTATE=$?
 
         if [ $TOUCH_ROTATE -eq 0 ]; then
@@ -256,7 +355,7 @@ if [ "$NEED_TOUCH_CHANGE" = true ]; then
         else
             echo "✗ Failed to apply touch input rotation (exit code: $TOUCH_ROTATE)"
             echo "Try running the command manually:"
-            echo "xinput set-prop $XINPUT_DEVICE_ID \"Coordinate Transformation Matrix\" 0 1 0 -1 0 1 0 0 1"
+            echo "xinput set-prop $XINPUT_DEVICE_ID \"Coordinate Transformation Matrix\" $TRANSFORM_MATRIX"
         fi
     fi
 fi
@@ -305,23 +404,27 @@ echo ""
 echo "Manual touch rotation commands for testing:"
 echo ""
 if [ -n "$XINPUT_DEVICE_ID" ]; then
-    echo "# 90° clockwise (configured for your device):"
+    echo "# 0° (no rotation):"
+    echo "sudo $0 0"
+    echo "xinput set-prop $XINPUT_DEVICE_ID \"Coordinate Transformation Matrix\" 1 0 0 0 1 0 0 0 1"
+    echo ""
+    echo "# 90° clockwise:"
+    echo "sudo $0 90"
     echo "xinput set-prop $XINPUT_DEVICE_ID \"Coordinate Transformation Matrix\" 0 1 0 -1 0 1 0 0 1"
     echo ""
-    echo "# 90° counter-clockwise:" 
-    echo "xinput set-prop $XINPUT_DEVICE_ID \"Coordinate Transformation Matrix\" 0 -1 1 1 0 0 0 0 1"
-    echo ""
     echo "# 180° rotation:"
+    echo "sudo $0 180"
     echo "xinput set-prop $XINPUT_DEVICE_ID \"Coordinate Transformation Matrix\" -1 0 1 0 -1 1 0 0 1"
     echo ""
-    echo "# Reset to normal:"
-    echo "xinput set-prop $XINPUT_DEVICE_ID \"Coordinate Transformation Matrix\" 1 0 0 0 1 0 0 0 1"
+    echo "# 270° clockwise (90° counter-clockwise):"
+    echo "sudo $0 270"
+    echo "xinput set-prop $XINPUT_DEVICE_ID \"Coordinate Transformation Matrix\" 0 -1 1 1 0 0 0 0 1"
 else
     echo "# Example commands (replace [ID] with your device ID):"
-    echo "xinput set-prop [ID] \"Coordinate Transformation Matrix\" 0 1 0 -1 0 1 0 0 1"
+    echo "xinput set-prop [ID] \"Coordinate Transformation Matrix\" $TRANSFORM_MATRIX"
 fi
 echo ""
 echo "Useful commands:"
 echo "- List all input devices: xinput --list"
 echo "- Check device properties: xinput list-props 6"
-echo "- Run this script again: sudo $0"
+echo "- Run this script with different rotation: sudo $0 [0|90|180|270]"

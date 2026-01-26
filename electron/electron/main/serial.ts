@@ -60,12 +60,14 @@ export async function closeSerialPorts(): Promise<void> {
 messageQueueInterval = setInterval(processMessageQueue, MESSAGE_INTERVAL);
 
 export function startSerialComms() {
-  if (process.env.VITE_DEV_SERVER_URL && getConfig().dev.mockSerial) {
+  // Only skip serial on non-Linux platforms (macOS, Windows)
+  if (process.platform !== 'linux') {
     console.log(
-      '[serial] Skipping serial port initialization in development mode'
+      `[serial] Skipping serial port initialization on ${process.platform}`
     );
-    return; // Don't start serial in dev mode
+    return;
   }
+
   // Don't try to open if already open
   if (port) {
     console.log('[serial] Port already open');
@@ -89,6 +91,14 @@ export function startSerialComms() {
 
     port.on('open', () => {
       console.log('[serial] Serial port open');
+      // Send initial command to turn off lights and exit Arduino startup mode
+      // Wait a moment for Arduino to be ready to receive
+      setTimeout(() => {
+        console.log(
+          '[serial] Sending initial command to exit Arduino startup mode'
+        );
+        sendMessage('LERP_LED 0 0 0 0 0 0');
+      }, 1000);
     });
 
     port.on('error', (err) => {

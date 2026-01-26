@@ -6,7 +6,7 @@ import Wifi from './pages/Wifi.vue';
 import WifiPassword from './pages/WifiPassword.vue';
 import WifiConnect from './pages/WifiConnect.vue';
 import ClockPage from './pages/ClockPage.vue';
-import MainMenu from './pages/MainMenu.vue';
+import Settings from './pages/Settings.vue';
 import SoundCategories from './pages/SoundCategories.vue';
 import { nextTick } from 'vue';
 import { useAppStore } from './stores/appState';
@@ -29,12 +29,22 @@ const routes = [
     name: 'WifiConnect',
     component: WifiConnect,
   },
-  { path: '/menu', name: 'MainMenu', component: MainMenu },
+  { path: '/settings', name: 'Settings', component: Settings },
+  {
+    path: '/timezone-settings',
+    name: 'TimezoneSettings',
+    component: () => import('./pages/TimezoneSettings.vue'),
+  },
+  {
+    path: '/color-settings',
+    name: 'ColorSettings',
+    component: () => import('./pages/ColorSettings.vue'),
+  },
   { path: '/sounds', name: 'SoundCategories', component: SoundCategories },
   {
-    path: '/bluetooth-media',
-    name: 'BluetoothMedia',
-    component: () => import('./pages/BluetoothMedia.vue'),
+    path: '/media-player/:soundId?',
+    name: 'MediaPlayer',
+    component: () => import('./pages/MediaPlayer.vue'),
   },
   {
     path: '/bluetooth-pairing',
@@ -42,24 +52,9 @@ const routes = [
     component: () => import('./pages/BluetoothPairing.vue'),
   },
   {
-    path: '/sounds/countries/:searchPhrase/:categoryName',
-    name: 'SoundCountries',
-    component: () => import('./pages/SoundCountries.vue'),
-  },
-  {
-    path: '/sounds/list/:searchPhrase/:country/:categoryName',
+    path: '/sounds/list/:searchPhrase/:categoryName',
     name: 'SoundsList',
     component: () => import('./pages/SoundsList.vue'),
-  },
-  {
-    path: '/sounds/player/:id?/:name?/:previewUrl?/:duration?/:currentTime?/:category?/:country?',
-    name: 'SoundPlayer',
-    component: () => import('./pages/SoundPlayer.vue'),
-  },
-  {
-    path: '/sounds/player-menu/:id?/:name?/:previewUrl?/:duration?/:currentTime?/:totalTime?/:category?/:country?',
-    name: 'SoundPlayerMenu',
-    component: () => import('./pages/SoundPlayerMenu.vue'),
   },
   {
     path: '/alarm',
@@ -67,42 +62,24 @@ const routes = [
     component: () => import('./pages/SetAlarm.vue'),
   },
   {
-    path: '/level/volume',
-    name: 'Volume',
-    component: () => import('./pages/LevelControl.vue'),
-    props: { type: 'volume' },
+    path: '/ambience-control/:favoriteId?',
+    name: 'AmbienceControl',
+    component: () => import('./pages/AmbienceControl.vue'),
   },
   {
-    path: '/level/screenBrightness',
-    name: 'ScreenBrightness',
-    component: () => import('./pages/LevelControl.vue'),
-    props: { type: 'screenBrightness' },
+    path: '/ambience-favorites',
+    name: 'AmbienceFavorites',
+    component: () => import('./pages/AmbienceFavorites.vue'),
   },
   {
-    path: '/level/lampBrightness',
-    name: 'LampBrightness',
-    component: () => import('./pages/LevelControl.vue'),
-    props: { type: 'lampBrightness' },
-  },
-  {
-    path: '/projector',
-    name: 'ProjectorPreview',
-    component: () => import('./pages/ProjectorPreview.vue'),
-  },
-  {
-    path: '/projector/:ledIndex',
-    name: 'ProjectorLEDControl',
-    component: () => import('./pages/ProjectorLEDControl.vue'),
+    path: '/projector-control',
+    name: 'ProjectorControl',
+    component: () => import('./pages/ProjectorControl.vue'),
   },
   {
     path: '/sunriseSettings',
     name: 'SunriseSettings',
     component: () => import('./pages/SunriseSettings.vue'),
-  },
-  {
-    path: '/sunrise-sounds',
-    name: 'SunriseSounds',
-    component: () => import('./pages/SunriseSounds.vue'),
   },
   {
     path: '/sunrise-player',
@@ -125,9 +102,6 @@ const app = createApp(App);
 app.use(router);
 app.use(pinia); // Add Pinia to the Vue application
 
-// Mount the app
-app.mount('#app');
-
 // Initialize the app state from saved data
 const initializeAppState = async () => {
   const appStore = useAppStore();
@@ -140,6 +114,23 @@ const initializeAppState = async () => {
     appStore.saveState();
   });
 };
+
+// Load state and mount app
+document.fonts.ready.then(async () => {
+  // Load state BEFORE mounting to prevent race condition
+  await initializeAppState();
+
+  // Mount the app after state is loaded
+  app.mount('#app');
+
+  // Perform post-mount initialization
+  nextTick(async () => {
+    postMessage({ payload: 'removeLoading' }, '*');
+
+    // Check internet connectivity
+    await checkInternetAndRoute(true);
+  });
+});
 
 // Check internet connectivity and route accordingly with retries
 const checkInternetAndRoute = async (initialStartup = false) => {
@@ -301,40 +292,11 @@ const checkInternetAndRoute = async (initialStartup = false) => {
 // Set up hourly checks (60 * 60 * 1000 = 3600000 milliseconds = 1 hour)
 setInterval(checkInternetAndRoute, 3600000);
 
-// Check if the alarm should be triggered
-const checkAlarmCondition = () => {
-  const appStore = useAppStore();
-
-  // Only proceed if the alarm is active
-  if (!appStore.alarmActive) return;
-
-  const now = new Date();
-  const currentHour = now.getHours();
-  const currentMinute = now.getMinutes();
-
-  const [alarmHour, alarmMinute] = appStore.alarmTime;
-
-  // Check if it's time to trigger the alarm
-  if (currentHour === alarmHour && currentMinute === alarmMinute) {
-    console.log('Alarm time reached! Redirecting to SunrisePlayer...');
-
-    // Only redirect if we're not already on the SunrisePlayer page
-    if (router.currentRoute.value.name !== 'SunrisePlayer') {
-      router.push({ name: 'SunrisePlayer' });
-    }
+// Listen for alarm trigger from main process
+window.ipcRenderer.on('trigger-alarm', () => {
+  console.log('[Alarm] Received trigger from main process');
+  // Only redirect if we're not already on the SunrisePlayer page
+  if (router.currentRoute.value.name !== 'SunrisePlayer') {
+    router.push({ name: 'SunrisePlayer' });
   }
-};
-
-// Set up alarm check every 10
-setInterval(checkAlarmCondition, 10000);
-
-// Perform initialization and checks after the app is mounted
-nextTick(async () => {
-  postMessage({ payload: 'removeLoading' }, '*');
-
-  // Load saved app state
-  await initializeAppState();
-
-  // Check internet connectivity
-  await checkInternetAndRoute(true);
 });

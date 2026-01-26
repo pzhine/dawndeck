@@ -188,8 +188,13 @@ log_message "✓ Using npm at: \$NPM_CMD"
 log_message "Starting Electron app with: sudo -u \$ACTUAL_USER \$NPM_CMD run dev"
 log_message "=========================================="
 
+# Get the user ID for XDG variables
+USER_ID=\$(id -u "\$ACTUAL_USER")
+log_message "Setting XDG_RUNTIME_DIR for user ID: \$USER_ID"
+
 # Run npm dev as the actual user and keep terminal open
-sudo -u "\$ACTUAL_USER" bash -c "cd '\$ELECTRON_DIR' && \$NPM_CMD run dev" 2>&1 | tee -a "\$LOG_FILE"
+# We explicitly set XDG_RUNTIME_DIR and DBUS_SESSION_BUS_ADDRESS to ensure audio (PulseAudio) and Bluetooth work
+sudo -u "\$ACTUAL_USER" bash -c "export XDG_RUNTIME_DIR=/run/user/\$USER_ID; export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/\$USER_ID/bus; cd '\$ELECTRON_DIR' && \$NPM_CMD run dev" 2>&1 | tee -a "\$LOG_FILE"
 
 # Keep terminal open after exit
 echo ""

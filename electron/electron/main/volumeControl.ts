@@ -72,13 +72,13 @@ export function initVolumeControl(): void {
   });
 
   // Apply stored volume level on startup
-  const appState = getState();
-  if (appState && typeof appState.volume === 'number') {
-    setSystemVolume(appState.volume);
-    console.log(`Applied stored volume level on startup: ${appState.volume}%`);
-  } else {
-    console.log('No stored volume level found, using system default');
-  }
+  // const appState = getState();
+  // if (appState && typeof appState.volume === 'number') {
+  //   setSystemVolume(appState.volume);
+  //   console.log(`Applied stored volume level on startup: ${appState.volume}%`);
+  // } else {
+  //   console.log('No stored volume level found, using system default');
+  // }
 
   console.log('System volume control initialized');
 }
