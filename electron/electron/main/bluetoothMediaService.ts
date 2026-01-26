@@ -39,7 +39,31 @@ export class BluetoothMediaService extends EventEmitter {
 
   constructor() {
     super();
+    // Start connecting immediately
     this.connect();
+  }
+
+  public startConnection(): void {
+    if (this.connectionState === 'disconnected') {
+      this.connect();
+    }
+  }
+
+  public isSimulationActive(): boolean {
+    return this.simulationMode && this.mockService !== null;
+  }
+
+  public stopSimulation(): void {
+    if (this.simulationMode && this.mockService) {
+      this.mockService.stopSimulation();
+      this.mockService = null;
+      this.simulationMode = false;
+      this.connectionState = 'disconnected';
+      this.currentMetadata = null;
+      this.emit('disconnected');
+      this.emit('simulationStateChanged', false);
+      console.log('🛑 Simulation mode stopped');
+    }
   }
 
   private connect(): void {
@@ -80,7 +104,7 @@ export class BluetoothMediaService extends EventEmitter {
             const response: MediaControlResponse = JSON.parse(message);
             this.handleResponse(response);
           } catch (error) {
-            console.error('Failed to parse response:', error);
+            console.error('Failed to parse BT response:', error);
           }
         }
       }
@@ -133,15 +157,27 @@ export class BluetoothMediaService extends EventEmitter {
     // Initialize mock service
     this.mockService = new MockBluetoothMedia();
     this.mockService.on('metadataUpdated', (metadata: MediaMetadata) => {
+      const oldMetadata = this.currentMetadata;
       this.currentMetadata = metadata;
       this.emit('metadataUpdated', metadata);
+      
+      // Also emit statusChanged if status changed
+      if (!oldMetadata || oldMetadata.status !== metadata.status) {
+        console.log('Mock BT status changed:', metadata.status);
+        this.emit('statusChanged', metadata.status);
+      }
     });
     
     // Start simulation and get initial metadata
     this.mockService.startSimulation();
+    
+    // Automatically start playing
+    this.mockService.play();
+    
     this.currentMetadata = this.mockService.getCurrentMetadata();
     
     this.emit('connected');
+    this.emit('simulationStateChanged', true);
     console.log('🎶 Simulation mode ready');
   }
 
@@ -154,10 +190,12 @@ export class BluetoothMediaService extends EventEmitter {
       
       // Emit events for metadata changes
       if (!oldMetadata || oldMetadata.title !== response.metadata.title) {
+        console.log('[BT] Track changed:', response.metadata.title, '-', response.metadata.artist);
         this.emit('trackChanged', response.metadata);
       }
       
       if (!oldMetadata || oldMetadata.status !== response.metadata.status) {
+        console.log('[BT] Status changed:', oldMetadata?.status, '→', response.metadata.status);
         this.emit('statusChanged', response.metadata.status);
       }
       
@@ -377,6 +415,8 @@ export class BluetoothMediaService extends EventEmitter {
         return { success: await this.next(), action: 'next' };
       case 'previous':
         return { success: await this.previous(), action: 'previous' };
+      case 'toggleplaypause':
+        return { success: await this.togglePlayPause(), action: 'togglePlayPause' };
       case 'status':
         const metadata = await this.getMetadata();
         return { success: true, metadata, action: 'status' };

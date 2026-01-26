@@ -9,6 +9,7 @@
 
     <!-- Transparent clock overlay in the foreground -->
     <ClockComponent
+      class="clock-overlay"
       :transparent="true"
       :transparentReverse="showTransparentReverse"
     />
@@ -33,7 +34,9 @@ const animationStartTime = ref(Date.now());
 const volumeUpdateInterval = ref<number | null>(null);
 const showTransparentReverse = ref(false);
 const sunriseOpacity = ref(1);
-const targetVolume = ref(appStore.volume / 100);
+
+// Use the saved alarm volume (last volume when alarm sound was playing)
+const targetVolume = ref(appStore.alarmVolume / 100);
 
 // Computed property to get the total sunrise duration in milliseconds
 const sunriseDuration = computed(() => appStore.sunriseDuration * 1000);
@@ -169,5 +172,10 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   z-index: 1;
+}
+
+.clock-overlay {
+  position: relative;
+  z-index: 2;
 }
 </style>

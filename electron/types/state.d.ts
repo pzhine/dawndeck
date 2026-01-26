@@ -28,6 +28,24 @@ export interface SunriseStep {
   duration: number;
 }
 
+// Define the interface for color favorites
+export interface ColorFavorite {
+  id: string;
+  name: string;
+  isPreset?: boolean; // True for sunrise presets that can be edited but not deleted
+  lamp: {
+    colors: [number, number, number]; // RGB values 0-255
+    position: { x: number; y: number };
+    brightness: number;
+  };
+  projector: {
+    colors: [number, number, number]; // RGB values 0-255
+    position: { x: number; y: number };
+    brightness: number;
+  };
+  timestamp: number;
+}
+
 // Define the interface for application configuration
 export interface AppConfig {
   freesound: {
@@ -64,7 +82,25 @@ export interface AppState {
   screenBrightness: number;
   projectorBrightness: number;
   lampBrightness: number;
+  lampActive: boolean; // Whether the lamp is currently active
+  lampColors: {
+    warmWhite: number; // 0-255
+    pink: number; // 0-255
+    orange: number; // 0-255
+  };
+  lampPosition?: { x: number; y: number }; // SVG coordinates for lamp color picker
+  projectorActive: boolean; // Whether the projector is currently active
+  projectorColors: {
+    color0: number; // 0-255
+    color1: number; // 0-255
+    color2: number; // 0-255
+  };
+  projectorPosition?: { x: number; y: number }; // SVG coordinates for projector color picker
+  ambienceFavorites: ColorFavorite[]; // Array of ambience color favorites (lamp + projector)
   timeFormat: '12h' | '24h'; // Add time format preference
+  timezone: string; // IANA timezone identifier (e.g., 'America/New_York')
+  colonBlink: boolean; // Whether the colon between hours and minutes should blink
+  uiColor: { r: number; g: number; b: number }; // RGB color for UI theme (0-255 each)
   listPositions: ListPositions; // Store InteractiveList positions by route
   alarmSound: AlarmSound | null;
   favoriteSounds: AlarmSound[]; // Array to store favorite sounds
@@ -86,7 +122,10 @@ export interface AppState {
   sunriseDuration: number;
   sunriseActive: boolean;
   sunriseBrightness: number; // Global brightness for sunrise (0-100)
+  alarmVolume: number; // Volume to use for alarm sound during sunrise (0-100)
   config: AppConfig; // Application configuration from main process
+  currentPlaylist: any[]; // Current playlist of sounds
+  currentPlaylistIndex: number; // Current index in the playlist
 }
 
 export type UpdateStatus =

@@ -46,7 +46,7 @@ export class MockBluetoothMedia extends EventEmitter {
       timestamp: Date.now()
     },
     {
-      title: "Chapter 1: The Desert Planet",
+      title: "Chapter 1: The Desert Planet of Arrakis (Dune)",
       artist: "Frank Herbert",
       album: "Dune (Audiobook)",
       duration: 2847, // 47:27

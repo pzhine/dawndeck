@@ -263,14 +263,20 @@ export async function searchSoundsWithCache(
   const url = new URL(`${BASE_URL}/search/text/`);
 
   // Add query parameters
+  console.log('Freesound query:', {
+    query,
+  });
   url.searchParams.append('query', query);
   url.searchParams.append('page', page.toString());
   url.searchParams.append('page_size', pageSize.toString());
   url.searchParams.append('fields', fields);
   url.searchParams.append('token', API_KEY);
+  url.searchParams.append('sort', 'downloads_desc');
 
   // Add filter for sounds that are at least 60 seconds long (1 minute)
   url.searchParams.append('filter', 'duration:[60 TO *]');
+
+  console.log('Freesound search URL:', url.toString());
 
   try {
     const response = await fetch(url.toString(), {

@@ -1,8 +1,16 @@
-module.exports = {
+/** @type {import('tailwindcss').Config} */
+export default {
   content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        accent: 'rgb(var(--ui-color))',
+      },
+    },
   },
-  darkMode: 'class', // Enable dark mode using a class
-  plugins: [],
+  corePlugins: {
+    // Explicitly enable filter utilities
+    filter: true,
+    backdropFilter: true,
+  },
 };

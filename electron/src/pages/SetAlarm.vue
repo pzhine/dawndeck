@@ -1,128 +1,177 @@
 <template>
-  <div>
-    <div class="flex items-center justify-center text-8xl mb-8">
-      <span :class="{ 'text-blue-400': editMode === 'hours' }">{{
-        formattedHours
-      }}</span>
-      <span class="mx-2">:</span>
-      <span :class="{ 'text-blue-400': editMode === 'minutes' }">{{
-        formattedMinutes
-      }}</span>
-      <span v-if="appStore.timeFormat === '12h'" class="ml-4">{{
-        isPM ? 'PM' : 'AM'
-      }}</span>
+  <RadialMenu 
+    :lowerItems="lowerMenuItems" 
+    :upperItems="upperMenuItems"
+    :width="'narrow'" 
+    :pinned="true"
+  >
+    <!-- Content -->
+    <div class="flex-1 flex flex-col items-center justify-center relative touch-none">
+      <div class="flex flex-row items-center justify-center gap-4">
+        
+        <!-- AM/PM Indicator (Only 12h) -->
+        <div 
+          v-if="is12h"
+          class="flex flex-col justify-center select-none"
+          :style="{ 
+             'font-family': '\'DS-Digital\', sans-serif', 
+             'font-size': '32px',
+             'line-height': '1',
+             'margin-bottom': '8px'
+          }"
+        >
+          <div :style="{ opacity: isAm ? 1 : 0.15 }">AM</div>
+          <div :style="{ opacity: !isAm ? 1 : 0.15 }">PM</div>
+        </div>
+
+        <!-- Hours -->
+        <div class="w-16">
+          <ScrollSelector 
+            :items="hoursItems" 
+            v-model="selectedHour"
+            :format-label="formatHourLabel"
+          />
+        </div>
+
+        <div class="text-4xl font-bold mb-2 opacity-50">:</div>
+
+        <!-- Minutes -->
+        <div class="w-16">
+          <ScrollSelector 
+            :items="minutesItems" 
+            v-model="selectedMinute"
+          />
+        </div>
+      
+      </div>
     </div>
-  </div>
-  <div class="flex flex-row fixed py-4 px-6 justify-between w-full items-start">
-    <h1 class="text-2xl mb-6">Set Alarm</h1>
-  </div>
+  </RadialMenu>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAppStore } from '../stores/appState';
-import { debounce } from 'lodash-es';
+import ScrollSelector from '../components/ScrollSelector.vue';
+import RadialMenu from '../components/RadialMenu.vue';
+import feather from 'feather-icons';
 
 const router = useRouter();
+
+const volumeIcon = feather.icons['volume-2'].toSvg();
+const sunriseIcon = feather.icons['sunrise'].toSvg();
+
 const appStore = useAppStore();
 
-// Local state for alarm time
-const hours = ref(appStore.alarmTime[0]);
-const minutes = ref(appStore.alarmTime[1]);
-const editMode = ref('hours'); // 'hours' or 'minutes'
+const upperMenuItems = computed(() => [
+  {
+    label: 'Alarm',
+    icon: feather.icons['bell'].toSvg(),
+    action: () => appStore.toggleAlarmActive(),
+    active: appStore.alarmActive,
+  }
+]);
 
-// Computed display values
-const isPM = computed(() => hours.value >= 12);
+const lowerMenuItems = computed(() => {
+  // Ensure reactivity tracks the alarm ID
+  // This forces the computed property to re-evaluate when the specific ID changes,
+  // not just when the alarmSound object reference changes (though that should work too)
+  const _dep = appStore.alarmSound?.id;
 
-// Formatted display values based on time format preference
-const formattedHours = computed(() => {
-  if (appStore.timeFormat === '12h') {
-    const hours12 = hours.value % 12 || 12; // Convert 0 to 12 for 12 AM
-    return hours12.toString().padStart(2, '0');
-  } else {
-    return hours.value.toString().padStart(2, '0');
+  return [
+  {
+    label: 'Sunrise',
+    icon: sunriseIcon,
+    action: () => router.push('/sunriseSettings')
+  },
+  {
+    label: 'Alarm Sound',
+    icon: volumeIcon,
+    active: !!appStore.alarmSound,
+    action: () => {
+      if (appStore.alarmSound) {
+        router.push({ 
+          name: 'MediaPlayer', 
+          params: { soundId: appStore.alarmSound.id },
+          query: { backRoute: '/alarm' }
+        });
+      } else {
+        router.push({ 
+          name: 'SoundCategories',
+          query: { backRoute: '/alarm' }
+        });
+      }
+    }
+  },
+]});
+
+// Generate items
+const minutesItems = Array.from({ length: 60 }, (_, i) => i);
+// 24h: 0-23. 12h: 12, 1-11
+const hours24Items = Array.from({ length: 24 }, (_, i) => i);
+const hours12Items = [12, ...Array.from({ length: 11 }, (_, i) => i + 1)];
+
+const is12h = computed(() => appStore.timeFormat === '12h');
+const hoursItems = computed(() => is12h.value ? hours12Items : hours24Items);
+
+// Track AM/PM state for display
+const isAm = computed(() => appStore.alarmTime[0] < 12);
+
+// Bindings
+const selectedMinute = computed({
+  get: () => appStore.alarmTime[1],
+  set: (val) => {
+    appStore.setAlarmTime(appStore.alarmTime[0], Number(val));
   }
 });
 
-const formattedMinutes = computed(() => {
-  return minutes.value.toString().padStart(2, '0');
-});
-
-// Create debounced save function
-const debouncedSave = debounce(() => {
-  appStore.setAlarmTime(hours.value, minutes.value);
-}, 300);
-
-// Handle wheel event to change time based on current edit mode
-const handleWheel = (event: WheelEvent) => {
-  // Check if the wheel event was triggered by a touch
-  const isTouchGenerated = (event as any).wheelDeltaY === undefined;
-
-  // Only prevent default for mouse-generated wheel events, not touch-generated ones
-  if (!isTouchGenerated) {
-    event.preventDefault();
-  }
-
-  if (editMode.value === 'hours') {
-    // Scrolling up decreases, scrolling down increases (consistent with natural scrolling)
-    if (event.deltaY < 0) {
-      hours.value = (hours.value + 1) % 24;
-    } else if (event.deltaY > 0) {
-      hours.value = (hours.value - 1 + 24) % 24;
+const selectedHour = computed({
+  get: () => {
+    const h = appStore.alarmTime[0];
+    if (is12h.value) {
+      if (h === 0) return 12;
+      if (h > 12) return h - 12;
+      return h;
     }
-  } else if (editMode.value === 'minutes') {
-    if (event.deltaY < 0) {
-      minutes.value = (Math.round(minutes.value / 1) * 1 + 1) % 60;
-    } else if (event.deltaY > 0) {
-      minutes.value = (Math.round(minutes.value / 1) * 1 - 1 + 60) % 60;
+    return h;
+  },
+  set: (val) => {
+    const valNum = Number(val);
+    if (!is12h.value) {
+      appStore.setAlarmTime(valNum, appStore.alarmTime[1]);
+      return;
     }
-  }
 
-  // Save changes as they're made
-  debouncedSave();
-};
-
-// Handle right click to advance mode or return to menu
-const handleRightClick = (event: MouseEvent) => {
-  if (event.button === 2) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (editMode.value === 'hours') {
-      // Switch to minutes mode
-      editMode.value = 'minutes';
+    // 12h Logic - Toggle AM/PM only on 11<->12 transition
+    const currentH = appStore.alarmTime[0];
+    const currentIsPM = currentH >= 12;
+    const currentDisplay = selectedHour.value; // Current displayed hour (1-12)
+    const newDisplay = valNum; // New displayed hour (1-12)
+    
+    // User Requirement:
+    // Forward (11 -> 12): Toggle AM/PM
+    // Backward (12 -> 11): Toggle AM/PM
+    // All other transitions (including 12 <-> 1) maintain AM/PM state
+    const shouldToggle = 
+      (currentDisplay === 11 && newDisplay === 12) ||
+      (currentDisplay === 12 && newDisplay === 11);
+    
+    const newIsPM = shouldToggle ? !currentIsPM : currentIsPM;
+    
+    // Convert to 24h
+    let newH = newDisplay;
+    if (newH === 12) {
+      newH = newIsPM ? 12 : 0;
     } else {
-      // Make sure any pending changes are saved before navigating
-      debouncedSave.flush();
-      // Return to menu
-      router.push('/sunriseSettings');
+      newH = newIsPM ? newH + 12 : newH;
     }
+    
+    appStore.setAlarmTime(newH, appStore.alarmTime[1]);
   }
+});
+
+const formatHourLabel = (val: string | number) => {
+  return String(val).padStart(2, '0');
 };
 
-// Initialize from global state and set up wheel event
-onMounted(() => {
-  hours.value = appStore.alarmTime[0];
-  minutes.value = appStore.alarmTime[1];
-
-  // Add global wheel event listener to window
-  window.addEventListener('wheel', handleWheel, { passive: false });
-
-  // Add global mousedown event listener for right-click detection
-  window.addEventListener('mousedown', handleRightClick);
-
-  // Prevent context menu from appearing on right-click
-  window.addEventListener('contextmenu', (e) => e.preventDefault());
-});
-
-// Clean up event listeners when component unmounts
-onBeforeUnmount(() => {
-  // Ensure any pending changes are saved before unmounting
-  debouncedSave.flush();
-
-  window.removeEventListener('wheel', handleWheel);
-  window.removeEventListener('mousedown', handleRightClick);
-  window.removeEventListener('contextmenu', (e) => e.preventDefault());
-});
 </script>

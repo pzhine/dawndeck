@@ -1,9 +1,133 @@
 import { defineStore } from 'pinia';
-import { debounce } from 'lodash-es';
+import { debounce, throttle } from 'lodash-es';
 import { AlarmSound } from '../../types/sound';
-import { AppState } from '../../types/state';
+import { AppState, ColorFavorite } from '../../types/state';
 import { setGlobalVolume } from '../services/audioService';
+import {
+  generateColorFavoriteName,
+  generateColorSlug,
+} from '../services/colorNaming';
+import { mixColorsRgb } from '../services/colorUtils';
 import defaultConfig from '../../config.example.json';
+
+// Sunrise presets with fixed names and colors
+const SUNRISE_PRESETS: ColorFavorite[] = [
+  {
+    id: 'night',
+    name: 'Night',
+    isPreset: true,
+    lamp: {
+      colors: [0, 0, 0], // All off
+      position: { x: 0, y: 0 },
+      brightness: 0,
+    },
+    projector: {
+      colors: [30, 0, 30], // Deep blue/purple
+      position: { x: 0, y: 0 },
+      brightness: 20,
+    },
+    timestamp: 0,
+  },
+  {
+    id: 'first-light',
+    name: 'First Light',
+    isPreset: true,
+    lamp: {
+      colors: [0, 0, 0],
+      position: { x: 0, y: 0 },
+      brightness: 0,
+    },
+    projector: {
+      colors: [80, 30, 100], // Deep blue with a hint of purple
+      position: { x: 0, y: 0 },
+      brightness: 40,
+    },
+    timestamp: 0,
+  },
+  {
+    id: 'dawn',
+    name: 'Dawn',
+    isPreset: true,
+    lamp: {
+      colors: [50, 20, 0], // Warm dim light
+      position: { x: 0, y: 0 },
+      brightness: 20,
+    },
+    projector: {
+      colors: [150, 100, 200], // Purple-pink blend
+      position: { x: 0, y: 0 },
+      brightness: 60,
+    },
+    timestamp: 0,
+  },
+  {
+    id: 'sunrise',
+    name: 'Sunrise',
+    isPreset: true,
+    lamp: {
+      colors: [180, 100, 50], // Warm amber
+      position: { x: 0, y: 0 },
+      brightness: 50,
+    },
+    projector: {
+      colors: [255, 180, 120], // Orange-pink sunrise colors
+      position: { x: 0, y: 0 },
+      brightness: 80,
+    },
+    timestamp: 0,
+  },
+  {
+    id: 'day',
+    name: 'Day',
+    isPreset: true,
+    lamp: {
+      colors: [255, 150, 100], // Bright warm light
+      position: { x: 0, y: 0 },
+      brightness: 80,
+    },
+    projector: {
+      colors: [255, 220, 180], // Bright warm white-yellow
+      position: { x: 0, y: 0 },
+      brightness: 100,
+    },
+    timestamp: 0,
+  },
+];
+
+// Helper function to ensure sunrise presets exist in favorites
+function ensureSunrisePresets(favorites: ColorFavorite[]): ColorFavorite[] {
+  // Check if any presets already exist
+  const hasPresets = favorites.some((fav) => fav.isPreset);
+
+  // If presets exist, user may have edited them - keep them as-is
+  if (hasPresets) {
+    return favorites;
+  }
+
+  // If no presets exist, add the defaults at the beginning
+  return [...SUNRISE_PRESETS, ...favorites];
+}
+
+// Pending hardware update queues (max length 1 - only latest values matter)
+let pendingLampUpdate: {
+  colors: { warmWhite: number; pink: number; orange: number };
+  brightness: number;
+} | null = null;
+let pendingProjectorUpdate: {
+  colors: { color0: number; color1: number; color2: number };
+  brightness: number;
+} | null = null;
+let lampUpdateInterval: NodeJS.Timeout | null = null;
+let projectorUpdateInterval: NodeJS.Timeout | null = null;
+
+// Throttled screen brightness update function
+const throttledSetScreenBrightness = throttle(async (brightness: number) => {
+  try {
+    await window.ipcRenderer.invoke('set-screen-brightness', brightness);
+  } catch (error) {
+    console.error('Failed to set screen brightness:', error);
+  }
+}, 200);
 
 // Create a Pinia store for our application state
 export const useAppStore = defineStore('appState', {
@@ -14,7 +138,25 @@ export const useAppStore = defineStore('appState', {
     screenBrightness: 80, // Default screen brightness (0-100)
     projectorBrightness: 70, // Default projector brightness (0-100)
     lampBrightness: 50, // Default lamp brightness (0-100)
+    lampActive: true, // Whether the lamp is currently active
+    lampColors: {
+      warmWhite: 0,
+      pink: 0,
+      orange: 0,
+    }, // Individual LED color values (0-255)
+    lampPosition: undefined, // SVG coordinates for lamp color picker
+    projectorActive: true, // Whether the projector is currently active
+    projectorColors: {
+      color0: 0,
+      color1: 0,
+      color2: 0,
+    }, // Individual LED color values (0-255)
+    projectorPosition: undefined, // SVG coordinates for projector color picker
+    ambienceFavorites: [], // Array to store ambience color favorites (lamp + projector)
     timeFormat: '24h', // Default time format
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Default to system timezone
+    colonBlink: true, // Default to blinking colon
+    uiColor: { r: 251, g: 191, b: 36 }, // Default to amber-400
     listPositions: {}, // Empty object to store list positions by route
     alarmSound: null, // Default to no alarm sound selected
     favoriteSounds: [], // Array to store favorite sounds
@@ -29,7 +171,10 @@ export const useAppStore = defineStore('appState', {
     sunriseDuration: 600, // Default: 10 minutes in seconds
     sunriseActive: false,
     sunriseBrightness: 100, // Default: 100% brightness
+    alarmVolume: 50, // Volume to use for alarm sound during sunrise (default 50%)
     config: defaultConfig,
+    currentPlaylist: [], // Current playlist of sounds
+    currentPlaylistIndex: -1, // Current index in the playlist
   }),
 
   getters: {
@@ -63,6 +208,71 @@ export const useAppStore = defineStore('appState', {
   },
 
   actions: {
+    // Queue a lamp hardware update (batched with 300ms interval)
+    queueLampHardwareUpdate(): void {
+      // Update or create pending update with latest values
+      pendingLampUpdate = {
+        colors: { ...this.lampColors },
+        brightness: this.lampBrightness,
+      };
+
+      // Start interval if not already running
+      if (!lampUpdateInterval) {
+        lampUpdateInterval = setInterval(() => {
+          this.flushLampHardwareUpdate();
+        }, 300);
+      }
+    },
+
+    // Flush pending lamp update to hardware
+    async flushLampHardwareUpdate(): Promise<void> {
+      if (!pendingLampUpdate || !this.lampActive) return;
+
+      const update = pendingLampUpdate;
+      pendingLampUpdate = null;
+
+      const multiplier = update.brightness / 100;
+      await window.ipcRenderer.invoke('set-lamp-colors', {
+        warmWhite: Math.round(update.colors.warmWhite * multiplier),
+        pink: Math.round(update.colors.pink * multiplier),
+        orange: Math.round(update.colors.orange * multiplier),
+      });
+
+      // Clear interval if no pending update
+      if (!pendingLampUpdate && lampUpdateInterval) {
+        clearInterval(lampUpdateInterval);
+        lampUpdateInterval = null;
+      }
+    },
+
+    // Toggle lamp active state
+    async toggleLampActive() {
+      const newState = !this.lampActive;
+      this.lampActive = newState;
+      this.saveState();
+
+      if (newState) {
+        // Lamp activated - restore colors with current brightness
+        const multiplier = this.lampBrightness / 100;
+        await window.ipcRenderer.invoke('set-lamp-colors', {
+          warmWhite: Math.round(this.lampColors.warmWhite * multiplier),
+          pink: Math.round(this.lampColors.pink * multiplier),
+          orange: Math.round(this.lampColors.orange * multiplier),
+        });
+        console.log(
+          'Lamp activated - colors restored with brightness',
+          this.lampBrightness
+        );
+      } else {
+        // Lamp deactivated - zero out all colors
+        await window.ipcRenderer.invoke('set-lamp-colors', {
+          warmWhite: 0,
+          pink: 0,
+          orange: 0,
+        });
+        console.log('Lamp deactivated - colors zeroed');
+      }
+    },
     // Save state to Electron via IPC
     saveState: debounce(function (this: any) {
       // Send the entire state to the main process
@@ -82,8 +292,57 @@ export const useAppStore = defineStore('appState', {
           this.$patch(savedState);
         }
 
+        // Ensure sunrise presets are always present
+        this.ambienceFavorites = ensureSunrisePresets(this.ambienceFavorites);
+
         // Sync with system volume after loading state
         await this.syncWithSystemVolume();
+
+        // Restore screen brightness
+        if (this.screenBrightness !== undefined) {
+          await window.ipcRenderer.invoke(
+            'set-screen-brightness',
+            this.screenBrightness
+          );
+          console.log('Screen brightness restored:', this.screenBrightness);
+        }
+
+        // Initialize UI color CSS variable
+        if (this.uiColor) {
+          document.documentElement.style.setProperty(
+            '--ui-color',
+            `${this.uiColor.r}, ${this.uiColor.g}, ${this.uiColor.b}`
+          );
+          console.log('UI color restored:', this.uiColor);
+        }
+
+        // Restore lamp state if active
+        if (this.lampActive) {
+          const multiplier = this.lampBrightness / 100;
+          await window.ipcRenderer.invoke('set-lamp-colors', {
+            warmWhite: Math.round(this.lampColors.warmWhite * multiplier),
+            pink: Math.round(this.lampColors.pink * multiplier),
+            orange: Math.round(this.lampColors.orange * multiplier),
+          });
+          console.log('Lamp state restored:', {
+            brightness: this.lampBrightness,
+            colors: this.lampColors,
+          });
+        }
+
+        // Restore projector state if active
+        if (this.projectorActive) {
+          const multiplier = this.projectorBrightness / 100;
+          await window.ipcRenderer.invoke('set-projector-colors', {
+            color0: Math.round(this.projectorColors.color0 * multiplier),
+            color1: Math.round(this.projectorColors.color1 * multiplier),
+            color2: Math.round(this.projectorColors.color2 * multiplier),
+          });
+          console.log('Projector state restored:', {
+            brightness: this.projectorBrightness,
+            colors: this.projectorColors,
+          });
+        }
       } catch (error) {
         console.error('Failed to load saved state:', error);
       }
@@ -141,21 +400,162 @@ export const useAppStore = defineStore('appState', {
     // Set the screen brightness
     setScreenBrightness(level: number): void {
       this.screenBrightness = Math.max(0, Math.min(100, level)); // Clamp between 0-100
+      this.saveState();
+
+      // Apply brightness to hardware on Linux (throttled)
+      throttledSetScreenBrightness(this.screenBrightness);
+    },
+
+    // set the sunrise duration
+    setSunriseDuration(durationSeconds: number): void {
+      this.sunriseDuration = durationSeconds;
+      this.saveState();
     },
 
     // Set the projector brightness
     setProjectorBrightness(level: number): void {
       this.projectorBrightness = Math.max(0, Math.min(100, level)); // Clamp between 0-100
+      this.saveState();
+      this.queueProjectorHardwareUpdate();
     },
 
     // Set the lamp brightness
     setLampBrightness(level: number): void {
       this.lampBrightness = Math.max(0, Math.min(100, level)); // Clamp between 0-100
+      this.saveState();
+      this.queueLampHardwareUpdate();
+    },
+
+    // Generic state update action
+    updateState<K extends keyof AppState>(key: K, value: AppState[K]): void {
+      (this as any)[key] = value;
+      this.saveState();
+    },
+
+    // Set individual lamp colors (RGB values 0-255)
+    setLampColors(
+      colors: { warmWhite: number; pink: number; orange: number },
+      position?: { x: number; y: number }
+    ): void {
+      this.lampColors = {
+        warmWhite: Math.max(0, Math.min(255, colors.warmWhite)),
+        pink: Math.max(0, Math.min(255, colors.pink)),
+        orange: Math.max(0, Math.min(255, colors.orange)),
+      };
+      if (position) {
+        this.lampPosition = position;
+      }
+      this.saveState();
+      this.queueLampHardwareUpdate();
+    },
+
+    // Throttled function to send current projector state to hardware
+    // Queue a projector hardware update (batched with 300ms interval)
+    queueProjectorHardwareUpdate(): void {
+      // Update or create pending update with latest values
+      pendingProjectorUpdate = {
+        colors: { ...this.projectorColors },
+        brightness: this.projectorBrightness,
+      };
+
+      // Start interval if not already running
+      if (!projectorUpdateInterval) {
+        projectorUpdateInterval = setInterval(() => {
+          this.flushProjectorHardwareUpdate();
+        }, 300);
+      }
+    },
+
+    // Flush pending projector update to hardware
+    async flushProjectorHardwareUpdate(): Promise<void> {
+      if (!pendingProjectorUpdate || !this.projectorActive) return;
+
+      const update = pendingProjectorUpdate;
+      pendingProjectorUpdate = null;
+
+      const multiplier = update.brightness / 100;
+      await window.ipcRenderer.invoke('set-projector-colors', {
+        color0: Math.round(update.colors.color0 * multiplier),
+        color1: Math.round(update.colors.color1 * multiplier),
+        color2: Math.round(update.colors.color2 * multiplier),
+      });
+
+      // Clear interval if no pending update
+      if (!pendingProjectorUpdate && projectorUpdateInterval) {
+        clearInterval(projectorUpdateInterval);
+        projectorUpdateInterval = null;
+      }
+    },
+
+    // Toggle projector active state
+    async toggleProjectorActive() {
+      const newState = !this.projectorActive;
+      this.projectorActive = newState;
+      this.saveState();
+
+      if (newState) {
+        // Projector activated - restore colors with current brightness
+        const multiplier = this.projectorBrightness / 100;
+        await window.ipcRenderer.invoke('set-projector-colors', {
+          color0: Math.round(this.projectorColors.color0 * multiplier),
+          color1: Math.round(this.projectorColors.color1 * multiplier),
+          color2: Math.round(this.projectorColors.color2 * multiplier),
+        });
+        console.log(
+          'Projector activated - colors restored with brightness',
+          this.projectorBrightness
+        );
+      } else {
+        // Projector deactivated - zero out all colors
+        await window.ipcRenderer.invoke('set-projector-colors', {
+          color0: 0,
+          color1: 0,
+          color2: 0,
+        });
+        console.log('Projector deactivated - colors zeroed');
+      }
+    },
+
+    // Set individual projector colors (RGB values 0-255)
+    setProjectorColors(
+      colors: { color0: number; color1: number; color2: number },
+      position?: { x: number; y: number }
+    ): void {
+      this.projectorColors = {
+        color0: Math.max(0, Math.min(255, colors.color0)),
+        color1: Math.max(0, Math.min(255, colors.color1)),
+        color2: Math.max(0, Math.min(255, colors.color2)),
+      };
+      if (position) {
+        this.projectorPosition = position;
+      }
+      this.saveState();
+      this.queueProjectorHardwareUpdate();
     },
 
     // Set the time format
     setTimeFormat(format: '12h' | '24h'): void {
       this.timeFormat = format;
+    },
+
+    // Set timezone
+    setTimezone(timezone: string): void {
+      this.timezone = timezone;
+    },
+
+    // Set colon blink
+    setColonBlink(enabled: boolean): void {
+      this.colonBlink = enabled;
+    },
+
+    // Set UI color
+    setUiColor(color: { r: number; g: number; b: number }): void {
+      this.uiColor = color;
+      // Update CSS variable with RGB format
+      document.documentElement.style.setProperty(
+        '--ui-color',
+        `${color.r}, ${color.g}, ${color.b}`
+      );
     },
 
     // Set the alarm sound
@@ -284,6 +684,200 @@ export const useAppStore = defineStore('appState', {
       this.favoriteSounds = this.favoriteSounds.filter(
         (sound) => sound.id !== soundId
       );
+    },
+
+    // Set the current playlist with context info
+    setCurrentPlaylist(
+      sounds: any[],
+      currentIndex: number,
+      context?: { category?: string; country?: string }
+    ): void {
+      this.currentPlaylist = sounds.map((sound) => ({
+        ...sound,
+        _context: context || {},
+      }));
+      this.currentPlaylistIndex = currentIndex;
+    },
+
+    // Clear the current playlist
+    clearCurrentPlaylist(): void {
+      this.currentPlaylist = [];
+      this.currentPlaylistIndex = -1;
+    },
+
+    // Get current sound in playlist
+    getCurrentPlaylistSound(): any | null {
+      if (this.currentPlaylist.length === 0 || this.currentPlaylistIndex < 0)
+        return null;
+      return this.currentPlaylist[this.currentPlaylistIndex];
+    },
+
+    // Move to next sound in playlist and return it
+    moveToNextSound(): any | null {
+      if (this.currentPlaylist.length === 0) return null;
+      this.currentPlaylistIndex =
+        (this.currentPlaylistIndex + 1) % this.currentPlaylist.length;
+      return this.currentPlaylist[this.currentPlaylistIndex];
+    },
+
+    // Move to previous sound in playlist and return it
+    moveToPreviousSound(): any | null {
+      if (this.currentPlaylist.length === 0) return null;
+      this.currentPlaylistIndex =
+        (this.currentPlaylistIndex - 1 + this.currentPlaylist.length) %
+        this.currentPlaylist.length;
+      return this.currentPlaylist[this.currentPlaylistIndex];
+    },
+
+    // Remove ambience (lamp + projector) from favorites by id
+    removeAmbienceFromFavorites(id: string): void {
+      // Don't allow deletion of sunrise presets
+      const favorite = this.ambienceFavorites.find((fav) => fav.id === id);
+      if (favorite?.isPreset) {
+        console.warn('Cannot delete sunrise preset:', id);
+        return;
+      }
+      this.ambienceFavorites = this.ambienceFavorites.filter(
+        (fav) => fav.id !== id
+      );
+      this.saveState();
+    },
+
+    // Add current ambience (lamp + projector) to favorites
+    addAmbienceToFavorites(): void {
+      // Define circle colors for lamp and projector
+      const lampCircleColors: [string, string, string] = [
+        '#ffb86d',
+        '#FF2A70',
+        '#ff4b09',
+      ];
+      const projectorCircleColors: [string, string, string] = [
+        '#9d09ff',
+        '#ff8409',
+        '#0058f0',
+      ];
+
+      // Mix lamp LED values with lamp circle colors
+      const lampRgb = mixColorsRgb(lampCircleColors, [
+        this.lampColors.warmWhite,
+        this.lampColors.pink,
+        this.lampColors.orange,
+      ]);
+
+      // Mix projector LED values with projector circle colors
+      const projectorRgb = mixColorsRgb(projectorCircleColors, [
+        this.projectorColors.color0,
+        this.projectorColors.color1,
+        this.projectorColors.color2,
+      ]);
+
+      // Pass both colors separately to generate a combined name (e.g. "Strawberry-Teal")
+      const name = generateColorFavoriteName(projectorRgb, lampRgb);
+
+      // Convert name to kebab-case for slug-friendly ID
+      const slug = generateColorSlug(name);
+
+      const favorite: ColorFavorite = {
+        id: slug,
+        name,
+        lamp: {
+          colors: [
+            this.lampColors.warmWhite,
+            this.lampColors.pink,
+            this.lampColors.orange,
+          ],
+          position: this.lampPosition || { x: 0, y: 0 },
+          brightness: this.lampBrightness,
+        },
+        projector: {
+          colors: [
+            this.projectorColors.color0,
+            this.projectorColors.color1,
+            this.projectorColors.color2,
+          ],
+          position: this.projectorPosition || { x: 0, y: 0 },
+          brightness: this.projectorBrightness,
+        },
+        timestamp: Date.now(),
+      };
+      this.ambienceFavorites.push(favorite);
+      this.saveState();
+    },
+
+    // Remove ambience favorite by id
+    removeAmbienceFavorite(id: string): void {
+      // Don't allow deletion of sunrise presets
+      const favorite = this.ambienceFavorites.find((fav) => fav.id === id);
+      if (favorite?.isPreset) {
+        console.warn('Cannot delete sunrise preset:', id);
+        return;
+      }
+      this.ambienceFavorites = this.ambienceFavorites.filter(
+        (fav) => fav.id !== id
+      );
+      this.saveState();
+    },
+
+    // Update an existing ambience favorite with current color and brightness values
+    updateAmbienceFavorite(id: string): void {
+      const existingIndex = this.ambienceFavorites.findIndex(
+        (fav) => fav.id === id
+      );
+      if (existingIndex === -1) return;
+
+      // Keep the existing favorite but update colors, positions, and brightness
+      const existing = this.ambienceFavorites[existingIndex];
+      this.ambienceFavorites[existingIndex] = {
+        ...existing,
+        lamp: {
+          colors: [
+            this.lampColors.warmWhite,
+            this.lampColors.pink,
+            this.lampColors.orange,
+          ],
+          position: this.lampPosition || { x: 0, y: 0 },
+          brightness: this.lampBrightness,
+        },
+        projector: {
+          colors: [
+            this.projectorColors.color0,
+            this.projectorColors.color1,
+            this.projectorColors.color2,
+          ],
+          position: this.projectorPosition || { x: 0, y: 0 },
+          brightness: this.projectorBrightness,
+        },
+        timestamp: Date.now(),
+      };
+      this.saveState();
+    },
+
+    // Load ambience favorite (apply both lamp and projector colors/positions)
+    loadAmbienceFavorite(id: string): void {
+      const favorite = this.ambienceFavorites.find((fav) => fav.id === id);
+      if (favorite) {
+        // Load lamp settings
+        this.setLampColors(
+          {
+            warmWhite: favorite.lamp.colors[0],
+            pink: favorite.lamp.colors[1],
+            orange: favorite.lamp.colors[2],
+          },
+          favorite.lamp.position
+        );
+        this.setLampBrightness(favorite.lamp.brightness);
+
+        // Load projector settings
+        this.setProjectorColors(
+          {
+            color0: favorite.projector.colors[0],
+            color1: favorite.projector.colors[1],
+            color2: favorite.projector.colors[2],
+          },
+          favorite.projector.position
+        );
+        this.setProjectorBrightness(favorite.projector.brightness);
+      }
     },
   },
 });

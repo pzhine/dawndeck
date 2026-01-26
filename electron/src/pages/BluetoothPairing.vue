@@ -3,7 +3,7 @@
     <div class="text-center">
       
       <!-- Ready to Pair -->
-      <div v-if="pairingState.active" class="text-2xl font-light text-amber-400">
+      <div v-if="pairingState.active" class="text-2xl font-light text-accent">
         ready to pair...
       </div>
 
@@ -18,7 +18,7 @@
       </div>
 
       <!-- Loading State -->
-      <div v-else class="text-2xl font-light text-amber-400">
+      <div v-else class="text-2xl font-light text-accent">
         starting...
       </div>
 

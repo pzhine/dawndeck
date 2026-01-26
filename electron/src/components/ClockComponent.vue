@@ -5,18 +5,35 @@
     tabindex="0"
     ref="clockContainer"
   >
-    <div
-      class="flex items-center justify-center"
-      :style="{
-        'font-size': '200px',
-        'line-height': '220px',
-        'font-weight': 'normal',
-        'font-family': '\'DS-Digital\', sans-serif',
-      }"
-    >
-      {{ hoursPart
-      }}<span :style="{ visibility: showColon ? 'visible' : 'hidden' }">:</span
-      >{{ minutesPart }}{{ amPmPart }}
+    <div class="flex items-center justify-center flex-row">
+      <!-- AM/PM Indicator -->
+      <div 
+        v-if="amPmPart"
+        class="flex flex-col justify-center mr-4 select-none"
+        :style="{ 
+           'font-family': '\'DS-Digital\', sans-serif', 
+           'font-size': '40px',
+           'line-height': '1',
+           'margin-top': '15px' 
+        }"
+      >
+        <div :style="{ opacity: isAm ? 1 : 0.15 }">AM</div>
+        <div :style="{ opacity: !isAm ? 1 : 0.15 }">PM</div>
+      </div>
+
+      <div
+        class="flex items-center justify-center"
+        :style="{
+          'font-size': '200px',
+          'line-height': '220px',
+          'font-weight': 'normal',
+          'font-family': '\'DS-Digital\', sans-serif',
+        }"
+      >
+        {{ hoursPart
+        }}<span :style="{ visibility: showColon ? 'visible' : 'hidden' }">:</span
+        >{{ minutesPart }}
+      </div>
     </div>
     <div
       v-if="showDate"
@@ -32,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed, watch, reactive } from 'vue';
+import { onMounted, onUnmounted, ref, watch, reactive } from 'vue';
 import { useAppStore } from '../stores/appState';
 import { animateStyle, easeInOutBezier } from '../animations/animationUtils'; // Import helpers
 
@@ -61,6 +78,16 @@ const props = defineProps({
   transparentReverse: {
     type: Boolean,
     default: false,
+  },
+  hours: {
+    type: Number,
+    default: null,
+    validator: (value: number) => value >= 0 && value <= 23
+  },
+  minutes: {
+    type: Number,
+    default: null,
+    validator: (value: number) => value >= 0 && value <= 59
   },
 });
 
@@ -154,24 +181,95 @@ const showColon = ref(true);
 const hoursPart = ref('');
 const minutesPart = ref('');
 const amPmPart = ref('');
+const isAm = ref(false); // Track AM/PM state
+
+// Watch for colonBlink setting changes
+watch(
+  () => appStore.colonBlink,
+  (newValue) => {
+    // Clear existing interval
+    if (colonBlinkIntervalId) {
+      clearInterval(colonBlinkIntervalId);
+    }
+    
+    if (newValue) {
+      // Enable blinking
+      colonBlinkIntervalId = window.setInterval(() => {
+        showColon.value = !showColon.value;
+      }, 1000);
+    } else {
+      // Disable blinking - keep colon always visible
+      showColon.value = true;
+    }
+  }
+);
+
+// Watch for changes locally or in props
+watch(
+  () => [appStore.timeFormat, props.hours, props.minutes],
+  () => {
+    updateFormattedTime();
+  }
+);
 
 // Format time based on timeFormat preference
 const updateFormattedTime = () => {
-  const hours = time.value.getHours();
-  const minutes = time.value.getMinutes().toString().padStart(2, '0');
-  // const seconds = time.value.getSeconds().toString().padStart(2, '0');
+    // If props are provided, use them instead of current time
+  if (props.hours !== null && props.minutes !== null) {
+      const h = props.hours;
+      const m = props.minutes;
+      
+      const minutesStr = m.toString().padStart(2, '0');
+      
+      if (appStore.timeFormat === '12h') {
+          const period = h >= 12 ? 'PM' : 'AM';
+          const displayH = h % 12 || 12;
+          
+          formattedTime.value = `${displayH}:${minutesStr} ${period}`;
+          hoursPart.value = displayH.toString();
+          minutesPart.value = minutesStr;
+          amPmPart.value = ` ${period}`;
+          isAm.value = period === 'AM';
+      } else {
+          const hoursStr = h.toString().padStart(2, '0');
+          formattedTime.value = `${hoursStr}:${minutesStr}`;
+          hoursPart.value = hoursStr;
+          minutesPart.value = minutesStr;
+          amPmPart.value = '';
+      }
+      return;
+  }
+
+  // Get time in the selected timezone
+  const timeZone = appStore.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  
+  // Create formatter for getting timezone-aware time
+  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: appStore.timeFormat === '12h'
+  });
+  
+  const parts = timeFormatter.formatToParts(time.value);
+  const hourPart = parts.find(p => p.type === 'hour');
+  const minutePart = parts.find(p => p.type === 'minute');
+  const dayPeriodPart = parts.find(p => p.type === 'dayPeriod');
+  
+  const hours = hourPart ? hourPart.value : '0';
+  const minutes = minutePart ? minutePart.value : '00';
 
   if (appStore.timeFormat === '12h') {
-    const isPM = hours >= 12;
-    const hours12 = hours % 12 || 12; // Convert 0 to 12 for 12 AM
-    formattedTime.value = `${hours12}:${minutes} ${isPM ? 'PM' : 'AM'}`;
-    hoursPart.value = hours12.toString();
+    const period = dayPeriodPart ? dayPeriodPart.value : '';
+    formattedTime.value = `${hours}:${minutes} ${period}`;
+    hoursPart.value = hours;
     minutesPart.value = minutes;
-    amPmPart.value = ` ${isPM ? 'PM' : 'AM'}`;
+    amPmPart.value = ` ${period}`;
+    isAm.value = period.toLowerCase() === 'am';
   } else {
     // 24h format
-    formattedTime.value = `${hours.toString().padStart(2, '0')}:${minutes}`;
-    hoursPart.value = hours.toString().padStart(2, '0');
+    formattedTime.value = `${hours.padStart(2, '0')}:${minutes}`;
+    hoursPart.value = hours.padStart(2, '0');
     minutesPart.value = minutes;
     amPmPart.value = '';
   }
@@ -183,6 +281,7 @@ const updateFormattedTime = () => {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
+      timeZone,
     };
     formattedDate.value = time.value.toLocaleDateString(undefined, options);
   }
@@ -198,10 +297,15 @@ onMounted(() => {
     updateFormattedTime();
   }, 500);
 
-  // Blink colon every second
-  colonBlinkIntervalId = window.setInterval(() => {
-    showColon.value = !showColon.value;
-  }, 1000);
+  // Blink colon every second if enabled
+  if (appStore.colonBlink) {
+    colonBlinkIntervalId = window.setInterval(() => {
+      showColon.value = !showColon.value;
+    }, 1000);
+  } else {
+    // Keep colon always visible if blinking is disabled
+    showColon.value = true;
+  }
 
   // Set focus to make the enter key work
   clockContainer.value?.focus();
@@ -213,11 +317,15 @@ onMounted(() => {
     ).color;
     initialColor.value = rawComputedColor; // Store the raw color string
     console.log('Initial color:', initialColor.value);
-    clockStyles.color = initialColor.value; // Set the reactive style
+    if (props.transparent) {
+      clockStyles.color = initialColor.value; // Set the reactive style only if animating
+    }
   } else {
     // Fallback if clockContainer is not yet available
     initialColor.value = 'rgb(0,0,0)'; // Fallback to a known parsable format
-    clockStyles.color = initialColor.value;
+    if (props.transparent) {
+      clockStyles.color = initialColor.value;
+    }
   }
 
   // Initialize styles
@@ -246,7 +354,7 @@ onMounted(() => {
         'number'
       );
       animateStyle(
-        200,
+        100,
         () => parseInt(clockStyles.marginTop.replace('px', '')),
         (val) => (clockStyles.marginTop = `${val}px`),
         5000,

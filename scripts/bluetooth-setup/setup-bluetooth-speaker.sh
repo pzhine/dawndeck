@@ -700,6 +700,10 @@ class MediaAgent(dbus.service.Object):
         self.current_position = 0
         self.current_duration = 0
         
+        # Track connected clients for broadcasting updates
+        self.connected_clients = []
+        self.clients_lock = threading.Lock()
+        
         # Create socket server for Electron communication
         self.setup_socket_server()
         
@@ -732,6 +736,10 @@ class MediaAgent(dbus.service.Object):
                 
     def handle_client(self, conn):
         """Handle individual client connections"""
+        # Add client to tracked connections
+        with self.clients_lock:
+            self.connected_clients.append(conn)
+        
         try:
             while True:
                 data = conn.recv(1024).decode('utf-8')
@@ -747,7 +755,24 @@ class MediaAgent(dbus.service.Object):
         except Exception as e:
             print(f"Client handler error: {e}")
         finally:
+            # Remove client from tracked connections
+            with self.clients_lock:
+                if conn in self.connected_clients:
+                    self.connected_clients.remove(conn)
             conn.close()
+    
+    def broadcast_update(self, metadata):
+        """Broadcast metadata updates to all connected clients"""
+        message = json.dumps({'metadata': metadata}) + '\n'
+        with self.clients_lock:
+            for client in self.connected_clients[:]:  # Copy list to avoid modification during iteration
+                try:
+                    client.send(message.encode('utf-8'))
+                except Exception as e:
+                    print(f"Failed to send update to client: {e}")
+                    # Remove failed client
+                    if client in self.connected_clients:
+                        self.connected_clients.remove(client)
             
     def process_command(self, command):
         """Process commands from Electron app"""
@@ -922,6 +947,8 @@ class MediaAgent(dbus.service.Object):
 def property_changed_handler(interface, changed_properties, invalidated_properties, path):
     """Handle D-Bus property changes for media metadata"""
     if interface == "org.bluez.MediaPlayer1":
+        should_broadcast = False
+        
         if "Track" in changed_properties:
             track = changed_properties["Track"]
             
@@ -955,20 +982,35 @@ def property_changed_handler(interface, changed_properties, invalidated_properti
             agent.current_metadata = metadata
             print(f"Metadata updated: {metadata}")
             print(f"Debug - Track keys: {list(track.keys())}")
+            should_broadcast = True
             
         if "Status" in changed_properties:
             agent.current_status = str(changed_properties["Status"])
             # Also update status in metadata dict
             agent.current_metadata['status'] = agent.current_status
             print(f"Status updated: {agent.current_status}")
+            should_broadcast = True
             
         if "Position" in changed_properties:
             agent.current_position = changed_properties["Position"]
             print(f"Position updated: {agent.current_position}")
+            # Don't broadcast position updates as frequently
             
         if "Duration" in changed_properties:
             agent.current_duration = changed_properties["Duration"]
             print(f"Duration updated: {agent.current_duration}")
+            should_broadcast = True
+        
+        # Broadcast the update to all connected clients
+        if should_broadcast:
+            metadata_with_status = dict(agent.current_metadata) if agent.current_metadata else {}
+            metadata_with_status.update({
+                'status': agent.current_status,
+                'position': agent.current_position,
+                'duration': agent.current_duration,
+                'timestamp': int(time.time() * 1000)  # Add timestamp in milliseconds
+            })
+            agent.broadcast_update(metadata_with_status)
 
 if __name__ == '__main__':
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)

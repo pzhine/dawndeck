@@ -1,6 +1,6 @@
 <template>
-  <div class="w-full">
-    <InteractiveList
+  <div class="w-full h-full">
+    <RoundScrollContainer
       :title="'Sounds'"
       :show-title="true"
       :items="soundCategories"
@@ -13,7 +13,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import InteractiveList from '../components/InteractiveList.vue';
+import RoundScrollContainer from '../components/RoundScrollContainer.vue';
 import soundCategoriesData from '../../assets/soundCategories.json';
 import { useAppStore } from '../stores/appState';
 
@@ -28,9 +28,6 @@ onMounted(() => {
   // Create "Favorites" item that will be pinned at the top
   const favorites = {
     label: 'Favorites',
-    value: hasFavorites.value
-      ? `${appStore.favoriteSounds.length} sounds`
-      : 'No favorites yet',
     onSelect: () => navigateToFavorites(),
   };
 
@@ -47,10 +44,13 @@ onMounted(() => {
 const selectCategory = (category: any) => {
   console.log('Selected category:', category.searchPhrase);
   router.push({
-    name: 'SoundCountries',
+    name: 'SoundsList',
     params: {
-      categoryName: category.name,
       searchPhrase: encodeURIComponent(category.searchPhrase),
+      categoryName: category.name,
+    },
+    query: {
+      country: 'all',
     },
   });
 };
@@ -63,6 +63,8 @@ const navigateToFavorites = () => {
       params: {
         searchPhrase: 'favorites',
         categoryName: 'Favorites',
+      },
+      query: {
         country: 'favorites',
       },
     });
