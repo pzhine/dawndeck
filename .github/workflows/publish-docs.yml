@@ -39,6 +39,9 @@ jobs:
             -f markdown \
             -t html \
             --standalone \
+            --toc \
+            --toc-depth=2 \
+            --metadata title="DawnDeck Owner's Manual" \
             --css style.css \
             -o _site/index.html
 
