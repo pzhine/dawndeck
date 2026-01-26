@@ -1,11 +1,6 @@
-# DawnDeck Sunrise Alarm — Owner’s Manual
+# DawnDeck — Owner’s Manual
 
-This manual covers the day-to-day operation of the DawnDeck sunrise alarm.
-
-## Table of Contents
-
-- [DawnDeck Sunrise Alarm — Owner’s Manual](#dawndeck-sunrise-alarm--owners-manual)
-  - [Table of Contents](#table-of-contents)
+- [DawnDeck — Owner’s Manual](#dawndeck--owners-manual)
   - [First Use (Setup)](#first-use-setup)
     - [1) Power on](#1-power-on)
     - [2) Connect to Wi‑Fi (only if not configured yet)](#2-connect-to-wifi-only-if-not-configured-yet)
