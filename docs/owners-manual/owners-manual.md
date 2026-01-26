@@ -16,12 +16,13 @@ This manual covers the day-to-day operation of the DawnDeck sunrise alarm.
   - [The Basics (Navigation)](#the-basics-navigation)
     - [Home screen (Clock)](#home-screen-clock)
     - [Radial menu (the ring menu)](#radial-menu-the-ring-menu)
+    - [Going back](#going-back)
   - [Alarm](#alarm)
     - [Turn the alarm on/off (quick toggle)](#turn-the-alarm-onoff-quick-toggle)
     - [Set the alarm time](#set-the-alarm-time)
     - [Choose the alarm sound](#choose-the-alarm-sound)
     - [Set alarm volume (the volume used for wake-up)](#set-alarm-volume-the-volume-used-for-wake-up)
-  - [Sunrise (Light + gentle fade-in)](#sunrise-light--gentle-fade-in)
+  - [Sunrise](#sunrise)
     - [Configure sunrise](#configure-sunrise)
     - [Start a sunrise now (test)](#start-a-sunrise-now-test)
     - [Advanced: Customize sunrise steps (presets)](#advanced-customize-sunrise-steps-presets)
@@ -43,7 +44,6 @@ This manual covers the day-to-day operation of the DawnDeck sunrise alarm.
     - [Timezone](#timezone)
     - [Colon blink](#colon-blink)
     - [Wi‑Fi](#wifi)
-  - [Troubleshooting (Quick)](#troubleshooting-quick)
 
 ## First Use (Setup)
 
@@ -101,7 +101,9 @@ If DawnDeck has **no Wi‑Fi network configured**, the first screen you see will
 1. From the clock screen, tap anywhere to open the radial menu.
 2. Tap a menu item for its quick action.
 3. Press-and-hold (~0.5s) a menu item to open that feature’s full page.
-4. On most pages, use the on-screen **Back** button (when shown) to return.
+
+### Going back
+On most pages, you can swipe right from the left side of the screen to go back.
 
 ---
 
@@ -137,7 +139,7 @@ You can set the alarm sound in two ways:
 
 ---
 
-## Sunrise (Light + gentle fade-in)
+## Sunrise
 
 The sunrise feature controls the lighting sequence and (optionally) fades in the alarm sound from silence up to your saved alarm volume.
 
@@ -258,12 +260,3 @@ Open from the clock radial menu (press-and-hold not required).
    - Use the backspace button next to the password field to delete.
 4. Tap **Connect**.
 5. On success, the device shows “Connected successfully!” and returns home automatically.
-
----
-
-## Troubleshooting (Quick)
-
-- **Alarm didn’t sound**: confirm **Alarm** is enabled (bell icon shows on clock) and verify the time and timezone.
-- **No sound / too quiet**: open **Media Player** and raise volume; confirm your alarm sound is selected.
-- **Bluetooth won’t connect**: re-enter **Bluetooth → Add Device**, and “forget” DawnDeck on your phone before pairing again.
-- **Wi‑Fi list looks wrong on a dev machine**: Wi‑Fi scanning is device-dependent; desktop builds may show mock networks.
