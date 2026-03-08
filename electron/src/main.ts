@@ -128,169 +128,133 @@ document.fonts.ready.then(async () => {
     postMessage({ payload: 'removeLoading' }, '*');
 
     // Check internet connectivity
-    await checkInternetAndRoute(true);
+    await checkInternetAndRoute();
   });
 });
 
 // Check internet connectivity and route accordingly with retries
-const checkInternetAndRoute = async (initialStartup = false) => {
+const checkInternetAndRoute = async () => {
   const appStore = useAppStore();
 
-  // Only use retry logic during initial startup
-  if (initialStartup) {
-    const startTime = Date.now();
-    const maxWaitTime = 30000; // 30 seconds timeout
-    let retryCount = 0;
-    const maxRetries = 10;
+  const startTime = Date.now();
+  const maxWaitTime = 30000; // 30 seconds timeout
+  let retryCount = 0;
+  const maxRetries = 10;
 
-    // First check if we already have an internet connection
+  // First check if we already have an internet connection
+  try {
+    const isConnected = await window.ipcRenderer.invoke(
+      'check-internet-connectivity'
+    );
+
+    if (isConnected) {
+      console.log('Internet connectivity already exists');
+
+      // We're already connected, get the current WiFi network name
+      try {
+        const currentWifiName = await window.ipcRenderer.invoke(
+          'get-current-wifi-network'
+        );
+
+        if (currentWifiName) {
+          console.log(`Currently connected to: ${currentWifiName}`);
+          // Save the current WiFi network name in app state
+          appStore.setLastConnectedWifi(currentWifiName);
+        }
+      } catch (error) {
+        console.error('Error getting current WiFi network:', error);
+      }
+
+      return; // Already connected, no need for further checks
+    }
+  } catch (error) {
+    console.error('Error checking initial connectivity:', error);
+  }
+
+  // Check if we have a previously connected WiFi network
+  const lastConnectedWifi = appStore.lastConnectedWifi;
+
+  // If we have a previously connected network, check if it's available
+  if (lastConnectedWifi) {
     try {
-      const isConnected = await window.ipcRenderer.invoke(
-        'check-internet-connectivity'
+      // Get list of available networks
+      const availableNetworks = await window.ipcRenderer.invoke(
+        'list-available-wifi-networks'
       );
 
-      if (isConnected) {
-        console.log('Internet connectivity already exists');
+      // Check if our last connected network is in the list
+      const isLastNetworkAvailable =
+        availableNetworks.includes(lastConnectedWifi);
 
-        // We're already connected, get the current WiFi network name
-        try {
-          const currentWifiName = await window.ipcRenderer.invoke(
-            'get-current-wifi-network'
-          );
-
-          if (currentWifiName) {
-            console.log(`Currently connected to: ${currentWifiName}`);
-            // Save the current WiFi network name in app state
-            appStore.setLastConnectedWifi(currentWifiName);
-          }
-        } catch (error) {
-          console.error('Error getting current WiFi network:', error);
-        }
-
-        return; // Already connected, no need for further checks
-      }
-    } catch (error) {
-      console.error('Error checking initial connectivity:', error);
-    }
-
-    // Check if we have a previously connected WiFi network
-    const lastConnectedWifi = appStore.lastConnectedWifi;
-
-    // If we have a previously connected network, check if it's available
-    if (lastConnectedWifi) {
-      try {
-        // Get list of available networks
-        const availableNetworks = await window.ipcRenderer.invoke(
-          'list-available-wifi-networks'
-        );
-
-        // Check if our last connected network is in the list
-        const isLastNetworkAvailable =
-          availableNetworks.includes(lastConnectedWifi);
-
-        if (!isLastNetworkAvailable) {
-          console.log(
-            'Last connected WiFi network not available, skipping retry logic'
-          );
-          router.push({ name: 'Wifi' });
-          return;
-        }
-
+      if (!isLastNetworkAvailable) {
         console.log(
-          'Last connected WiFi network available, attempting to connect'
+          'Last connected WiFi network not available, skipping retry logic'
         );
-      } catch (error) {
-        console.error('Error checking available WiFi networks:', error);
         router.push({ name: 'Wifi' });
         return;
       }
-    } else {
-      // No previously connected network, skip retry logic
-      console.log('No previously connected WiFi network, skipping retry logic');
+
+      console.log(
+        'Last connected WiFi network available, attempting to connect'
+      );
+    } catch (error) {
+      console.error('Error checking available WiFi networks:', error);
       router.push({ name: 'Wifi' });
       return;
     }
-
-    // Try until we succeed, hit max retries, or timeout
-    while (retryCount < maxRetries) {
-      try {
-        const isConnected = await window.ipcRenderer.invoke(
-          'check-internet-connectivity'
-        );
-        if (isConnected) {
-          console.log('Internet connectivity confirmed');
-          return; // We're connected, exit the function
-        }
-
-        // If we've waited more than maxWaitTime, give up
-        if (Date.now() - startTime > maxWaitTime) {
-          console.log('Timeout waiting for internet connection');
-          break;
-        }
-
-        // Exponential backoff delay
-        const delay = Math.min(2000 * Math.pow(2, retryCount), 8000);
-        console.log(
-          `No internet connection detected, retry ${retryCount + 1}/${maxRetries} in ${delay}ms`
-        );
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        retryCount++;
-      } catch (error) {
-        console.error('Error checking internet connectivity:', error);
-
-        // If we've waited more than maxWaitTime, give up
-        if (Date.now() - startTime > maxWaitTime) {
-          console.log('Timeout waiting for internet connection');
-          break;
-        }
-
-        // Shorter delay on error
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        retryCount++;
-      }
-    }
-
-    // If we get here, we couldn't connect after several attempts
-    console.log('Failed to establish internet connection after retries');
-    router.push({ name: 'Wifi' });
   } else {
-    // Check for periodic checks (non-initial startup)
+    // No previously connected network, skip retry logic
+    console.log('No previously connected WiFi network, skipping retry logic');
+    router.push({ name: 'Wifi' });
+    return;
+  }
+
+  // Try until we succeed, hit max retries, or timeout
+  while (retryCount < maxRetries) {
     try {
       const isConnected = await window.ipcRenderer.invoke(
         'check-internet-connectivity'
       );
-
       if (isConnected) {
-        // We're connected, check if we need to update the saved WiFi name
-        try {
-          const currentWifiName = await window.ipcRenderer.invoke(
-            'get-current-wifi-network'
-          );
-
-          if (
-            currentWifiName &&
-            currentWifiName !== appStore.lastConnectedWifi
-          ) {
-            console.log(`Connected to a different network: ${currentWifiName}`);
-            // Update the stored WiFi network name
-            appStore.setLastConnectedWifi(currentWifiName);
-          }
-        } catch (error) {
-          console.error('Error getting current WiFi network:', error);
-        }
-      } else {
-        router.push({ name: 'Wifi' });
+        console.log('Internet connectivity confirmed');
+        return; // We're connected, exit the function
       }
+
+      // If we've waited more than maxWaitTime, give up
+      if (Date.now() - startTime > maxWaitTime) {
+        console.log('Timeout waiting for internet connection');
+        break;
+      }
+
+      // Exponential backoff delay
+      const delay = Math.min(2000 * Math.pow(2, retryCount), 8000);
+      console.log(
+        `No internet connection detected, retry ${retryCount + 1}/${maxRetries} in ${delay}ms`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      retryCount++;
     } catch (error) {
       console.error('Error checking internet connectivity:', error);
-      // Default to Wifi page if there's an error
-      router.push({ name: 'Wifi' });
+
+      // If we've waited more than maxWaitTime, give up
+      if (Date.now() - startTime > maxWaitTime) {
+        console.log('Timeout waiting for internet connection');
+        break;
+      }
+
+      // Shorter delay on error
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      retryCount++;
     }
   }
+
+  // If we get here, we couldn't connect after several attempts
+  console.log('Failed to establish internet connection after retries');
+  router.push({ name: 'Wifi' });
 };
 
-// Set up hourly checks (60 * 60 * 1000 = 3600000 milliseconds = 1 hour)
-setInterval(checkInternetAndRoute, 3600000);
+// Set up daily checks (24 * 60 * 60 * 1000 = 86_400_000 ms = 1 day)
+setInterval(checkInternetAndRoute, 86_400_000);
 
 // Listen for alarm trigger from main process
 window.ipcRenderer.on('trigger-alarm', () => {
