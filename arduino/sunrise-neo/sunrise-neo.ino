@@ -11,7 +11,7 @@
 
 // Which pin on the Arduino is connected to the NeoPixels?
 #define LAMP_PIN 5
-#define SPOT_PIN 3
+#define SPOT_PIN 6
 
 // How many LED "pixels" per strip (we use 1 pixel object per strip to control R,G,B channels)
 #define LED_COUNT 1
@@ -454,6 +454,7 @@ void loop() {
   // Update startup pulse animation if in startup mode
   if (startupMode) {
     updateStartupPulse();
+    spot.show(); // Keep spot off during startup pulse
   }
   
   // Update LED transitions at most every 16ms (approx. 60fps)
