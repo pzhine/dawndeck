@@ -503,12 +503,9 @@ export ELECTRON_DISABLE_SANDBOX=1
 while true; do
     log_message "Launching Electron app..."
     "$ELECTRON_BINARY" \
-        --js-flags="--max-old-space-size=384 --optimize-for-size" \
+        --js-flags="--max-old-space-size=500 --optimize-for-size" \
         --disable-dev-shm-usage \
-        --disable-gpu-compositing \
         --enable-low-end-device-mode \
-        --disable-smooth-scrolling \
-        --disable-features=VizDisplayCompositor \
         --renderer-process-limit=1 \
         >> "$LOG_FILE" 2>&1
     EXIT_CODE=$?
@@ -558,6 +555,34 @@ EOF
     chmod +x "$BASH_PROFILE"
     
     log_info "Created $BASH_PROFILE"
+}
+
+# Function to disable swap for better performance
+disable_swap() {
+    log_info "Disabling swap memory for better performance..."
+    
+    # Check if dphys-swapfile service exists
+    if systemctl list-unit-files | grep -q dphys-swapfile; then
+        systemctl stop dphys-swapfile 2>/dev/null || true
+        systemctl disable dphys-swapfile 2>/dev/null || true
+        log_info "Disabled dphys-swapfile service"
+    fi
+    
+    # Try to turn off any active swap
+    if command -v swapoff &>/dev/null; then
+        swapoff -a 2>/dev/null || true
+    fi
+    
+    # Comment out swap entries in /etc/fstab
+    if [ -f /etc/fstab ]; then
+        if grep -q "^[^#].*swap" /etc/fstab; then
+            cp /etc/fstab /etc/fstab.backup-$(date +%Y%m%d_%H%M%S)
+            sed -i 's/^\([^#].*swap.*\)$/#\1/' /etc/fstab
+            log_info "Commented out swap entries in /etc/fstab"
+        fi
+    fi
+    
+    log_info "Swap disabled (will take effect after reboot)"
 }
 
 # Function to disable desktop environments
@@ -624,6 +649,20 @@ rm -f "$BASH_PROFILE"
 systemctl set-default graphical.target
 systemctl enable lightdm 2>/dev/null || true
 
+# Re-enable swap
+echo "Re-enabling swap..."
+if systemctl list-unit-files | grep -q dphys-swapfile; then
+    systemctl enable dphys-swapfile 2>/dev/null || true
+    systemctl start dphys-swapfile 2>/dev/null || true
+    echo "✓ Re-enabled dphys-swapfile service"
+fi
+
+# Uncomment swap entries in /etc/fstab
+if [ -f /etc/fstab ] && grep -q "^#.*swap" /etc/fstab; then
+    sed -i 's/^#\(.*swap.*\)$/\1/' /etc/fstab
+    echo "✓ Uncommented swap entries in /etc/fstab"
+fi
+
 echo "✓ Kiosk mode disabled"
 echo "✓ System will boot normally on next restart"
 echo ""
@@ -676,6 +715,11 @@ show_completion() {
     fi
     
     echo ""
+    echo "Performance optimizations:"
+    echo "  Swap memory: Disabled (improves responsiveness on low-RAM systems)"
+    echo "  X11 backing store: Disabled"
+    echo "  Electron memory limit: 500MB with size optimization"
+    echo ""
     echo "The system will boot into X and run only the Electron app."
     echo "No desktop environment will be loaded."
     echo ""
@@ -714,6 +758,7 @@ main() {
     configure_easyeffects
     create_xsession_script
     configure_bash_profile
+    disable_swap
     disable_desktop_environments
     create_uninstall_script
     show_completion
