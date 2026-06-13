@@ -158,7 +158,6 @@ install_packages() {
         bluez \
         bluez-tools \
         dbus-x11 \
-        unclutter \
         easyeffects \
         2>/dev/null || log_warn "Some packages may already be installed"
     
@@ -397,10 +396,11 @@ if command -v xrandr &> /dev/null; then
         
         # Check if 800x800 mode is available
         if xrandr 2>/dev/null | grep -A20 "$DSI_OUTPUT" | grep -q " 800x800"; then
-            log_message "800x800 mode is available, setting it..."
-            xrandr --output "$DSI_OUTPUT" --mode 800x800 >> "$LOG_FILE" 2>&1
+            log_message "800x800 mode is available, setting and rotating it..."
+            xrandr --output "$DSI_OUTPUT" --mode 800x800 --rotate right >> "$LOG_FILE" 2>&1
         else
-            log_message "800x800 mode not found in available modes"
+            log_message "800x800 mode not found in available modes, only rotating..."
+            xrandr --output "$DSI_OUTPUT" --rotate right >> "$LOG_FILE" 2>&1
         fi
         
         log_message "Final xrandr output:"
@@ -458,7 +458,7 @@ export ELECTRON_DISABLE_SANDBOX=1
 # Run Electron app and restart it if it crashes
 while true; do
     log_message "Launching Electron app..."
-    "$ELECTRON_BINARY" >> "$LOG_FILE" 2>&1
+    "$ELECTRON_BINARY" --js-flags="--max-old-space-size=256" --disable-dev-shm-usage >> "$LOG_FILE" 2>&1
     EXIT_CODE=$?
     log_message "Electron app exited with code: $EXIT_CODE"
     
@@ -495,7 +495,9 @@ configure_bash_profile() {
 if [[ -z $DISPLAY ]] && [[ $(tty) = /dev/tty1 ]]; then
     # Redirect all output to log file for silent boot
     exec > "$HOME/x-startup.log" 2>&1
-    exec startx "$HOME/.xinitrc" -- -dpi 96 -quiet
+    # -bs disables backing store (saves memory)
+    # -nolisten tcp disables X11 network listening
+    exec startx "$HOME/.xinitrc" -- -dpi 96 -quiet -bs -nolisten tcp -nocursor
 fi
 EOF
     
