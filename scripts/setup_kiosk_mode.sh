@@ -148,6 +148,7 @@ install_packages() {
         xserver-xorg-input-evdev \
         xserver-xorg-input-libinput \
         x11-xserver-utils \
+        xinput \
         xinit \
         libgtk-3-0 \
         libnss3 \
@@ -396,10 +397,10 @@ if command -v xrandr &> /dev/null; then
         
         # Check if 800x800 mode is available
         if xrandr 2>/dev/null | grep -A20 "$DSI_OUTPUT" | grep -q " 800x800"; then
-            log_message "800x800 mode is available, setting and rotating it..."
+            log_message "800x800 mode is available, setting it and rotating 90 degrees..."
             xrandr --output "$DSI_OUTPUT" --mode 800x800 --rotate right >> "$LOG_FILE" 2>&1
         else
-            log_message "800x800 mode not found in available modes, only rotating..."
+            log_message "800x800 mode not found in available modes, rotating 90 degrees..."
             xrandr --output "$DSI_OUTPUT" --rotate right >> "$LOG_FILE" 2>&1
         fi
         
@@ -410,6 +411,27 @@ if command -v xrandr &> /dev/null; then
     fi
 else
     log_message "⚠ xrandr not available"
+fi
+
+# Set touch input rotation (Coordinates mapped to 90 degrees clockwise)
+if command -v xinput &> /dev/null; then
+    log_message "Configuring touch input rotation matrix..."
+    # matrix for 90 degrees clockwise rotation: "0 1 0 -1 0 1 0 0 1"
+    
+    TOUCH_DEVICE=$(xinput --list | grep -i -E "(touch|finger|pointer|waveshare|goodix|ft|edt)" | grep -v "Virtual core" | head -1)
+    if [ -z "$TOUCH_DEVICE" ]; then
+        TOUCH_DEVICE=$(xinput --list | grep "slave.*pointer" | grep -v "Virtual core" | head -1)
+    fi
+    
+    if [ -n "$TOUCH_DEVICE" ]; then
+        XINPUT_DEVICE_ID=$(echo "$TOUCH_DEVICE" | awk -F 'id=' '{print $2}' | awk '{print $1}')
+        if [ -n "$XINPUT_DEVICE_ID" ]; then
+            log_message "Found touch device ID: $XINPUT_DEVICE_ID, applying matrix..."
+            xinput set-prop "$XINPUT_DEVICE_ID" "Coordinate Transformation Matrix" 0 1 0 -1 0 1 0 0 1 >> "$LOG_FILE" 2>&1
+        fi
+    else
+        log_message "⚠ No touch device found via xinput"
+    fi
 fi
 
 # Start PulseAudio if not already running
