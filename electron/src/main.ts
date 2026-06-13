@@ -2,12 +2,6 @@ import { createRouter, createWebHashHistory } from 'vue-router';
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import App from './App.vue';
-import Wifi from './pages/Wifi.vue';
-import WifiPassword from './pages/WifiPassword.vue';
-import WifiConnect from './pages/WifiConnect.vue';
-import ClockPage from './pages/ClockPage.vue';
-import Settings from './pages/Settings.vue';
-import SoundCategories from './pages/SoundCategories.vue';
 import { nextTick } from 'vue';
 import { useAppStore } from './stores/appState';
 
@@ -17,19 +11,19 @@ import './style.css';
 const pinia = createPinia();
 
 const routes = [
-  { path: '/', name: 'Clock', component: ClockPage },
-  { path: '/wifi', component: Wifi, name: 'Wifi' },
+  { path: '/', name: 'Clock', component: () => import('./pages/ClockPage.vue') },
+  { path: '/wifi', component: () => import('./pages/Wifi.vue'), name: 'Wifi' },
   {
     path: '/wifi-password/:networkName',
     name: 'WifiPassword',
-    component: WifiPassword,
+    component: () => import('./pages/WifiPassword.vue'),
   },
   {
     path: '/wifi-connect/:networkName/:password',
     name: 'WifiConnect',
-    component: WifiConnect,
+    component: () => import('./pages/WifiConnect.vue'),
   },
-  { path: '/settings', name: 'Settings', component: Settings },
+  { path: '/settings', name: 'Settings', component: () => import('./pages/Settings.vue') },
   {
     path: '/timezone-settings',
     name: 'TimezoneSettings',
@@ -40,7 +34,7 @@ const routes = [
     name: 'ColorSettings',
     component: () => import('./pages/ColorSettings.vue'),
   },
-  { path: '/sounds', name: 'SoundCategories', component: SoundCategories },
+  { path: '/sounds', name: 'SoundCategories', component: () => import('./pages/SoundCategories.vue') },
   {
     path: '/media-player/:soundId?',
     name: 'MediaPlayer',

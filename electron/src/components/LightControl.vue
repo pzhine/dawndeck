@@ -4,7 +4,7 @@
       <svg
         ref="svgRef"
         class="w-full h-full bg-black rounded-full cursor-crosshair touch-none"
-        style="filter: blur(25px);"
+        style="filter: blur(10px); will-change: transform;"
         viewBox="-150 -150 1100 1050"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -260,7 +260,7 @@ function calculateColorWheelValues(x: number, y: number): [number, number, numbe
     return Math.sqrt(dx * dx + dy * dy) <= tapRadius;
   }
   
-  const gridSize = 40;
+  const gridSize = 20; // Reduced from 40 for better performance on low-memory devices
   const step = (tapRadius * 2) / gridSize;
   
   let color0Count = 0; // 180°-300° sector
