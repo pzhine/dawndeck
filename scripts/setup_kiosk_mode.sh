@@ -416,22 +416,44 @@ fi
 # Set touch input rotation (Coordinates mapped to 90 degrees clockwise)
 if command -v xinput &> /dev/null; then
     log_message "Configuring touch input rotation matrix..."
-    # matrix for 90 degrees clockwise rotation: "0 1 0 -1 0 1 0 0 1"
+    # Wait a moment for display to settle after xrandr changes
+    sleep 2
     
+    # List all input devices for debugging
+    log_message "Available input devices:"
+    xinput --list >> "$LOG_FILE" 2>&1
+    
+    # matrix for 90 degrees clockwise rotation: "0 1 0 -1 0 1 0 0 1"
     TOUCH_DEVICE=$(xinput --list | grep -i -E "(touch|finger|pointer|waveshare|goodix|ft|edt)" | grep -v "Virtual core" | head -1)
     if [ -z "$TOUCH_DEVICE" ]; then
+        log_message "No obvious touch device found, trying all pointer devices..."
         TOUCH_DEVICE=$(xinput --list | grep "slave.*pointer" | grep -v "Virtual core" | head -1)
     fi
     
     if [ -n "$TOUCH_DEVICE" ]; then
         XINPUT_DEVICE_ID=$(echo "$TOUCH_DEVICE" | awk -F 'id=' '{print $2}' | awk '{print $1}')
+        log_message "Detected touch device: $TOUCH_DEVICE"
+        log_message "Extracted device ID: $XINPUT_DEVICE_ID"
+        
         if [ -n "$XINPUT_DEVICE_ID" ]; then
-            log_message "Found touch device ID: $XINPUT_DEVICE_ID, applying matrix..."
-            xinput set-prop "$XINPUT_DEVICE_ID" "Coordinate Transformation Matrix" 0 1 0 -1 0 1 0 0 1 >> "$LOG_FILE" 2>&1
+            log_message "Applying coordinate transformation matrix for 90° rotation..."
+            if xinput set-prop "$XINPUT_DEVICE_ID" "Coordinate Transformation Matrix" 0 1 0 -1 0 1 0 0 1 2>> "$LOG_FILE"; then
+                log_message "✓ Touch rotation applied successfully"
+                # Verify it was applied
+                log_message "Verifying transformation matrix:"
+                xinput list-props "$XINPUT_DEVICE_ID" | grep "Coordinate Transformation Matrix" >> "$LOG_FILE" 2>&1
+            else
+                log_message "✗ ERROR: Failed to apply touch rotation matrix"
+            fi
+        else
+            log_message "✗ ERROR: Could not extract device ID from: $TOUCH_DEVICE"
         fi
     else
         log_message "⚠ No touch device found via xinput"
+        log_message "This is normal if using only a mouse, but touch input will not be rotated"
     fi
+else
+    log_message "⚠ xinput command not available"
 fi
 
 # Start PulseAudio if not already running
