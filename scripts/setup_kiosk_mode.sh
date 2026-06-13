@@ -502,7 +502,15 @@ export ELECTRON_DISABLE_SANDBOX=1
 # Run Electron app and restart it if it crashes
 while true; do
     log_message "Launching Electron app..."
-    "$ELECTRON_BINARY" --js-flags="--max-old-space-size=256" --disable-dev-shm-usage >> "$LOG_FILE" 2>&1
+    "$ELECTRON_BINARY" \
+        --js-flags="--max-old-space-size=384 --optimize-for-size" \
+        --disable-dev-shm-usage \
+        --disable-gpu-compositing \
+        --enable-low-end-device-mode \
+        --disable-smooth-scrolling \
+        --disable-features=VizDisplayCompositor \
+        --renderer-process-limit=1 \
+        >> "$LOG_FILE" 2>&1
     EXIT_CODE=$?
     log_message "Electron app exited with code: $EXIT_CODE"
     
