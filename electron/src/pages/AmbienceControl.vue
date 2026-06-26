@@ -128,7 +128,9 @@ const lampColors = computed<[number, number, number]>(() => {
   return [colors.warmWhite, colors.pink, colors.orange];
 });
 const lampPosition = computed(() => appStore.lampPosition);
-const lampCircleColors: [string, string, string] = ['#ffb86d', '#FF2A70', '#ff4b09'];
+const lampCircleColors = computed<[string, string, string]>(() => {
+  return appStore.config?.colorMapping?.lamp?.colors || ['#ffb86d', '#FF2A70', '#ff4b09'];
+});
 
 // Projector state
 const projectorBrightness = computed(() => appStore.projectorBrightness);
@@ -137,7 +139,9 @@ const projectorColors = computed<[number, number, number]>(() => {
   return [colors.color0, colors.color1, colors.color2];
 });
 const projectorPosition = computed(() => appStore.projectorPosition);
-const projectorCircleColors: [string, string, string] = ['#9d09ff', '#ff8409', '#0058f0'];
+const projectorCircleColors = computed<[string, string, string]>(() => {
+  return appStore.config?.colorMapping?.projector?.colors || ['#9d09ff', '#ff8409', '#0058f0'];
+});
 
 // Color name state
 const colorNameLamp = ref<string>('');
@@ -205,14 +209,14 @@ watch(
  * Computed lamp brightness control color
  */
 const lampBrightnessColor = computed(() => {
-  return mixColorsRgb(lampCircleColors, lampColors.value);
+  return mixColorsRgb(lampCircleColors.value, lampColors.value);
 });
 
 /**
  * Computed projector brightness control color
  */
 const projectorBrightnessColor = computed(() => {
-  return mixColorsRgb(projectorCircleColors, projectorColors.value);
+  return mixColorsRgb(projectorCircleColors.value, projectorColors.value);
 });
 
 /**

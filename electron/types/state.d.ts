@@ -72,6 +72,16 @@ export interface AppConfig {
     mockSerial: boolean;
     mockSystemAudio: boolean;
   };
+  colorMapping?: {
+    lamp: {
+      colors: [string, string, string]; // RGB hex colors for warmWhite, pink, orange
+      labels: [string, string, string]; // Labels for each color
+    };
+    projector: {
+      colors: [string, string, string]; // RGB hex colors for color0, color1, color2
+      labels: [string, string, string]; // Labels for each color
+    };
+  };
 }
 
 // Define the interface for our app state

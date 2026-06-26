@@ -22,5 +22,15 @@
   "dev": {
     "mockSerial": true,
     "mockSystemAudio": true
+  },
+  "colorMapping": {
+    "lamp": {
+      "colors": ["#ffb86d", "#FF2A70", "#ff4b09"],
+      "labels": ["Warm White", "Pink", "Orange"]
+    },
+    "projector": {
+      "colors": ["#9d09ff", "#ff8409", "#0058f0"],
+      "labels": ["Purple", "Orange", "Blue"]
+    }
   }
 }
