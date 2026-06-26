@@ -74,12 +74,12 @@ export interface AppConfig {
   };
   colorMapping?: {
     lamp: {
-      colors: [string, string, string]; // RGB hex colors for warmWhite, pink, orange
-      labels: [string, string, string]; // Labels for each color
+      colors: string[]; // RGB hex colors for warmWhite, pink, orange (3 colors)
+      labels: string[]; // Labels for each color (3 labels)
     };
     projector: {
-      colors: [string, string, string]; // RGB hex colors for color0, color1, color2
-      labels: [string, string, string]; // Labels for each color
+      colors: string[]; // RGB hex colors for color0, color1, color2 (3 colors)
+      labels: string[]; // Labels for each color (3 labels)
     };
   };
 }

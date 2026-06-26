@@ -129,7 +129,8 @@ const lampColors = computed<[number, number, number]>(() => {
 });
 const lampPosition = computed(() => appStore.lampPosition);
 const lampCircleColors = computed<[string, string, string]>(() => {
-  return appStore.config?.colorMapping?.lamp?.colors || ['#ffb86d', '#FF2A70', '#ff4b09'];
+  const colors = appStore.config?.colorMapping?.lamp?.colors || ['#ffb86d', '#FF2A70', '#ff4b09'];
+  return colors as [string, string, string];
 });
 
 // Projector state
@@ -140,7 +141,8 @@ const projectorColors = computed<[number, number, number]>(() => {
 });
 const projectorPosition = computed(() => appStore.projectorPosition);
 const projectorCircleColors = computed<[string, string, string]>(() => {
-  return appStore.config?.colorMapping?.projector?.colors || ['#9d09ff', '#ff8409', '#0058f0'];
+  const colors = appStore.config?.colorMapping?.projector?.colors || ['#9d09ff', '#ff8409', '#0058f0'];
+  return colors as [string, string, string];
 });
 
 // Color name state
