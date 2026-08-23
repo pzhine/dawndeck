@@ -38,7 +38,7 @@ const route = useRoute();
 // Screen sleep state
 const isScreenAsleep = ref(false);
 const effectiveScreenBrightness = ref(appStore.screenBrightness); // The actual brightness to display
-let lastActivityTime = Date.now();
+let lastActivityTime = 0; // Will be initialized in onMounted
 let sleepCheckInterval: NodeJS.Timeout | null = null;
 
 // Watch for changes to the store's screen brightness and update effective brightness when awake
@@ -177,6 +177,9 @@ onMounted(() => {
     '--brightness-filter',
     brightnessFilter.value
   );
+  
+  // Initialize activity timer now that UI is ready
+  lastActivityTime = Date.now();
   
   // Set up screen sleep timer (check every second)
   sleepCheckInterval = setInterval(checkScreenSleep, 1000);
