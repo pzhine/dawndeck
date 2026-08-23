@@ -3,8 +3,8 @@
     <div 
       class="content-wrapper" 
       :class="{ 'shrunk': isActive && !pinned, 'pinned': pinned }" 
-      @touchstart="!pinned && !justClosed && activateMenu()" 
-      @click="!pinned && !justClosed && activateMenu()"
+      @touchstart="handleContentTouch" 
+      @click="handleContentClick"
     >
       <slot></slot>
     </div>
@@ -295,6 +295,20 @@ const preloadIcons = async () => {
   });
   
   await Promise.all(promises);
+};
+
+const handleContentTouch = (event: TouchEvent) => {
+  if (props.pinned || justClosed.value) return;
+  event.stopPropagation();
+  event.preventDefault();
+  activateMenu();
+};
+
+const handleContentClick = (event: MouseEvent) => {
+  if (props.pinned || justClosed.value) return;
+  event.stopPropagation();
+  event.preventDefault();
+  activateMenu();
 };
 
 const activateMenu = () => {
@@ -805,6 +819,10 @@ const onTouchStart = (event: TouchEvent) => {
     const segment = getIntersectedSegment(touch.clientX, touch.clientY);
     
     if (segment) {
+      // Ignore input if menu wasn't active (this is the opening tap)
+      if (!isActive.value) {
+        return;
+      }
       isInteracting = true;
       event.preventDefault();
       event.stopPropagation();
@@ -827,6 +845,10 @@ const onMouseDown = (event: MouseEvent) => {
   const segment = getIntersectedSegment(event.clientX, event.clientY);
   
   if (segment) {
+    // Ignore input if menu wasn't active (this is the opening click)
+    if (!isActive.value) {
+      return;
+    }
     isInteracting = true;
     event.preventDefault();
     event.stopPropagation();

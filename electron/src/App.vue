@@ -37,24 +37,41 @@ const route = useRoute();
 
 // Screen sleep state
 const isScreenAsleep = ref(false);
-const awakeBrightness = ref(appStore.screenBrightness);
+const effectiveScreenBrightness = ref(appStore.screenBrightness); // The actual brightness to display
 let lastActivityTime = Date.now();
 let sleepCheckInterval: NodeJS.Timeout | null = null;
+
+// Watch for changes to the store's screen brightness and update effective brightness when awake
+watch(
+  () => appStore.screenBrightness,
+  (newBrightness) => {
+    if (!isScreenAsleep.value) {
+      effectiveScreenBrightness.value = newBrightness;
+    }
+  }
+);
 
 // Computed property to get text brightness as a CSS filter value
 const brightnessFilter = computed(() => {
   // On Linux (production), hardware controls brightness directly - skip CSS filter
-  // In dev mode (macOS), use CSS filter since we don't have hardware control
-  if (!appStore.config.dev.mockSystemAudio) {
+  // In dev mode (macOS), use CSS filter to simulate screen brightness
+  if (!appStore.config.dev.mockBrightness) {
     return 'brightness(1)'; // No CSS brightness adjustment on Linux
   }
   
-  // Convert brightness percentage to a curve that starts fast and decelerates
-  // Map input range [0-100] to output range [0.5-1.0] with square root scaling
-  const normalizedInput = appStore.screenBrightness / 100; // Convert to 0-1 range
+  // Simulate screen brightness on desktop
+  // When screen is at 0% (asleep), CSS brightness should be 0
+  // When screen is at 100%, CSS brightness should be 1
+  // Apply square root curve for more natural feel at lower brightness
+  const normalizedInput = effectiveScreenBrightness.value / 100; // Convert to 0-1 range
+  
+  if (normalizedInput === 0) {
+    return 'brightness(0)'; // Fully black when asleep
+  }
+  
   const sqrtValue = Math.sqrt(normalizedInput); // Apply square root formula (√x)
-  const brightnessValue = 0.5 + sqrtValue * 0.5; // Map to 0.5-1.0 range
-  console.log(`Brightness Filter Value: ${brightnessValue}`);
+  const brightnessValue = 0.8 + sqrtValue * 0.2; // Map to 0.8-1.0 range for visible brightness
+  console.log(`Brightness Filter Value: ${brightnessValue} (screen brightness: ${effectiveScreenBrightness.value}%)`);
   return `brightness(${brightnessValue})`;
 });
 
@@ -73,8 +90,13 @@ function sleepScreen() {
   
   console.log('Screen going to sleep');
   isScreenAsleep.value = true;
-  awakeBrightness.value = appStore.screenBrightness;
-  appStore.setScreenBrightness(0);
+  // Set effective brightness to 0 without touching the store
+  effectiveScreenBrightness.value = 0;
+  
+  // Apply hardware brightness on Linux (if not mocked)
+  if (!appStore.config.dev.mockBrightness) {
+    window.ipcRenderer.invoke('set-screen-brightness', 0);
+  }
 }
 
 function wakeScreen() {
@@ -82,11 +104,18 @@ function wakeScreen() {
   
   console.log('Screen waking up');
   isScreenAsleep.value = false;
-  appStore.setScreenBrightness(awakeBrightness.value);
+  // Restore effective brightness from the store's saved value
+  effectiveScreenBrightness.value = appStore.screenBrightness;
+  
+  // Apply hardware brightness on Linux (if not mocked)
+  if (!appStore.config.dev.mockBrightness) {
+    window.ipcRenderer.invoke('set-screen-brightness', appStore.screenBrightness);
+  }
 }
 
 function checkScreenSleep() {
   if (isScreenAsleep.value) return; // Don't check if already asleep
+  if (!appStore.screenSleepEnabled) return; // Don't sleep if disabled
   
   const timeoutMs = appStore.screenSleepTimeout * 1000;
   const timeSinceActivity = Date.now() - lastActivityTime;
@@ -100,8 +129,10 @@ function checkScreenSleep() {
 function handleUserActivity(event: Event) {
   // If screen is asleep, prevent the event from propagating to other handlers
   if (isScreenAsleep.value) {
-    event.stopPropagation();
-    event.preventDefault();
+    event.stopImmediatePropagation(); // Prevent all other handlers from firing
+    event.preventDefault(); // Prevent default browser behavior
+    resetActivityTimer(); // Wake the screen
+    return; // Don't process any further
   }
   resetActivityTimer();
 }

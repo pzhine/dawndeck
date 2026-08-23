@@ -137,6 +137,7 @@ export const useAppStore = defineStore('appState', {
     alarmTime: [7, 0], // Default alarm time [hours, minutes] (7:00 AM)
     screenBrightness: 80, // Default screen brightness (0-100)
     screenSleepTimeout: 30, // Default screen sleep timeout: 30 seconds
+    screenSleepEnabled: true, // Default: screen sleep is enabled
     projectorBrightness: 70, // Default projector brightness (0-100)
     lampBrightness: 50, // Default lamp brightness (0-100)
     lampActive: true, // Whether the lamp is currently active
@@ -299,8 +300,12 @@ export const useAppStore = defineStore('appState', {
         // Sync with system volume after loading state
         await this.syncWithSystemVolume();
 
-        // Restore screen brightness
-        if (this.screenBrightness !== undefined) {
+        // Restore screen brightness on Linux only
+        // In dev mode (macOS), CSS filter simulates brightness instead
+        if (
+          this.screenBrightness !== undefined &&
+          !this.config.dev.mockBrightness
+        ) {
           await window.ipcRenderer.invoke(
             'set-screen-brightness',
             this.screenBrightness
@@ -403,13 +408,22 @@ export const useAppStore = defineStore('appState', {
       this.screenBrightness = Math.max(0, Math.min(100, level)); // Clamp between 0-100
       this.saveState();
 
-      // Apply brightness to hardware on Linux (throttled)
-      throttledSetScreenBrightness(this.screenBrightness);
+      // Apply brightness to hardware on Linux only (throttled)
+      // In dev mode (macOS), CSS filter simulates brightness instead
+      if (!this.config.dev.mockBrightness) {
+        throttledSetScreenBrightness(this.screenBrightness);
+      }
     },
 
     // Set the screen sleep timeout
     setScreenSleepTimeout(seconds: number): void {
       this.screenSleepTimeout = Math.max(10, Math.min(180, seconds)); // Clamp between 10-180
+      this.saveState();
+    },
+
+    // Toggle screen sleep enabled
+    toggleScreenSleepEnabled(): void {
+      this.screenSleepEnabled = !this.screenSleepEnabled;
       this.saveState();
     },
 
@@ -626,6 +640,7 @@ export const useAppStore = defineStore('appState', {
       this.alarmTime = [7, 0];
       this.screenBrightness = 80;
       this.screenSleepTimeout = 30;
+      this.screenSleepEnabled = true;
       this.projectorBrightness = 70;
       this.lampBrightness = 50;
       this.timeFormat = '24h';

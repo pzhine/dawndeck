@@ -71,6 +71,7 @@ export interface AppConfig {
   dev: {
     mockSerial: boolean;
     mockSystemAudio: boolean;
+    mockBrightness: boolean;
   };
   colorMapping?: {
     lamp: {
@@ -91,6 +92,7 @@ export interface AppState {
   alarmTime: AlarmTime;
   screenBrightness: number;
   screenSleepTimeout: number; // Screen sleep timeout in seconds (10-180)
+  screenSleepEnabled: boolean; // Whether screen sleep is enabled
   projectorBrightness: number;
   lampBrightness: number;
   lampActive: boolean; // Whether the lamp is currently active

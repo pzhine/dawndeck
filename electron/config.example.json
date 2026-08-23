@@ -21,7 +21,8 @@
   },
   "dev": {
     "mockSerial": true,
-    "mockSystemAudio": true
+    "mockSystemAudio": true,
+    "mockBrightness": true
   },
   "colorMapping": {
     "lamp": {

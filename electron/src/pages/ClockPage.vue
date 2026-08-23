@@ -44,6 +44,7 @@ const lampIcon = feather.icons['sun'].toSvg();
 const musicIcon = feather.icons['volume-2'].toSvg();
 const alarmIcon = feather.icons['bell'].toSvg();
 const settingsIcon = feather.icons['settings'].toSvg();
+const moonIcon = feather.icons['moon'].toSvg();
 
 const upperMenuItems = computed<MenuItem[]>(() => [
   { 
@@ -92,6 +93,14 @@ const upperMenuItems = computed<MenuItem[]>(() => [
   },
 ]);
 const lowerMenuItems = computed<MenuItem[]>(() => [
+  { 
+    label: 'Sleep', 
+    icon: moonIcon, 
+    active: appStore.screenSleepEnabled,
+    action: () => {
+      appStore.toggleScreenSleepEnabled();
+    }
+  },
   { 
     label: 'Alarm', 
     icon: alarmIcon, 
