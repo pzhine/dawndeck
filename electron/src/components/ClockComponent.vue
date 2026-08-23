@@ -248,7 +248,8 @@ const updateFormattedTime = () => {
     timeZone,
     hour: 'numeric',
     minute: '2-digit',
-    hour12: appStore.timeFormat === '12h'
+    hour12: appStore.timeFormat === '12h',
+    hourCycle: 'h23'
   });
   
   const parts = timeFormatter.formatToParts(time.value);
