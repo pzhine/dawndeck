@@ -37,6 +37,7 @@ const route = useRoute();
 
 // Screen sleep state
 const isScreenAsleep = ref(false);
+const justWokeUp = ref(false);
 const effectiveScreenBrightness = ref(appStore.screenBrightness); // The actual brightness to display
 let lastActivityTime = 0; // Will be initialized in onMounted
 let sleepCheckInterval: NodeJS.Timeout | null = null;
@@ -79,9 +80,19 @@ const brightnessFilter = computed(() => {
 function resetActivityTimer() {
   lastActivityTime = Date.now();
   
+  // Cancel and restart the sleep check interval
+  if (sleepCheckInterval) {
+    clearInterval(sleepCheckInterval);
+  }
+  sleepCheckInterval = setInterval(checkScreenSleep, 1000);
+  
   // If screen is asleep, wake it up
   if (isScreenAsleep.value) {
     wakeScreen();
+    justWokeUp.value = true;
+    setTimeout(() => {
+      justWokeUp.value = false;
+    }, 500); // Ignore interactions for 500ms after waking
   }
 }
 
@@ -127,11 +138,15 @@ function checkScreenSleep() {
 
 // Handle user activity (tap/click anywhere on the screen)
 function handleUserActivity(event: Event) {
-  // If screen is asleep, prevent the event from propagating to other handlers
-  if (isScreenAsleep.value) {
+  // If screen is asleep or just woke up, prevent the event from propagating
+  if (isScreenAsleep.value || justWokeUp.value) {
     event.stopImmediatePropagation(); // Prevent all other handlers from firing
     event.preventDefault(); // Prevent default browser behavior
-    resetActivityTimer(); // Wake the screen
+    
+    // Only wake if actually asleep (not if just woke up)
+    if (isScreenAsleep.value) {
+      resetActivityTimer(); // Wake the screen (sets justWokeUp)
+    }
     return; // Don't process any further
   }
   resetActivityTimer();
