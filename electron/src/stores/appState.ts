@@ -136,6 +136,7 @@ export const useAppStore = defineStore('appState', {
     alarmActive: false, // Alarm active state
     alarmTime: [7, 0], // Default alarm time [hours, minutes] (7:00 AM)
     screenBrightness: 80, // Default screen brightness (0-100)
+    screenSleepTimeout: 30, // Default screen sleep timeout: 30 seconds
     projectorBrightness: 70, // Default projector brightness (0-100)
     lampBrightness: 50, // Default lamp brightness (0-100)
     lampActive: true, // Whether the lamp is currently active
@@ -406,6 +407,12 @@ export const useAppStore = defineStore('appState', {
       throttledSetScreenBrightness(this.screenBrightness);
     },
 
+    // Set the screen sleep timeout
+    setScreenSleepTimeout(seconds: number): void {
+      this.screenSleepTimeout = Math.max(10, Math.min(180, seconds)); // Clamp between 10-180
+      this.saveState();
+    },
+
     // set the sunrise duration
     setSunriseDuration(durationSeconds: number): void {
       this.sunriseDuration = durationSeconds;
@@ -618,6 +625,7 @@ export const useAppStore = defineStore('appState', {
       this.volume = 50;
       this.alarmTime = [7, 0];
       this.screenBrightness = 80;
+      this.screenSleepTimeout = 30;
       this.projectorBrightness = 70;
       this.lampBrightness = 50;
       this.timeFormat = '24h';

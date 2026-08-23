@@ -90,6 +90,7 @@ export interface AppState {
   alarmActive: boolean;
   alarmTime: AlarmTime;
   screenBrightness: number;
+  screenSleepTimeout: number; // Screen sleep timeout in seconds (10-180)
   projectorBrightness: number;
   lampBrightness: number;
   lampActive: boolean; // Whether the lamp is currently active

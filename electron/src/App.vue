@@ -23,7 +23,7 @@
 
 <script setup lang="ts">
 import { useAppStore } from './stores/appState';
-import { computed, watch, onMounted, onUnmounted } from 'vue';
+import { computed, watch, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import UpdateIndicator from './components/UpdateIndicator.vue';
 import BackButton from './components/BackButton.vue';
@@ -35,6 +35,12 @@ const appStore = useAppStore();
 const router = useRouter();
 const route = useRoute();
 
+// Screen sleep state
+const isScreenAsleep = ref(false);
+const awakeBrightness = ref(appStore.screenBrightness);
+let lastActivityTime = Date.now();
+let sleepCheckInterval: NodeJS.Timeout | null = null;
+
 // Computed property to get text brightness as a CSS filter value
 const brightnessFilter = computed(() => {
   // On Linux (production), hardware controls brightness directly - skip CSS filter
@@ -44,13 +50,61 @@ const brightnessFilter = computed(() => {
   }
   
   // Convert brightness percentage to a curve that starts fast and decelerates
-  // Map input range [0-100] to output range [0.3-1.0] with square root scaling
+  // Map input range [0-100] to output range [0.5-1.0] with square root scaling
   const normalizedInput = appStore.screenBrightness / 100; // Convert to 0-1 range
   const sqrtValue = Math.sqrt(normalizedInput); // Apply square root formula (√x)
-  const brightnessValue = 0.7 + sqrtValue * 0.3; // Map to 0.7-1.0 range
+  const brightnessValue = 0.5 + sqrtValue * 0.5; // Map to 0.5-1.0 range
   console.log(`Brightness Filter Value: ${brightnessValue}`);
   return `brightness(${brightnessValue})`;
 });
+
+// Screen sleep functions
+function resetActivityTimer() {
+  lastActivityTime = Date.now();
+  
+  // If screen is asleep, wake it up
+  if (isScreenAsleep.value) {
+    wakeScreen();
+  }
+}
+
+function sleepScreen() {
+  if (isScreenAsleep.value) return; // Already asleep
+  
+  console.log('Screen going to sleep');
+  isScreenAsleep.value = true;
+  awakeBrightness.value = appStore.screenBrightness;
+  appStore.setScreenBrightness(0);
+}
+
+function wakeScreen() {
+  if (!isScreenAsleep.value) return; // Already awake
+  
+  console.log('Screen waking up');
+  isScreenAsleep.value = false;
+  appStore.setScreenBrightness(awakeBrightness.value);
+}
+
+function checkScreenSleep() {
+  if (isScreenAsleep.value) return; // Don't check if already asleep
+  
+  const timeoutMs = appStore.screenSleepTimeout * 1000;
+  const timeSinceActivity = Date.now() - lastActivityTime;
+  
+  if (timeSinceActivity >= timeoutMs) {
+    sleepScreen();
+  }
+}
+
+// Handle user activity (tap/click anywhere on the screen)
+function handleUserActivity(event: Event) {
+  // If screen is asleep, prevent the event from propagating to other handlers
+  if (isScreenAsleep.value) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  resetActivityTimer();
+}
 
 // Update CSS variable when text brightness changes
 watch(
@@ -93,6 +147,14 @@ onMounted(() => {
     brightnessFilter.value
   );
   
+  // Set up screen sleep timer (check every second)
+  sleepCheckInterval = setInterval(checkScreenSleep, 1000);
+  
+  // Add global event listeners for user activity
+  document.addEventListener('click', handleUserActivity, true);
+  document.addEventListener('touchstart', handleUserActivity, true);
+  document.addEventListener('wheel', handleUserActivity, true);
+  
   // Set up global auto-advance callback for playlist
   setOnSoundEndedCallback(() => {
     console.log('Sound ended, auto-advancing to next track');
@@ -129,6 +191,14 @@ onMounted(() => {
 // Clean up listener on unmount
 onUnmounted(() => {
   setOnSoundEndedCallback(null);
+  
+  // Clean up screen sleep timer and event listeners
+  if (sleepCheckInterval) {
+    clearInterval(sleepCheckInterval);
+  }
+  document.removeEventListener('click', handleUserActivity, true);
+  document.removeEventListener('touchstart', handleUserActivity, true);
+  document.removeEventListener('wheel', handleUserActivity, true);
   
   if (window.ipcRenderer) {
     window.ipcRenderer.off('navigate-to-page', handleNavigate);
