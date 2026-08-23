@@ -189,8 +189,8 @@ export const useAppStore = defineStore('appState', {
         const hours12 = hours % 12 || 12; // Convert 0 to 12 for 12 AM
         return `${hours12}:${minutes.toString().padStart(2, '0')} ${isPM ? 'PM' : 'AM'}`;
       } else {
-        // 24h format
-        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        // 24h format - ensure hours are in 0-23 range
+        return `${(hours % 24).toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
       }
     },
 
@@ -290,8 +290,11 @@ export const useAppStore = defineStore('appState', {
         const savedState = await window.ipcRenderer.invoke('load-app-state');
         console.log('Loaded saved state:', savedState);
         if (savedState) {
-          // Replace the entire state with the saved one
-          this.$patch(savedState);
+          // Merge saved state with current state to preserve any new default fields
+          // This prevents undefined values when new fields are added to the store
+          this.$patch((state) => {
+            Object.assign(state, savedState);
+          });
         }
 
         // Ensure sunrise presets are always present
@@ -377,7 +380,8 @@ export const useAppStore = defineStore('appState', {
 
     // Set the alarm time
     setAlarmTime(hours: number, minutes: number): void {
-      this.alarmTime = [hours, minutes];
+      // Ensure hours are in valid 0-23 range
+      this.alarmTime = [hours % 24, minutes];
     },
 
     // Save list position for a specific route

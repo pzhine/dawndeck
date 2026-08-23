@@ -7,6 +7,34 @@ import { useAppStore } from './stores/appState';
 
 import './style.css';
 
+// Override console methods to send logs to main process
+const originalConsole = {
+  log: console.log,
+  info: console.info,
+  warn: console.warn,
+  error: console.error,
+};
+
+console.log = (...args) => {
+  originalConsole.log(...args);
+  window.ipcRenderer?.send('renderer-log', 'log', ...args);
+};
+
+console.info = (...args) => {
+  originalConsole.info(...args);
+  window.ipcRenderer?.send('renderer-log', 'info', ...args);
+};
+
+console.warn = (...args) => {
+  originalConsole.warn(...args);
+  window.ipcRenderer?.send('renderer-log', 'warn', ...args);
+};
+
+console.error = (...args) => {
+  originalConsole.error(...args);
+  window.ipcRenderer?.send('renderer-log', 'error', ...args);
+};
+
 // Create the Pinia store instance
 const pinia = createPinia();
 
@@ -95,6 +123,24 @@ const router = createRouter({
 const app = createApp(App);
 app.use(router);
 app.use(pinia); // Add Pinia to the Vue application
+
+// Set up global error handlers to log to main process
+app.config.errorHandler = (err, instance, info) => {
+  console.error('[Vue Error]', err);
+  window.ipcRenderer?.send('renderer-log', 'error', `[Vue Error] ${info}:`, err);
+};
+
+// Catch uncaught errors
+window.addEventListener('error', (event) => {
+  console.error('[Uncaught Error]', event.error);
+  window.ipcRenderer?.send('renderer-log', 'error', '[Uncaught Error]', event.error?.message || event.message, event.error?.stack);
+});
+
+// Catch unhandled promise rejections
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('[Unhandled Rejection]', event.reason);
+  window.ipcRenderer?.send('renderer-log', 'error', '[Unhandled Rejection]', event.reason);
+});
 
 // Initialize the app state from saved data
 const initializeAppState = async () => {

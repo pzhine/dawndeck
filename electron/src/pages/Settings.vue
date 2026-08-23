@@ -52,11 +52,12 @@ const sleepTimeoutProgressFunction = (value: number): number => {
 
 // Format screen sleep timeout for display
 const formatSleepTimeout = (seconds: number): string => {
-  if (seconds < 60) {
-    return `${seconds}s`;
+  const validSeconds = seconds || 30; // Fallback to 30 if undefined/null/0
+  if (validSeconds < 60) {
+    return `${validSeconds}s`;
   }
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
+  const minutes = Math.floor(validSeconds / 60);
+  const remainingSeconds = validSeconds % 60;
   if (remainingSeconds === 0) {
     return `${minutes}m`;
   }

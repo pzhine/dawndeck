@@ -231,7 +231,7 @@ const updateFormattedTime = () => {
           amPmPart.value = ` ${period}`;
           isAm.value = period === 'AM';
       } else {
-          const hoursStr = h.toString().padStart(2, '0');
+          const hoursStr = (h % 24).toString().padStart(2, '0');
           formattedTime.value = `${hoursStr}:${minutesStr}`;
           hoursPart.value = hoursStr;
           minutesPart.value = minutesStr;

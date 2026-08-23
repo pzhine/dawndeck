@@ -117,7 +117,7 @@ function checkScreenSleep() {
   if (isScreenAsleep.value) return; // Don't check if already asleep
   if (!appStore.screenSleepEnabled) return; // Don't sleep if disabled
   
-  const timeoutMs = appStore.screenSleepTimeout * 1000;
+  const timeoutMs = (appStore.screenSleepTimeout || 30) * 1000;
   const timeSinceActivity = Date.now() - lastActivityTime;
   
   if (timeSinceActivity >= timeoutMs) {
