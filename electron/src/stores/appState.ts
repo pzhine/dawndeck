@@ -300,7 +300,9 @@ export const useAppStore = defineStore('appState', {
         // Defensive fix: Ensure screenBrightness is never 0 or too low
         // This can happen if the old code saved brightness during sleep
         if (this.screenBrightness < 5) {
-          console.warn(`Screen brightness was ${this.screenBrightness}, clamping to 80`);
+          console.warn(
+            `Screen brightness was ${this.screenBrightness}, clamping to 80`
+          );
           this.screenBrightness = 80;
           this.saveState(); // Save the corrected value
         }
@@ -417,7 +419,7 @@ export const useAppStore = defineStore('appState', {
 
     // Set the screen brightness
     setScreenBrightness(level: number): void {
-      this.screenBrightness = Math.max(5, Math.min(100, level)); // Clamp between 5-100 (never allow 0)
+      this.screenBrightness = Math.max(20, Math.min(100, level)); // Clamp between 20-100 (never allow 0)
       this.saveState();
 
       // Apply brightness to hardware on Linux only (throttled)
