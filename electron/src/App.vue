@@ -80,12 +80,6 @@ const brightnessFilter = computed(() => {
 function resetActivityTimer() {
   lastActivityTime = Date.now();
   
-  // Cancel and restart the sleep check interval
-  if (sleepCheckInterval) {
-    clearInterval(sleepCheckInterval);
-  }
-  sleepCheckInterval = setInterval(checkScreenSleep, 1000);
-  
   // If screen is asleep, wake it up
   if (isScreenAsleep.value) {
     wakeScreen();
@@ -202,6 +196,9 @@ onMounted(() => {
   // Add global event listeners for user activity
   document.addEventListener('click', handleUserActivity, true);
   document.addEventListener('touchstart', handleUserActivity, true);
+  document.addEventListener('touchmove', handleUserActivity, true);
+  document.addEventListener('touchend', handleUserActivity, true);
+  document.addEventListener('touchcancel', handleUserActivity, true);
   document.addEventListener('wheel', handleUserActivity, true);
   
   // Set up global auto-advance callback for playlist
