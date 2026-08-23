@@ -244,13 +244,20 @@ const updateFormattedTime = () => {
   const timeZone = appStore.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   
   // Create formatter for getting timezone-aware time
-  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+  const formatterOptions: Intl.DateTimeFormatOptions = {
     timeZone,
     hour: 'numeric',
     minute: '2-digit',
-    hour12: appStore.timeFormat === '12h',
-    hourCycle: 'h23'
-  });
+  };
+  
+  // Set hour format based on timeFormat preference
+  if (appStore.timeFormat === '12h') {
+    formatterOptions.hour12 = true;
+  } else {
+    formatterOptions.hourCycle = 'h23'; // 0-23 hours for 24h format
+  }
+  
+  const timeFormatter = new Intl.DateTimeFormat('en-US', formatterOptions);
   
   const parts = timeFormatter.formatToParts(time.value);
   const hourPart = parts.find(p => p.type === 'hour');
