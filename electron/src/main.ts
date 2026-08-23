@@ -39,7 +39,11 @@ console.error = (...args) => {
 const pinia = createPinia();
 
 const routes = [
-  { path: '/', name: 'Clock', component: () => import('./pages/ClockPage.vue') },
+  {
+    path: '/',
+    name: 'Clock',
+    component: () => import('./pages/ClockPage.vue'),
+  },
   { path: '/wifi', component: () => import('./pages/Wifi.vue'), name: 'Wifi' },
   {
     path: '/wifi-password/:networkName',
@@ -51,7 +55,11 @@ const routes = [
     name: 'WifiConnect',
     component: () => import('./pages/WifiConnect.vue'),
   },
-  { path: '/settings', name: 'Settings', component: () => import('./pages/Settings.vue') },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: () => import('./pages/Settings.vue'),
+  },
   {
     path: '/timezone-settings',
     name: 'TimezoneSettings',
@@ -62,7 +70,11 @@ const routes = [
     name: 'ColorSettings',
     component: () => import('./pages/ColorSettings.vue'),
   },
-  { path: '/sounds', name: 'SoundCategories', component: () => import('./pages/SoundCategories.vue') },
+  {
+    path: '/sounds',
+    name: 'SoundCategories',
+    component: () => import('./pages/SoundCategories.vue'),
+  },
   {
     path: '/media-player/:soundId?',
     name: 'MediaPlayer',
@@ -127,19 +139,35 @@ app.use(pinia); // Add Pinia to the Vue application
 // Set up global error handlers to log to main process
 app.config.errorHandler = (err, instance, info) => {
   console.error('[Vue Error]', err);
-  window.ipcRenderer?.send('renderer-log', 'error', `[Vue Error] ${info}:`, err);
+  window.ipcRenderer?.send(
+    'renderer-log',
+    'error',
+    `[Vue Error] ${info}:`,
+    err
+  );
 };
 
 // Catch uncaught errors
 window.addEventListener('error', (event) => {
   console.error('[Uncaught Error]', event.error);
-  window.ipcRenderer?.send('renderer-log', 'error', '[Uncaught Error]', event.error?.message || event.message, event.error?.stack);
+  window.ipcRenderer?.send(
+    'renderer-log',
+    'error',
+    '[Uncaught Error]',
+    event.error?.message || event.message,
+    event.error?.stack
+  );
 });
 
 // Catch unhandled promise rejections
 window.addEventListener('unhandledrejection', (event) => {
   console.error('[Unhandled Rejection]', event.reason);
-  window.ipcRenderer?.send('renderer-log', 'error', '[Unhandled Rejection]', event.reason);
+  window.ipcRenderer?.send(
+    'renderer-log',
+    'error',
+    '[Unhandled Rejection]',
+    event.reason
+  );
 });
 
 // Initialize the app state from saved data
