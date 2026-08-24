@@ -56,13 +56,16 @@ export function getState(): AppState | null {
 export function saveState(state: AppState): Promise<boolean> {
   return new Promise((resolve) => {
     try {
+      console.log('[stateManager] saveState called, favorites count:', state.ambienceFavorites?.length);
       // Remove the config before saving to disk - we don't want to persist it
       // as it's managed separately by configManager
       const stateToPersist = { ...state };
       delete stateToPersist.config;
 
       const stateJson = JSON.stringify(stateToPersist, null, 2);
+      console.log('[stateManager] Writing state to file:', STATE_FILE_PATH);
       fs.writeFileSync(STATE_FILE_PATH, stateJson);
+      console.log('[stateManager] State saved successfully');
 
       // Keep config in memory cache, but don't persist it to disk
       stateCache = { ...stateToPersist, config: state.config };
@@ -91,7 +94,10 @@ export function updateState<K extends keyof AppState>(
 
 // Handler for saving app state to file
 ipcMain.handle('save-app-state', async (_, state: AppState) => {
-  return saveState(state);
+  console.log('[stateManager] IPC save-app-state received, favorites count:', state.ambienceFavorites?.length);
+  const result = await saveState(state);
+  console.log('[stateManager] IPC save-app-state result:', result);
+  return result;
 });
 
 // Handler for loading app state from file

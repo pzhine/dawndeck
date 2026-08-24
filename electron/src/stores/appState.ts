@@ -278,10 +278,17 @@ export const useAppStore = defineStore('appState', {
     // Save state to Electron via IPC
     saveState: debounce(function (this: any) {
       // Send the entire state to the main process
+      console.log('[appState] saveState called (debounced)');
+      const stateToSave = JSON.parse(JSON.stringify(this.$state));
+      console.log('[appState] Favorites count in state:', stateToSave.ambienceFavorites?.length);
       window.ipcRenderer.invoke(
         'save-app-state',
-        JSON.parse(JSON.stringify(this.$state))
-      );
+        stateToSave
+      ).then((result) => {
+        console.log('[appState] save-app-state IPC result:', result);
+      }).catch((err) => {
+        console.error('[appState] save-app-state IPC error:', err);
+      });
     }, 100),
 
     // Load state from Electron main process
@@ -782,6 +789,7 @@ export const useAppStore = defineStore('appState', {
 
     // Add current ambience (lamp + projector) to favorites
     addAmbienceToFavorites(): void {
+      console.log('[appState] addAmbienceToFavorites called');
       // Define circle colors for lamp and projector
       const lampCircleColors: [string, string, string] = [
         '#ffb86d',
@@ -810,9 +818,11 @@ export const useAppStore = defineStore('appState', {
 
       // Pass both colors separately to generate a combined name (e.g. "Strawberry-Teal")
       const name = generateColorFavoriteName(projectorRgb, lampRgb);
+      console.log('[appState] Generated name:', name);
 
       // Convert name to kebab-case for slug-friendly ID
       const slug = generateColorSlug(name);
+      console.log('[appState] Generated slug:', slug);
 
       const favorite: ColorFavorite = {
         id: slug,
@@ -837,7 +847,11 @@ export const useAppStore = defineStore('appState', {
         },
         timestamp: Date.now(),
       };
+      console.log('[appState] Created favorite:', JSON.stringify(favorite));
+      console.log('[appState] Current favorites count:', this.ambienceFavorites.length);
       this.ambienceFavorites.push(favorite);
+      console.log('[appState] New favorites count:', this.ambienceFavorites.length);
+      console.log('[appState] Calling saveState');
       this.saveState();
     },
 
