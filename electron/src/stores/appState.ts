@@ -280,15 +280,18 @@ export const useAppStore = defineStore('appState', {
       // Send the entire state to the main process
       console.log('[appState] saveState called (debounced)');
       const stateToSave = JSON.parse(JSON.stringify(this.$state));
-      console.log('[appState] Favorites count in state:', stateToSave.ambienceFavorites?.length);
-      window.ipcRenderer.invoke(
-        'save-app-state',
-        stateToSave
-      ).then((result) => {
-        console.log('[appState] save-app-state IPC result:', result);
-      }).catch((err) => {
-        console.error('[appState] save-app-state IPC error:', err);
-      });
+      console.log(
+        '[appState] Favorites count in state:',
+        stateToSave.ambienceFavorites?.length
+      );
+      window.ipcRenderer
+        .invoke('save-app-state', stateToSave)
+        .then((result) => {
+          console.log('[appState] save-app-state IPC result:', result);
+        })
+        .catch((err) => {
+          console.error('[appState] save-app-state IPC error:', err);
+        });
     }, 100),
 
     // Load state from Electron main process
@@ -790,17 +793,17 @@ export const useAppStore = defineStore('appState', {
     // Add current ambience (lamp + projector) to favorites
     addAmbienceToFavorites(): void {
       console.log('[appState] addAmbienceToFavorites called');
-      // Define circle colors for lamp and projector
-      const lampCircleColors: [string, string, string] = [
-        '#ffb86d',
-        '#FF2A70',
-        '#ff4b09',
-      ];
-      const projectorCircleColors: [string, string, string] = [
-        '#9d09ff',
-        '#ff8409',
-        '#0058f0',
-      ];
+      // Get circle colors from config (same as AmbienceControl.vue)
+      const lampCircleColors: [string, string, string] = this.config
+        ?.colorMapping?.lamp?.colors || ['#ffb86d', '#FF2A70', '#ff4b09'];
+      const projectorCircleColors: [string, string, string] = this.config
+        ?.colorMapping?.projector?.colors || ['#9d09ff', '#ff8409', '#0058f0'];
+
+      console.log('[appState] Using lamp circle colors:', lampCircleColors);
+      console.log(
+        '[appState] Using projector circle colors:',
+        projectorCircleColors
+      );
 
       // Mix lamp LED values with lamp circle colors
       const lampRgb = mixColorsRgb(lampCircleColors, [
@@ -815,6 +818,9 @@ export const useAppStore = defineStore('appState', {
         this.projectorColors.color1,
         this.projectorColors.color2,
       ]);
+
+      console.log('[appState] Lamp RGB:', lampRgb);
+      console.log('[appState] Projector RGB:', projectorRgb);
 
       // Pass both colors separately to generate a combined name (e.g. "Strawberry-Teal")
       const name = generateColorFavoriteName(projectorRgb, lampRgb);
@@ -848,9 +854,15 @@ export const useAppStore = defineStore('appState', {
         timestamp: Date.now(),
       };
       console.log('[appState] Created favorite:', JSON.stringify(favorite));
-      console.log('[appState] Current favorites count:', this.ambienceFavorites.length);
+      console.log(
+        '[appState] Current favorites count:',
+        this.ambienceFavorites.length
+      );
       this.ambienceFavorites.push(favorite);
-      console.log('[appState] New favorites count:', this.ambienceFavorites.length);
+      console.log(
+        '[appState] New favorites count:',
+        this.ambienceFavorites.length
+      );
       console.log('[appState] Calling saveState');
       this.saveState();
     },

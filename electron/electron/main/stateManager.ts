@@ -56,7 +56,10 @@ export function getState(): AppState | null {
 export function saveState(state: AppState): Promise<boolean> {
   return new Promise((resolve) => {
     try {
-      console.log('[stateManager] saveState called, favorites count:', state.ambienceFavorites?.length);
+      console.log(
+        '[stateManager] saveState called, favorites count:',
+        state.ambienceFavorites?.length
+      );
       // Remove the config before saving to disk - we don't want to persist it
       // as it's managed separately by configManager
       const stateToPersist = { ...state };
@@ -94,7 +97,10 @@ export function updateState<K extends keyof AppState>(
 
 // Handler for saving app state to file
 ipcMain.handle('save-app-state', async (_, state: AppState) => {
-  console.log('[stateManager] IPC save-app-state received, favorites count:', state.ambienceFavorites?.length);
+  console.log(
+    '[stateManager] IPC save-app-state received, favorites count:',
+    state.ambienceFavorites?.length
+  );
   const result = await saveState(state);
   console.log('[stateManager] IPC save-app-state result:', result);
   return result;
@@ -162,22 +168,23 @@ export function sendLEDToSerial(
 // Handler for setting lamp colors (3 separate LEDs/pixels)
 ipcMain.handle(
   'set-lamp-colors',
-  async (
-    _,
-    colors: { warmWhite: number; pink: number; orange: number }
-  ) => {
+  async (_, colors: { warmWhite: number; pink: number; orange: number }) => {
     // Ensure values are within valid range (0-255)
     const warmWhite = Math.max(0, Math.min(255, colors.warmWhite));
     const pink = Math.max(0, Math.min(255, colors.pink));
     const orange = Math.max(0, Math.min(255, colors.orange));
 
-    console.log('[stateManager] Setting lamp colors:', { warmWhite, pink, orange });
+    console.log('[stateManager] Setting lamp colors:', {
+      warmWhite,
+      pink,
+      orange,
+    });
 
     // Send each color to its corresponding pixel
     // Pixel 0: Orange LED
     // Pixel 1: Warm White LED
     // Pixel 2: Pink LED
-    
+
     sendLEDToSerial(STRIP_LAMP, 0, orange, warmWhite, pink, 100);
 
     return true;
@@ -187,25 +194,25 @@ ipcMain.handle(
 // Handler for setting projector colors (3 separate LEDs/pixels)
 ipcMain.handle(
   'set-projector-colors',
-  async (
-    _,
-    colors: { color0: number; color1: number; color2: number }
-  ) => {
+  async (_, colors: { color0: number; color1: number; color2: number }) => {
     // Ensure values are within valid range (0-255)
     const color0 = Math.max(0, Math.min(255, colors.color0));
     const color1 = Math.max(0, Math.min(255, colors.color1));
     const color2 = Math.max(0, Math.min(255, colors.color2));
 
-    console.log('[stateManager] Setting projector colors:', { color0, color1, color2 });
+    console.log('[stateManager] Setting projector colors:', {
+      color0,
+      color1,
+      color2,
+    });
 
     // Send to strip 1 (projector)
     // Pixel 0: color2
     // Pixel 1: color0
     // Pixel 2: color1
-    
+
     sendLEDToSerial(STRIP_PROJECTOR, 0, color2, color0, color1, 100);
 
     return true;
   }
 );
-
