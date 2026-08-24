@@ -795,14 +795,22 @@ export const useAppStore = defineStore('appState', {
       console.log('[appState] addAmbienceToFavorites called');
       // Get circle colors from config (same as AmbienceControl.vue)
       const lampCircleColors: [string, string, string] = (this.config
-        ?.colorMapping?.lamp?.colors as [string, string, string]) || ['#ffb86d', '#FF2A70', '#ff4b09'];
+        ?.colorMapping?.lamp?.colors as [string, string, string]) || [
+        '#ffb86d',
+        '#FF2A70',
+        '#ff4b09',
+      ];
       const projectorCircleColors: [string, string, string] = (this.config
-        ?.colorMapping?.projector?.colors as [string, string, string]) || ['#9d09ff', '#ff8409', '#0058f0'];
+        ?.colorMapping?.projector?.colors as [string, string, string]) || [
+        '#9d09ff',
+        '#ff8409',
+        '#0058f0',
+      ];
 
-      console.log('[appState] Using lamp circle colors:', lampCircleColors);
+      console.log('[appState] Using lamp circle colors:', [...lampCircleColors]);
       console.log(
         '[appState] Using projector circle colors:',
-        projectorCircleColors
+        [...projectorCircleColors]
       );
 
       // Mix lamp LED values with lamp circle colors
@@ -819,7 +827,8 @@ export const useAppStore = defineStore('appState', {
         this.projectorColors.color2,
       ]);
 
-      console.log('[appState] Lamp RGB:', lampRgb);
+      console.log('[appState] Lamp RGB:', [...lampRgb]);
+      console.log('[appState] Projector RGB:', [...projectorRgb]);
       console.log('[appState] Projector RGB:', projectorRgb);
 
       // Pass both colors separately to generate a combined name (e.g. "Strawberry-Teal")
