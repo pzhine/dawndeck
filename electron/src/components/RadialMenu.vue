@@ -706,6 +706,7 @@ const onWindowResize = () => {
 };
 
 let inputTimer: any = null;
+let actionTriggered = false;
 
 const getIntersectedSegment = (clientX: number, clientY: number): THREE.Mesh | null => {
   if (!canvasContainer.value) return null;
@@ -740,6 +741,11 @@ const handleInputStart = (clientX: number, clientY: number) => {
     inputTimer = null;
   }
 
+  // Don't process if action already triggered in this interaction
+  if (actionTriggered) {
+    return;
+  }
+
   const segment = getIntersectedSegment(clientX, clientY);
   
   console.log('[RadialMenu] handleInputStart - segment found:', segment ? 'yes' : 'no');
@@ -770,8 +776,12 @@ const handleInputStart = (clientX: number, clientY: number) => {
       if (item.action) {
         console.log('[RadialMenu] Calling action function');
         item.action();
+        actionTriggered = true; // Mark action as triggered
       }
-      if (item.route) router.push(item.route);
+      if (item.route) {
+        router.push(item.route);
+        actionTriggered = true; // Mark action as triggered
+      }
       // Don't hide menu for instant actions (like volume) unless it's a route change
       if (item.route) hideMenu();
     } else {
@@ -806,6 +816,9 @@ const handleInputEnd = () => {
       item.quickAction();
     }
   }
+  
+  // Reset action triggered flag
+  actionTriggered = false;
   
   highlightSegment(null);
 };
