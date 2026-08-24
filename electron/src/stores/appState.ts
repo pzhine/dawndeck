@@ -807,11 +807,12 @@ export const useAppStore = defineStore('appState', {
         '#0058f0',
       ];
 
-      console.log('[appState] Using lamp circle colors:', [...lampCircleColors]);
-      console.log(
-        '[appState] Using projector circle colors:',
-        [...projectorCircleColors]
-      );
+      console.log('[appState] Using lamp circle colors:', [
+        ...lampCircleColors,
+      ]);
+      console.log('[appState] Using projector circle colors:', [
+        ...projectorCircleColors,
+      ]);
 
       // Mix lamp LED values with lamp circle colors
       const lampRgb = mixColorsRgb(lampCircleColors, [
