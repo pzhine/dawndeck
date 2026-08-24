@@ -277,9 +277,15 @@ async function handleProjectorBrightnessUpdate(value: number) {
  * Add current lamp and projector colors to favorites
  */
 function toggleFavorite() {
+  console.log('[AmbienceControl] toggleFavorite called', { 
+    isFavorite: currentIsFavorite.value,
+    editingFavoriteId: editingFavoriteId.value,
+    currentColorSlug: currentColorSlug.value
+  });
   if (currentIsFavorite.value) {
     // Use the editing favorite ID if available, otherwise use the computed slug
     const idToRemove = editingFavoriteId.value || currentColorSlug.value;
+    console.log('[AmbienceControl] Removing favorite:', idToRemove);
     appStore.removeAmbienceFromFavorites(idToRemove);
     // Clear the route param after removing
     if (editingFavoriteId.value) {
@@ -287,6 +293,7 @@ function toggleFavorite() {
     }
     return;
   }
+  console.log('[AmbienceControl] Adding to favorites');
   appStore.addAmbienceToFavorites();
 }
 

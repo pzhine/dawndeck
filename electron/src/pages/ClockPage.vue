@@ -53,8 +53,22 @@ const upperMenuItems = computed<MenuItem[]>(() => [
     route: '/ambience-control',
     hold: true,
     active: appStore.lampActive || appStore.projectorActive,
+    action: async () => {
+      // Long press: Turn on both lights if either is off
+      const shouldTurnOn = !appStore.lampActive || !appStore.projectorActive;
+      
+      if (shouldTurnOn) {
+        // Turn on both if they're not already on
+        if (!appStore.lampActive) await appStore.toggleLampActive();
+        if (!appStore.projectorActive) await appStore.toggleProjectorActive();
+      } else {
+        // Both are on, so turn both off
+        await appStore.toggleLampActive();
+        await appStore.toggleProjectorActive();
+      }
+    },
     quickAction: async () => {
-      // If either is off, turn both on. If both are on, turn both off.
+      // Short tap: Toggle both lights
       const shouldTurnOn = !appStore.lampActive || !appStore.projectorActive;
       
       if (shouldTurnOn) {

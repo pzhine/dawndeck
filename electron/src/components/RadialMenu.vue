@@ -351,6 +351,7 @@ onMounted(async () => {
   }
 
   if (props.pinned) {
+    console.log('[RadialMenu] Menu is pinned, setting isActive to true');
     isActive.value = true;
     startAnimation();
   }
@@ -741,11 +742,16 @@ const handleInputStart = (clientX: number, clientY: number) => {
 
   const segment = getIntersectedSegment(clientX, clientY);
   
+  console.log('[RadialMenu] handleInputStart - segment found:', segment ? 'yes' : 'no');
+  
   if (segment) {
     const item = segment.userData.item as MenuItem;
     
+    console.log('[RadialMenu] Item:', item.label, 'hold:', item.hold, 'hasAction:', !!item.action);
+    
     // Skip interaction if it's a spacer
     if ((item as any).isSpacer) {
+      console.log('[RadialMenu] Item is a spacer, skipping');
       return;
     }
     
@@ -760,7 +766,11 @@ const handleInputStart = (clientX: number, clientY: number) => {
       }, 100);
     } else if (!item.hold) {
       // Trigger immediately
-      if (item.action) item.action();
+      console.log('[RadialMenu] Triggering action for item:', item.label);
+      if (item.action) {
+        console.log('[RadialMenu] Calling action function');
+        item.action();
+      }
       if (item.route) router.push(item.route);
       // Don't hide menu for instant actions (like volume) unless it's a route change
       if (item.route) hideMenu();
@@ -815,18 +825,23 @@ const handleInputMove = (clientX: number, clientY: number) => {
 };
 
 const onTouchStart = (event: TouchEvent) => {
+  console.log('[RadialMenu] onTouchStart - touches:', event.touches.length, 'isActive:', isActive.value);
   if (event.touches.length > 0) {
     const touch = event.touches[0];
     const segment = getIntersectedSegment(touch.clientX, touch.clientY);
     
+    console.log('[RadialMenu] onTouchStart - segment found:', segment ? 'yes' : 'no');
+    
     if (segment) {
       // Ignore input if menu wasn't active (this is the opening tap)
       if (!isActive.value) {
+        console.log('[RadialMenu] Menu not active, ignoring touch');
         return;
       }
       isInteracting = true;
       event.preventDefault();
       event.stopPropagation();
+      console.log('[RadialMenu] Calling handleInputStart from touch');
       handleInputStart(touch.clientX, touch.clientY);
     } else {
       isInteracting = false;
