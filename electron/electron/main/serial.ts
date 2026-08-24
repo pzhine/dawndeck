@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import { SerialPort, ReadlineParser } from 'serialport';
 import { getConfig } from './configManager';
+import { updateState } from './stateManager';
 
 const MAX_RETRIES = 4;
 const MESSAGE_INTERVAL = 300;
@@ -95,9 +96,15 @@ export function startSerialComms() {
       // Wait a moment for Arduino to be ready to receive
       setTimeout(() => {
         console.log(
-          '[serial] Sending initial command to exit Arduino startup mode'
+          '[serial] Sending initial commands to exit Arduino startup mode and turn off all lights'
         );
+        // Turn off lamp (strip 0) and projector (strip 1)
         sendMessage('LERP_LED 0 0 0 0 0 0');
+        sendMessage('LERP_LED 1 0 0 0 0 0');
+
+        // Update app state to reflect that lights are off
+        updateState('lampActive', false);
+        updateState('projectorActive', false);
       }, 1000);
     });
 
