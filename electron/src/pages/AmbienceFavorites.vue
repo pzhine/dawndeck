@@ -22,8 +22,13 @@ const router = useRouter();
 
 const upperMenuItems = computed<MenuItem[]>(() => []);
 
-const lampCircleColors: [string, string, string] = ['#ffb86d', '#FF2A70', '#ff4b09'];
-const projectorCircleColors: [string, string, string] = ['#9d09ff', '#ff8409', '#0058f0'];
+// Get circle colors from config (same as AmbienceControl.vue and appState.ts)
+const lampCircleColors = computed<[string, string, string]>(() => 
+  (appStore.config?.colorMapping?.lamp?.colors as [string, string, string]) || ['#ffb86d', '#FF2A70', '#ff4b09']
+);
+const projectorCircleColors = computed<[string, string, string]>(() => 
+  (appStore.config?.colorMapping?.projector?.colors as [string, string, string]) || ['#9d09ff', '#ff8409', '#0058f0']
+);
 
 /**
  * Convert hex color to RGB
@@ -74,8 +79,8 @@ function getFavoriteColor(ledValues: [number, number, number], circleColors: [st
  * Get gradient background for a favorite row
  */
 function getFavoriteGradient(favorite: ColorFavorite): string {
-  const projectorColor = getFavoriteColor(favorite.projector.colors, projectorCircleColors);
-  const lampColor = getFavoriteColor(favorite.lamp.colors, lampCircleColors);
+  const projectorColor = getFavoriteColor(favorite.projector.colors, projectorCircleColors.value);
+  const lampColor = getFavoriteColor(favorite.lamp.colors, lampCircleColors.value);
   
   return `linear-gradient(to right, ${projectorColor}, ${lampColor})`;
 }
