@@ -224,7 +224,11 @@ const projectorBrightnessColor = computed(() => {
 /**
  * Handle lamp color updates
  */
-function handleLampColorsUpdate(colors: [number, number, number], position: { x: number; y: number }) {
+async function handleLampColorsUpdate(colors: [number, number, number], position: { x: number; y: number }) {
+  // Turn on lamp if it's off
+  if (!lampActive.value) {
+    await appStore.toggleLampActive();
+  }
   appStore.setLampColors({
     warmWhite: colors[0],
     pink: colors[1],
@@ -235,14 +239,22 @@ function handleLampColorsUpdate(colors: [number, number, number], position: { x:
 /**
  * Handle lamp brightness updates
  */
-function handleLampBrightnessUpdate(value: number) {
+async function handleLampBrightnessUpdate(value: number) {
+  // Turn on lamp if it's off
+  if (!lampActive.value) {
+    await appStore.toggleLampActive();
+  }
   appStore.setLampBrightness(value);
 }
 
 /**
  * Handle projector color updates
  */
-function handleProjectorColorsUpdate(colors: [number, number, number], position: { x: number; y: number }) {
+async function handleProjectorColorsUpdate(colors: [number, number, number], position: { x: number; y: number }) {
+  // Turn on projector if it's off
+  if (!projectorActive.value) {
+    await appStore.toggleProjectorActive();
+  }
   appStore.setProjectorColors({
     color0: colors[0],
     color1: colors[1],
@@ -253,7 +265,11 @@ function handleProjectorColorsUpdate(colors: [number, number, number], position:
 /**
  * Handle projector brightness updates
  */
-function handleProjectorBrightnessUpdate(value: number) {
+async function handleProjectorBrightnessUpdate(value: number) {
+  // Turn on projector if it's off
+  if (!projectorActive.value) {
+    await appStore.toggleProjectorActive();
+  }
   appStore.setProjectorBrightness(value);
 }
 

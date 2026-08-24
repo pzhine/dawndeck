@@ -54,9 +54,18 @@ const upperMenuItems = computed<MenuItem[]>(() => [
     hold: true,
     active: appStore.lampActive || appStore.projectorActive,
     quickAction: async () => {
-      // Toggle both lamp and projector
-      await appStore.toggleLampActive();
-      await appStore.toggleProjectorActive();
+      // If either is off, turn both on. If both are on, turn both off.
+      const shouldTurnOn = !appStore.lampActive || !appStore.projectorActive;
+      
+      if (shouldTurnOn) {
+        // Turn on both if they're not already on
+        if (!appStore.lampActive) await appStore.toggleLampActive();
+        if (!appStore.projectorActive) await appStore.toggleProjectorActive();
+      } else {
+        // Both are on, so turn both off
+        await appStore.toggleLampActive();
+        await appStore.toggleProjectorActive();
+      }
     }
   },
   { 

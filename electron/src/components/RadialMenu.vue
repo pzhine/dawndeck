@@ -351,6 +351,7 @@ onMounted(async () => {
   }
 
   if (props.pinned) {
+    isActive.value = true;
     startAnimation();
   }
 });
